@@ -1,0 +1,1 @@
+// Move this file's contents to dashboard-stats/route.ts for proper API routing in Next.js app directory structure. 

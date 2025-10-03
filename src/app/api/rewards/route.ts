@@ -1,0 +1,166 @@
+import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/api/auth/auth.config';
+import { prisma } from '@/lib/prisma';
+
+// Import or redefine the Reward interface and rewardsDatabase
+interface Reward {
+  id: string;
+  name: string;
+  description: string;
+  points: number;
+  createdAt: string;
+}
+
+// Use a global variable to persist rewards across requests (for dev only)
+let globalAny = global as any;
+if (!globalAny.rewardsDatabase) {
+  globalAny.rewardsDatabase = {
+    '1': {
+      id: '1',
+      name: 'Free Coffee',
+      description: 'Get a free coffee with 100 points',
+      points: 100,
+      createdAt: new Date().toISOString(),
+    },
+    '2': {
+      id: '2',
+      name: 'Discounted Lunch',
+      description: '50% off your next lunch',
+      points: 200,
+      createdAt: new Date().toISOString(),
+    },
+  };
+}
+const rewardsDatabase: { [key: string]: Reward } = globalAny.rewardsDatabase;
+
+export async function GET() {
+  try {
+    console.log('Rewards API: Starting GET request');
+    
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    console.log('Rewards API: Fetching rewards from database');
+    
+    // Build tenant filter based on user role
+    let whereClause = {};
+    
+    if (session.user.role === 'PARTNER' && session.user.tenantId) {
+      // Partners only see their own rewards
+      whereClause = { tenantId: session.user.tenantId };
+      console.log('Rewards API: Filtering for partner tenant:', session.user.tenantId);
+    } else if (session.user.role === 'ADMIN' || session.user.role === 'SUPER_ADMIN') {
+      // Admins see all rewards
+      console.log('Rewards API: Admin user - showing all rewards');
+    } else {
+      // Customers see all rewards from all tenants (no tenant filtering)
+      console.log('Rewards API: Customer user - showing all rewards from all tenants');
+    }
+    
+    // Fetch rewards from database with tenant filtering and include tenant info
+    const rewards = await prisma.reward.findMany({
+      where: whereClause,
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+    
+    console.log('Rewards API: Successfully fetched rewards:', rewards.length);
+    return NextResponse.json(rewards);
+  } catch (error) {
+    console.error('Rewards API: Error in GET:', error);
+    return NextResponse.json({ error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    console.log('Rewards API: Starting POST request');
+    
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Only partners and admins can create rewards
+    if (!['PARTNER', 'ADMIN', 'SUPER_ADMIN'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { name, description, points, tenantId: requestTenantId } = body;
+    
+    if (!name || !description || points === undefined) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+    
+    console.log('Rewards API: Creating reward:', { name, description, points });
+    
+    // Set tenantId based on user role
+    let tenantId = null;
+    if (session.user.role === 'PARTNER') {
+      if (!session.user.tenantId) {
+        return NextResponse.json({ error: 'Partner has no tenant assigned' }, { status: 400 });
+      }
+      tenantId = session.user.tenantId;
+    } else {
+      // For admins, tenantId is optional (can be null for LocalPerks rewards)
+      if (!requestTenantId) {
+        // Find or create the System Default Tenant for LocalPerks rewards
+        let defaultTenant = await prisma.tenant.findFirst({
+          where: { name: 'System Default Tenant' }
+        });
+
+        if (!defaultTenant) {
+          // Create a system user first for the tenant
+          const systemUser = await prisma.user.create({
+            data: {
+              email: 'system@localperks.com',
+              name: 'LocalPerks System',
+              role: 'ADMIN',
+              suspended: false,
+            }
+          });
+
+          defaultTenant = await prisma.tenant.create({
+            data: {
+              name: 'System Default Tenant',
+              partnerUserId: systemUser.id,
+            }
+          });
+        }
+        tenantId = defaultTenant.id;
+      } else {
+        tenantId = requestTenantId;
+      }
+    }
+    
+    const reward = await prisma.reward.create({
+      data: { 
+        name, 
+        description, 
+        points: Number(points),
+        tenantId: tenantId
+      },
+    });
+    
+    console.log('Rewards API: Successfully created reward:', reward.id);
+    return NextResponse.json({ message: 'Reward created successfully', reward });
+  } catch (error) {
+    console.error('Rewards API: Error in POST:', error);
+    return NextResponse.json({ error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
+  }
+} 

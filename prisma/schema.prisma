@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+  provider     = "mysql"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
 }
 
 model Account {
@@ -52,7 +53,7 @@ model User {
   sessions       Session[]
   partnerTenants Tenant[]      @relation("PartnerUser")
   transactions   Transaction[]
-  tenant         Tenant?       @relation(fields: [tenantId], references: [id])
+  tenant         Tenant?       @relation(fields: [tenantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([tenantId])
   @@index([role])
@@ -94,7 +95,7 @@ model Tenant {
   mobile        String?
   customers     Customer[]
   rewards       Reward[]
-  partnerUser   User                @relation("PartnerUser", fields: [partnerUserId], references: [id])
+  partnerUser   User                @relation("PartnerUser", fields: [partnerUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   pointsConfig  TenantPointsConfig?
   transactions  Transaction[]
   users         User[]

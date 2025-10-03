@@ -80,8 +80,8 @@ export const authOptions: NextAuthOptions = {
           console.log('Finding user:', credentials.email);
           // Use raw query to get user with password
           const users = await prisma.$queryRaw<UserWithPassword[]>`
-            SELECT id, email, name, role, "tenantId", password, suspended, "approvalStatus"
-            FROM "User"
+            SELECT id, email, name, role, tenantId, password, suspended, approvalStatus
+            FROM User
             WHERE email = ${credentials.email}
             LIMIT 1
           `;

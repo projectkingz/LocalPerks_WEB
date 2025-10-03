@@ -10,11 +10,16 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
 });
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 const RESET_TOKEN_EXPIRY = 60 * 60; // 1 hour in seconds
 
 export async function sendPasswordResetEmail(email: string) {
+  if (!resend) {
+    console.warn('Resend API key not configured, skipping email send');
+    return false;
+  }
+  
   try {
     // Check if user exists
     const user = await prisma.user.findUnique({

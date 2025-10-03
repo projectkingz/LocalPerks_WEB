@@ -3,7 +3,7 @@ import { Redis } from '@upstash/redis';
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL || '',
   token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
@@ -12,6 +12,11 @@ const redis = new Redis({
 const VERIFICATION_EXPIRY = 24 * 60 * 60; // 24 hours in seconds
 
 export async function sendVerificationEmail(email: string, name: string) {
+  if (!resend) {
+    console.warn('Resend API key not configured, skipping email send');
+    return { success: false, error: 'Email service not configured' };
+  }
+  
   try {
     // Generate a verification token
     const token = crypto.randomBytes(32).toString('hex');

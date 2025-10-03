@@ -8,7 +8,7 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
 });
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 // Only initialize Twilio if credentials are properly set
 let twilio: Twilio | null = null;
@@ -52,6 +52,11 @@ async function storeCode(userId: string, code: string): Promise<void> {
 
 // Send code via email
 async function sendCodeViaEmail(email: string, code: string, name: string): Promise<boolean> {
+  if (!resend) {
+    console.warn('Resend API key not configured, skipping email send');
+    return false;
+  }
+  
   try {
     await resend.emails.send({
       from: 'Rewards App <noreply@rewards.example.com>',

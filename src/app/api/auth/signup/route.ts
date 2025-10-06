@@ -58,6 +58,7 @@ export async function POST(req: Request) {
         data: {
           name: user.name || '',
           email: user.email,
+          mobile: '000-000-0000', // Default mobile for new users
           points: 0,
           tenantId: user.tenantId || tenantId
         }

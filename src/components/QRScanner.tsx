@@ -20,8 +20,9 @@ const InnerScanner = ({ onScanSuccess, onScanError }: QRScannerProps) => {
 
     const initializeScanner = async () => {
       if (!scannerRef.current && isScanning) {
-        const module = await import('html5-qrcode');
-        Html5QrcodeScanner = module.Html5QrcodeScanner;
+        // eslint-disable-next-line @next/next/no-assign-module-variable
+        const qrModule = await import('html5-qrcode');
+        Html5QrcodeScanner = qrModule.Html5QrcodeScanner;
 
         scannerRef.current = new Html5QrcodeScanner(
           'qr-reader',

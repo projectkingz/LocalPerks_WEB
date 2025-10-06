@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import * as jwt from 'jsonwebtoken';
 
 export interface MobileJwtPayload {
   sub: string; // user id
@@ -10,7 +10,8 @@ export interface MobileJwtPayload {
 export function signMobileJwt(payload: MobileJwtPayload, expiresIn: string = '7d') {
   const secret = process.env.NEXTAUTH_SECRET || process.env.JWT_SECRET;
   if (!secret) throw new Error('JWT secret not configured');
-  return jwt.sign(payload, secret, { expiresIn });
+  // @ts-ignore - Temporary fix for JWT type issues
+  return jwt.sign(payload, secret, { expiresIn: expiresIn });
 }
 
 export function verifyMobileJwt(token?: string): MobileJwtPayload | null {

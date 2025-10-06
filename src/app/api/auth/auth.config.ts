@@ -268,6 +268,7 @@ export const authOptions: NextAuthOptions = {
                   data: {
                     email: existingUser.email,
                     name: existingUser.name || '',
+                    mobile: '000-000-0000', // Default mobile for social login users
                     tenantId: defaultTenant.id,
                   }
                 });
@@ -343,6 +344,7 @@ export const authOptions: NextAuthOptions = {
               data: {
                 email: session.user.email!,
                 name: session.user.name || '',
+                mobile: '000-000-0000', // Default mobile for social login users
                 tenantId: defaultTenant.id,
               }
             });

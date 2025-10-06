@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get customer/tenant data based on role
-    let userData = { ...user };
+    let userData: any = { ...user };
     
     if (user.role === 'CUSTOMER') {
       const customer = await prisma.customer.findUnique({

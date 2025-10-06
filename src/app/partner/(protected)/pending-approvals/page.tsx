@@ -353,6 +353,7 @@ export default function PendingApprovalsPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Receipt Image
                     </label>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={selectedTransaction.receiptImage}
                       alt="Receipt"

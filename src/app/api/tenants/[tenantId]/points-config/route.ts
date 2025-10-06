@@ -50,7 +50,7 @@ export async function PUT(
     const configData = await request.json();
 
     // Validate the configuration data
-    if (!configData.pointsPerDollar || !configData.minPurchase) {
+    if (!configData.pointsPerPound || !configData.minPurchase) {
       return NextResponse.json({ error: 'Invalid configuration data' }, { status: 400 });
     }
 

@@ -130,7 +130,7 @@ function getTransactionDescription(transaction: any): string {
   
   if (type === 'EARNED') {
     if (amount > 0) {
-      return `Purchase - $${amount.toFixed(2)}`;
+      return `Purchase - £${amount.toFixed(2)}`;
     } else {
       return 'Points earned';
     }

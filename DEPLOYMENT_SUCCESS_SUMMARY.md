@@ -118,3 +118,6 @@ eas build -p android --profile preview
 - **Mobile App Directory**: `C:\Users\drtha\OneDrive\Desktop\LocalPerks_APP`
 
 **🚀 You're almost ready to launch your rewards platform! 🚀**
+
+
+

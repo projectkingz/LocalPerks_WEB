@@ -45,23 +45,23 @@ export const roundAmount = (amount: number, rule: TenantPointsConfig['roundingRu
 
 // Default configuration with UK-appropriate values
 export const defaultPointsConfig: TenantPointsConfig = {
-  basePointsPerPound: 10,
+  basePointsPerPound: 5,
   tiers: [
     {
       minAmount: 0,
       maxAmount: 30,  // £30
-      pointsPerPound: 10,
+      pointsPerPound: 5,
       description: 'Standard Tier'
     },
     {
       minAmount: 30.01,
       maxAmount: 75,  // £75
-      pointsPerPound: 12,
+      pointsPerPound: 6,
       description: 'Silver Tier'
     },
     {
       minAmount: 75.01,
-      pointsPerPound: 15,
+      pointsPerPound: 8,
       description: 'Gold Tier'
     }
   ],

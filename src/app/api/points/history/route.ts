@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/auth.config';
 import { prisma } from '@/lib/prisma';
 import { pointsUtil } from '@/lib/pointsUtil';
+import { calculatePointsForTransaction } from '@/lib/pointsCalculation';
 
 export async function GET() {
   const session = await getServerSession(authOptions);

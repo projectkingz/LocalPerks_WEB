@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
@@ -22,6 +22,26 @@ export default function TenantScanPage() {
   const [error, setError] = useState('');
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [success, setSuccess] = useState('');
+  const [pointsPerPound, setPointsPerPound] = useState(5); // Default to 5 points per £1
+
+  // Fetch points configuration on mount
+  useEffect(() => {
+    async function fetchPointsConfig() {
+      try {
+        const response = await fetch('/api/points/config');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.config) {
+            setPointsPerPound(data.config.basePointsPerPound);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch points config:', err);
+        // Keep default of 5
+      }
+    }
+    fetchPointsConfig();
+  }, []);
 
   const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCode(e.target.value.toUpperCase());
@@ -97,13 +117,15 @@ export default function TenantScanPage() {
 
     try {
       if (scanResult.type === 'customer') {
-        // Process points earning
+        // Process points earning - calculate using tenant-specific rate
+        const calculatedPoints = Math.floor(parseFloat(amount) * pointsPerPound);
         const response = await fetch('/api/points/history', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             customerId: scanResult.customerId,
-            points: Math.floor(parseFloat(amount)),
+            points: calculatedPoints,
+            amount: parseFloat(amount),
             description: `Purchase at ${session?.user?.name}`,
             type: 'EARNED'
           })

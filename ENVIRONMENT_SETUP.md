@@ -47,3 +47,4 @@ TWILIO_PHONE_NUMBER=+1234567890
 
 ## ⚠️ **CURRENT ISSUE:**
 Your app is failing because these environment variables are missing!
+

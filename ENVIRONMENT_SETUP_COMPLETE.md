@@ -165,3 +165,6 @@ npx expo start
 4. **Test mobile app** (5 minutes)
 
 **🎉 You now have both development and production environments! 🎉**
+
+
+

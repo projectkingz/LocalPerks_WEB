@@ -59,3 +59,4 @@ else
     echo ""
     echo "🔧 Complete the checklist above and run this script again"
 fi
+

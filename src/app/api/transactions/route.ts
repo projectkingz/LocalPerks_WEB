@@ -3,12 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/auth.config';
 import { prisma } from '@/lib/prisma';
 import { verifyMobileJwt } from '@/lib/auth/mobile';
-
-// Points calculation function (can be adjusted based on business rules)
-function calculatePoints(amount: number, pointsPerPound: number = 10): number {
-  // Example: points per pound spent, rounded down
-  return Math.floor(amount * pointsPerPound);
-}
+import { calculatePointsForTransaction, calculatePoints } from '@/lib/pointsCalculation';
 
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
@@ -197,8 +192,8 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
       }
 
-      // Use provided points or calculate them
-      const calculatedPoints = points || calculatePoints(amount);
+      // Use provided points or calculate them using tenant-specific config
+      const calculatedPoints = points || await calculatePointsForTransaction(amount, userTenantId);
 
       // Get or create user record for the customer
       let user = await prisma.user.findUnique({
@@ -291,8 +286,8 @@ export async function POST(request: Request) {
       });
     }
 
-    // Calculate points based on amount
-    const points = calculatePoints(amount);
+    // Calculate points based on amount using tenant-specific config
+    const points = await calculatePointsForTransaction(amount, tenantId);
 
     // Create transaction
     const transaction = await prisma.transaction.create({

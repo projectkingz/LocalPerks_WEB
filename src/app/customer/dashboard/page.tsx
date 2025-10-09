@@ -259,7 +259,7 @@ export default function DashboardPage() {
               <div className="flex items-center">
                 <PoundSterling className="h-4 w-4 text-green-100 mr-1" />
                 <span className="text-sm text-green-100">
-                  {pointsData.points} points = £{availableDiscount.toFixed(2)} value
+                  Redeemable discount value
                 </span>
               </div>
             </div>

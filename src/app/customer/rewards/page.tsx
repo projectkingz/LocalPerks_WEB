@@ -330,7 +330,7 @@ export default function RewardsPage() {
             <h2 className="text-xl font-semibold">Available Discounts</h2>
             <p className="text-4xl font-bold mt-2">£{availableDiscount.toFixed(2)}</p>
             <p className="text-sm text-green-100 mt-2">
-              {pointsData.points} points = £{availableDiscount.toFixed(2)} value (£{pointFaceValue.toFixed(2)} per point)
+              Redeemable discount value
             </p>
           </div>
           <div className="text-5xl">🎟️</div>

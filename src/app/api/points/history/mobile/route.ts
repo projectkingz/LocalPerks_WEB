@@ -126,7 +126,15 @@ export async function OPTIONS(request: NextRequest) {
 }
 
 function getTransactionDescription(transaction: any): string {
-  const { type, points, amount } = transaction;
+  const { type, points, amount, status } = transaction;
+  
+  if (status === 'VOID') {
+    if (amount > 0) {
+      return `Transaction Voided - £${amount.toFixed(2)}`;
+    } else {
+      return 'Transaction voided';
+    }
+  }
   
   if (type === 'EARNED') {
     if (amount > 0) {
@@ -140,8 +148,6 @@ function getTransactionDescription(transaction: any): string {
     } else {
       return 'Reward redemption';
     }
-  } else if (transaction.status === 'VOID') {
-    return 'Transaction voided';
   }
   
   return 'Points transaction';

@@ -34,13 +34,24 @@ async function migrateTransactionAmounts() {
   console.log('🔍 Starting transaction amount migration...\n');
 
   try {
-    // Find all SPENT transactions with amount = 0 or negative amounts
+    // Find all SPENT and VOID transactions with amount = 0 or negative amounts
     const spentTransactionsWithZeroAmount = await prisma.transaction.findMany({
       where: {
-        type: 'SPENT',
         OR: [
-          { amount: 0 },
-          { amount: { lt: 0 } } // Also fix negative amounts
+          {
+            type: 'SPENT',
+            OR: [
+              { amount: 0 },
+              { amount: { lt: 0 } }
+            ]
+          },
+          {
+            status: 'VOID',
+            OR: [
+              { amount: 0 },
+              { amount: { lt: 0 } }
+            ]
+          }
         ]
       },
       include: {
@@ -63,10 +74,10 @@ async function migrateTransactionAmounts() {
       }
     });
 
-    console.log(`📊 Found ${spentTransactionsWithZeroAmount.length} SPENT transactions with amount = 0\n`);
+    console.log(`📊 Found ${spentTransactionsWithZeroAmount.length} SPENT/VOID transactions with amount = 0 or negative\n`);
 
     if (spentTransactionsWithZeroAmount.length === 0) {
-      console.log('✅ No transactions to migrate. All SPENT transactions already have amounts set.\n');
+      console.log('✅ No transactions to migrate. All SPENT/VOID transactions already have amounts set.\n');
       return;
     }
 
@@ -105,7 +116,8 @@ async function migrateTransactionAmounts() {
             data: { amount: faceValueAmount }
           });
 
-          console.log(`   ✅ Updated transaction ${transaction.id.substring(0, 8)}... | ${absolutePoints} pts → £${faceValueAmount.toFixed(2)} | Customer: ${transaction.customer?.name || 'Unknown'}`);
+          const txType = transaction.status === 'VOID' ? 'VOID' : transaction.type;
+          console.log(`   ✅ Updated transaction ${transaction.id.substring(0, 8)}... | ${txType} | ${absolutePoints} pts → £${faceValueAmount.toFixed(2)} | Customer: ${transaction.customer?.name || 'Unknown'}`);
           totalUpdated++;
         } catch (error) {
           console.error(`   ❌ Failed to update transaction ${transaction.id}:`, error.message);
@@ -125,8 +137,10 @@ async function migrateTransactionAmounts() {
     console.log('📋 Sample of updated transactions:');
     const sampleTransactions = await prisma.transaction.findMany({
       where: {
-        type: 'SPENT',
-        amount: { gt: 0 },
+        OR: [
+          { type: 'SPENT', amount: { gt: 0 } },
+          { status: 'VOID', amount: { gt: 0 } }
+        ]
       },
       include: {
         customer: {

@@ -385,14 +385,14 @@ export default function RewardsPage() {
                   className="block w-full pl-12 pr-4 py-4 text-3xl font-bold border-2 border-gray-300 rounded-xl focus:border-green-500 focus:ring-2 focus:ring-green-200 transition"
                 />
               </div>
-              <div className="mt-2 flex items-center justify-between text-sm">
-                <span className="text-gray-500">
+              <div className="mt-2 space-y-1">
+                <div className="text-sm text-gray-500">
                   Maximum: £{Math.floor(availableDiscount)}
-                </span>
+                </div>
                 {selectedDiscount && (
-                  <span className="text-green-600 font-medium">
+                  <div className="text-sm text-green-600 font-medium">
                     {Math.ceil(selectedDiscount / pointFaceValue)} points required
-                  </span>
+                  </div>
                 )}
               </div>
             </div>

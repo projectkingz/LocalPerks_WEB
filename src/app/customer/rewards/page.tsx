@@ -328,7 +328,7 @@ export default function RewardsPage() {
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-xl font-semibold">Available Discounts</h2>
-            <p className="text-4xl font-bold mt-2">£{availableDiscount.toFixed(2)}</p>
+            <p className="text-4xl font-bold mt-2">£{Math.floor(availableDiscount)}</p>
             <p className="text-sm text-green-100 mt-2">
               Redeemable discount value
             </p>

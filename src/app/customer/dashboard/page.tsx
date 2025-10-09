@@ -249,7 +249,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-green-100">Available Discounts</p>
-                <p className="text-3xl font-bold text-white">£{availableDiscount.toFixed(2)}</p>
+                <p className="text-3xl font-bold text-white">£{Math.floor(availableDiscount)}</p>
               </div>
               <div className="p-3 bg-white bg-opacity-20 rounded-xl">
                 <Ticket className="h-6 w-6 text-white" />

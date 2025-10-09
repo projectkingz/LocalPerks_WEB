@@ -56,16 +56,36 @@ export async function POST(request: Request) {
     // Get tenant configuration
     const config = await getTenantPointsConfig(customer.tenantId);
     
+    console.log('Discount redemption debug:', {
+      discountAmount,
+      customerEmail: userEmail,
+      customerPoints: customer.points,
+      config: {
+        pointFaceValue: config.pointFaceValue,
+        basePointsPerPound: config.basePointsPerPound,
+      }
+    });
+    
     // Calculate required points
     const requiredPoints = calculatePointsForDiscount(discountAmount, config);
+
+    console.log('Points calculation:', {
+      discountAmount,
+      requiredPoints,
+      calculation: `${discountAmount} / ${config.pointFaceValue} = ${requiredPoints}`,
+      customerHas: customer.points,
+      sufficient: customer.points >= requiredPoints
+    });
 
     // Check if customer has enough points
     if (customer.points < requiredPoints) {
       return NextResponse.json(
         { 
-          error: 'Insufficient points',
+          error: `Insufficient points. You need ${requiredPoints} points but only have ${customer.points} points.`,
           required: requiredPoints,
-          available: customer.points
+          available: customer.points,
+          discountAmount: discountAmount,
+          pointFaceValue: config.pointFaceValue
         },
         { status: 400 }
       );

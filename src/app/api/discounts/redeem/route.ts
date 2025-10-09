@@ -87,16 +87,42 @@ export async function POST(request: Request) {
       });
     }
 
-    // Create redemption transaction
+    // Log for debugging
+    console.log('Creating transaction with:', {
+      amount: discountAmount,
+      points: requiredPoints,
+      type: 'SPENT',
+      userId: user.id,
+      customerId: customer.id,
+      tenantId: customer.tenantId,
+      config: config,
+    });
+
+    // Validate requiredPoints is not NaN
+    if (isNaN(requiredPoints) || !isFinite(requiredPoints)) {
+      console.error('Invalid points calculation:', { requiredPoints, discountAmount, config });
+      return NextResponse.json(
+        { error: 'Invalid points calculation. Please contact support.' },
+        { status: 500 }
+      );
+    }
+
+    // Create redemption transaction with explicit relations for MySQL
     const transaction = await prisma.transaction.create({
       data: {
         amount: discountAmount,
         points: requiredPoints,
         type: 'SPENT',
         status: 'APPROVED',
-        userId: user.id,
-        customerId: customer.id,
-        tenantId: customer.tenantId,
+        user: {
+          connect: { id: user.id }
+        },
+        customer: {
+          connect: { id: customer.id }
+        },
+        tenant: {
+          connect: { id: customer.tenantId }
+        }
       },
       include: {
         customer: {

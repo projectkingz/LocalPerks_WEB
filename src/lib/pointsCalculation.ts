@@ -12,7 +12,12 @@ export async function getTenantPointsConfig(tenantId: string): Promise<TenantPoi
     });
 
     if (config && config.config) {
-      return JSON.parse(config.config);
+      const parsedConfig = JSON.parse(config.config);
+      // Merge with defaults to ensure all required fields exist
+      return {
+        ...defaultPointsConfig,
+        ...parsedConfig,
+      };
     }
   } catch (error) {
     console.error('Error fetching tenant points config:', error);

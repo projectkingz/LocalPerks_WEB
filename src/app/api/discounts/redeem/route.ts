@@ -53,13 +53,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
     }
 
+    // Calculate ACTUAL points from transactions (same logic as /api/points)
+    const transactions = await prisma.transaction.findMany({
+      where: {
+        customerId: customer.id,
+        status: { in: ["APPROVED", "VOID"] },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    const actualPoints = transactions.reduce((total, t) => {
+      if (t.type === "EARNED" || t.status === "VOID") return total + t.points;
+      if (t.type === "SPENT") return total - t.points; // Subtract SPENT points
+      return total;
+    }, 0);
+
+    const currentPoints = Math.max(0, actualPoints);
+
     // Get tenant configuration
     const config = await getTenantPointsConfig(customer.tenantId);
     
     console.log('Discount redemption debug:', {
       discountAmount,
       customerEmail: userEmail,
-      customerPoints: customer.points,
+      customerPointsDB: customer.points,
+      customerPointsCalculated: currentPoints,
       config: {
         pointFaceValue: config.pointFaceValue,
         basePointsPerPound: config.basePointsPerPound,
@@ -73,17 +93,17 @@ export async function POST(request: Request) {
       discountAmount,
       requiredPoints,
       calculation: `${discountAmount} / ${config.pointFaceValue} = ${requiredPoints}`,
-      customerHas: customer.points,
-      sufficient: customer.points >= requiredPoints
+      customerHas: currentPoints,
+      sufficient: currentPoints >= requiredPoints
     });
 
-    // Check if customer has enough points
-    if (customer.points < requiredPoints) {
+    // Check if customer has enough points (use calculated points)
+    if (currentPoints < requiredPoints) {
       return NextResponse.json(
         { 
-          error: `Insufficient points. You need ${requiredPoints} points but only have ${customer.points} points.`,
+          error: `Insufficient points. You need ${requiredPoints} points but only have ${currentPoints} points.`,
           required: requiredPoints,
-          available: customer.points,
+          available: currentPoints,
           discountAmount: discountAmount,
           pointFaceValue: config.pointFaceValue
         },
@@ -155,13 +175,12 @@ export async function POST(request: Request) {
       }
     });
 
-    // Deduct points from customer balance
+    // Update customer balance with new calculated points
+    const newPointsBalance = currentPoints - requiredPoints;
     const updatedCustomer = await prisma.customer.update({
       where: { id: customer.id },
       data: {
-        points: {
-          decrement: requiredPoints
-        }
+        points: Math.max(0, newPointsBalance)
       }
     });
 

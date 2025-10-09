@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
 
     const calculatedPoints = transactions.reduce((total, t) => {
       if (t.type === "EARNED" || t.status === "VOID") return total + t.points;
-      if (t.type === "SPENT") return total + t.points;
+      if (t.type === "SPENT") return total - t.points; // FIX: Subtract SPENT points
       return total;
     }, 0);
 

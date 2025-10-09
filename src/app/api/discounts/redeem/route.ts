@@ -8,6 +8,7 @@ import {
   calculatePointsForDiscount,
   calculatePointsFaceValue 
 } from '@/lib/pointsCalculation';
+import { generateUniqueVoucherCode } from '@/lib/utils/voucher';
 
 /**
  * POST /api/discounts/redeem
@@ -111,6 +112,32 @@ export async function POST(request: Request) {
       );
     }
 
+    // Find the system discount reward for this amount
+    const systemTenant = await prisma.tenant.findFirst({
+      where: { name: 'LocalPerks System' }
+    });
+
+    if (!systemTenant) {
+      return NextResponse.json(
+        { error: 'System discount rewards not configured. Please contact support.' },
+        { status: 500 }
+      );
+    }
+
+    const discountReward = await prisma.reward.findFirst({
+      where: {
+        name: `£${discountAmount} Discount Voucher`,
+        tenantId: systemTenant.id
+      }
+    });
+
+    if (!discountReward) {
+      return NextResponse.json(
+        { error: `£${discountAmount} discount reward not found. Please contact support.` },
+        { status: 500 }
+      );
+    }
+
     // Get or create user record for the customer
     let user = await prisma.user.findUnique({
       where: { email: customer.email }
@@ -127,17 +154,6 @@ export async function POST(request: Request) {
       });
     }
 
-    // Log for debugging
-    console.log('Creating transaction with:', {
-      amount: discountAmount,
-      points: requiredPoints,
-      type: 'SPENT',
-      userId: user.id,
-      customerId: customer.id,
-      tenantId: customer.tenantId,
-      config: config,
-    });
-
     // Validate requiredPoints is not NaN
     if (isNaN(requiredPoints) || !isFinite(requiredPoints)) {
       console.error('Invalid points calculation:', { requiredPoints, discountAmount, config });
@@ -147,69 +163,121 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create redemption transaction with explicit relations for MySQL
-    const transaction = await prisma.transaction.create({
-      data: {
-        amount: discountAmount,
-        points: requiredPoints,
-        type: 'SPENT',
-        status: 'APPROVED',
-        user: {
-          connect: { id: user.id }
+    // Create redemption, voucher, and transaction in a database transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Create the redemption record
+      const redemption = await tx.redemption.create({
+        data: {
+          rewardId: discountReward.id,
+          customerId: customer.id,
+          points: requiredPoints,
         },
-        customer: {
-          connect: { id: customer.id }
-        },
-        tenant: {
-          connect: { id: customer.tenantId }
+        include: {
+          reward: true
         }
-      },
-      include: {
-        customer: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
+      });
+
+      // Generate unique voucher code
+      const voucherCode = await generateUniqueVoucherCode();
+      
+      // Set expiration date to 1 year from now
+      const expiresAt = new Date();
+      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+
+      // Create the voucher
+      const voucher = await tx.voucher.create({
+        data: {
+          code: voucherCode,
+          redemptionId: redemption.id,
+          customerId: customer.id,
+          rewardId: discountReward.id,
+          status: 'active',
+          expiresAt,
+        },
+        include: {
+          customer: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            }
+          },
+          reward: {
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              points: true,
+            }
           }
         }
-      }
+      });
+
+      // Create transaction record
+      const transaction = await tx.transaction.create({
+        data: {
+          amount: discountAmount,
+          points: requiredPoints,
+          type: 'SPENT',
+          status: 'APPROVED',
+          user: {
+            connect: { id: user.id }
+          },
+          customer: {
+            connect: { id: customer.id }
+          },
+          tenant: {
+            connect: { id: customer.tenantId }
+          }
+        }
+      });
+
+      // Update customer balance
+      const newPointsBalance = currentPoints - requiredPoints;
+      await tx.customer.update({
+        where: { id: customer.id },
+        data: {
+          points: Math.max(0, newPointsBalance)
+        }
+      });
+
+      // Create activity log
+      await tx.activity.create({
+        data: {
+          type: 'DISCOUNT_REDEEMED',
+          description: `Discount Voucher Redeemed - £${discountAmount} (${requiredPoints} points)`,
+          points: -requiredPoints,
+          userId: user.id,
+        }
+      });
+
+      return { redemption, voucher, transaction };
     });
 
-    // Update customer balance with new calculated points
-    const newPointsBalance = currentPoints - requiredPoints;
-    const updatedCustomer = await prisma.customer.update({
-      where: { id: customer.id },
-      data: {
-        points: Math.max(0, newPointsBalance)
-      }
-    });
-
-    // Create activity log
-    await prisma.activity.create({
-      data: {
-        type: 'DISCOUNT_REDEEMED',
-        description: `Discount Redeemed - £${discountAmount} (${requiredPoints} points)`,
-        points: -requiredPoints,
-        userId: user.id,
-      }
-    });
-
-    console.log(`Discount redeemed: £${discountAmount} for ${customer.email}, ${requiredPoints} points deducted`);
+    console.log(`Discount voucher created: £${discountAmount} for ${customer.email}, code: ${result.voucher.code}`);
 
     return NextResponse.json({
       success: true,
-      message: `Successfully redeemed £${discountAmount} discount`,
+      message: `Successfully redeemed £${discountAmount} discount voucher`,
+      voucher: {
+        id: result.voucher.id,
+        code: result.voucher.code,
+        amount: discountAmount,
+        points: requiredPoints,
+        status: result.voucher.status,
+        expiresAt: result.voucher.expiresAt,
+        reward: result.voucher.reward,
+      },
       transaction: {
-        id: transaction.id,
-        amount: transaction.amount,
-        points: transaction.points,
-        type: transaction.type,
-        status: transaction.status,
-        createdAt: transaction.createdAt,
+        id: result.transaction.id,
+        amount: result.transaction.amount,
+        points: result.transaction.points,
+        type: result.transaction.type,
+        status: result.transaction.status,
       },
       customer: {
-        pointsRemaining: updatedCustomer.points,
-        availableDiscount: calculatePointsFaceValue(updatedCustomer.points, config)
+        pointsRemaining: currentPoints - requiredPoints,
+        availableDiscount: calculatePointsFaceValue(currentPoints - requiredPoints, config)
       }
     });
   } catch (error) {

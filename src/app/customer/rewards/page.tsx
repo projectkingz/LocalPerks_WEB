@@ -275,7 +275,14 @@ export default function RewardsPage() {
       }
 
       const data = await response.json();
-      setSuccess(`Successfully redeemed £${selectedDiscount} discount!`);
+      setSuccess(`Successfully redeemed £${selectedDiscount} discount voucher! Code: ${data.voucher?.code || 'N/A'}`);
+      
+      // Refresh vouchers
+      const vouchersResponse = await fetch('/api/rewards/vouchers');
+      if (vouchersResponse.ok) {
+        const vouchersData = await vouchersResponse.json();
+        setVouchers(vouchersData);
+      }
       
       // Update points
       const pointsResponse = await fetch('/api/points');

@@ -61,15 +61,26 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // Tenant validation: Only the tenant that issued the reward can redeem vouchers for it
+    // Tenant validation: Check if this is a system discount voucher or tenant-specific reward
     if (userRole === 'PARTNER' && userTenantId) {
       // Get the reward with tenant information
       const rewardWithTenant = await prisma.reward.findUnique({
         where: { id: voucher.rewardId },
-        select: { tenantId: true }
+        select: { 
+          tenantId: true,
+          name: true,
+          tenant: {
+            select: { name: true }
+          }
+        }
       });
 
-      if (rewardWithTenant && rewardWithTenant.tenantId !== userTenantId) {
+      // Check if this is a system discount voucher (LocalPerks System)
+      const isSystemDiscountVoucher = rewardWithTenant?.tenant?.name === 'LocalPerks System' || 
+                                       rewardWithTenant?.name?.includes('Discount Voucher');
+
+      // Allow any partner to scan system discount vouchers
+      if (!isSystemDiscountVoucher && rewardWithTenant && rewardWithTenant.tenantId !== userTenantId) {
         return NextResponse.json({ 
           error: 'This voucher can only be redeemed at the business that issued the reward',
           voucher: {
@@ -80,6 +91,11 @@ export async function POST(request: Request) {
             }
           }
         }, { status: 403 });
+      }
+
+      // Log if this is a system discount voucher being scanned
+      if (isSystemDiscountVoucher) {
+        console.log(`System discount voucher ${voucherCode} being scanned by partner ${userTenantId}`);
       }
     }
 

@@ -38,9 +38,9 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { discountAmount } = body;
 
-    if (!discountAmount || discountAmount <= 0 || discountAmount > 20) {
+    if (!discountAmount || discountAmount <= 0 || !Number.isInteger(discountAmount)) {
       return NextResponse.json(
-        { error: 'Invalid discount amount. Must be between £1 and £20.' },
+        { error: 'Invalid discount amount. Must be a whole number greater than £0.' },
         { status: 400 }
       );
     }

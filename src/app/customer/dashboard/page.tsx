@@ -16,7 +16,8 @@ import {
   ArrowRight,
   QrCode,
   History,
-  Gift
+  Gift,
+  Ticket
 } from 'lucide-react';
 
 interface PointsData {
@@ -51,6 +52,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mobile, setMobile] = useState<string | null>(null);
+  const [availableDiscount, setAvailableDiscount] = useState<number>(0);
+  const [pointFaceValue, setPointFaceValue] = useState<number>(0.01);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -69,6 +72,16 @@ export default function DashboardPage() {
         const pointsData = await pointsResponse.json();
         console.log('Points data received:', pointsData);
         setPointsData(pointsData);
+
+        // Fetch points configuration to get face value
+        const configResponse = await fetch('/api/points/config');
+        if (configResponse.ok) {
+          const configData = await configResponse.json();
+          if (configData.success && configData.config) {
+            setPointFaceValue(configData.config.pointFaceValue || 0.01);
+            setAvailableDiscount(pointsData.points * (configData.config.pointFaceValue || 0.01));
+          }
+        }
 
         // Always fetch mobile number from profile
         let mobileNumber = null;
@@ -225,6 +238,38 @@ export default function DashboardPage() {
                 <span className="text-sm text-gray-500">{progress.current}/{progress.target} points</span>
               </div>
             </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+            className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl shadow-lg p-6 text-white"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-green-100">Available Discounts</p>
+                <p className="text-3xl font-bold text-white">£{availableDiscount.toFixed(2)}</p>
+              </div>
+              <div className="p-3 bg-white bg-opacity-20 rounded-xl">
+                <Ticket className="h-6 w-6 text-white" />
+              </div>
+            </div>
+            <div className="mt-4">
+              <div className="flex items-center">
+                <PoundSterling className="h-4 w-4 text-green-100 mr-1" />
+                <span className="text-sm text-green-100">
+                  {pointsData.points} points = £{availableDiscount.toFixed(2)} value
+                </span>
+              </div>
+            </div>
+            <Link
+              href="/customer/rewards"
+              className="mt-4 inline-flex items-center text-sm font-medium text-white hover:text-green-100 transition-colors"
+            >
+              Redeem Discounts
+              <ArrowRight className="ml-1 h-4 w-4" />
+            </Link>
           </motion.div>
         </div>
 

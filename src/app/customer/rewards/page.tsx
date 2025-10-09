@@ -57,6 +57,11 @@ export default function RewardsPage() {
   const [success, setSuccess] = useState('');
   const [selectedReward, setSelectedReward] = useState<string | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [selectedDiscount, setSelectedDiscount] = useState<number | null>(null);
+  const [showDiscountConfirmation, setShowDiscountConfirmation] = useState(false);
+  const [availableDiscount, setAvailableDiscount] = useState<number>(0);
+  const [pointFaceValue, setPointFaceValue] = useState<number>(0.01);
+  const [availableDiscounts, setAvailableDiscounts] = useState<number[]>([]);
 
   // Color variations with same visual weight as vibrant blue
   const getCardColors = (index: number) => {
@@ -88,6 +93,28 @@ export default function RewardsPage() {
         const pointsData = await pointsResponse.json();
         console.log('Points data fetched:', pointsData);
         setPointsData(pointsData);
+
+        // Fetch points configuration to get face value
+        const configResponse = await fetch('/api/points/config');
+        if (configResponse.ok) {
+          const configData = await configResponse.json();
+          if (configData.success && configData.config) {
+            const faceValue = configData.config.pointFaceValue || 0.01;
+            setPointFaceValue(faceValue);
+            const totalDiscount = pointsData.points * faceValue;
+            setAvailableDiscount(totalDiscount);
+            
+            // Calculate available discount tiers (£1 to £20)
+            const discounts: number[] = [];
+            const maxDiscountPounds = Math.floor(totalDiscount);
+            for (let i = 1; i <= 20; i++) {
+              if (i <= maxDiscountPounds) {
+                discounts.push(i);
+              }
+            }
+            setAvailableDiscounts(discounts);
+          }
+        }
 
         // Fetch rewards
         const rewardsResponse = await fetch('/api/rewards');
@@ -209,6 +236,73 @@ export default function RewardsPage() {
     return reward ? reward.name : 'Unknown Reward';
   };
 
+  const handleDiscountSelect = (discountAmount: number) => {
+    const requiredPoints = Math.ceil(discountAmount / pointFaceValue);
+    
+    console.log('Discount selected:', {
+      discountAmount,
+      requiredPoints,
+      userPoints: pointsData.points,
+      hasEnoughPoints: pointsData.points >= requiredPoints
+    });
+
+    if (pointsData.points < requiredPoints) {
+      setError(`Not enough points for £${discountAmount} discount`);
+      return;
+    }
+
+    setSelectedDiscount(discountAmount);
+    setShowDiscountConfirmation(true);
+    setError('');
+  };
+
+  const redeemDiscount = async () => {
+    if (!selectedDiscount || !session?.user?.email) return;
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/discounts/redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ discountAmount: selectedDiscount })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to redeem discount');
+      }
+
+      const data = await response.json();
+      setSuccess(`Successfully redeemed £${selectedDiscount} discount!`);
+      
+      // Update points
+      const pointsResponse = await fetch('/api/points');
+      const pointsData = await pointsResponse.json();
+      setPointsData(pointsData);
+      
+      // Recalculate available discounts
+      const totalDiscount = pointsData.points * pointFaceValue;
+      setAvailableDiscount(totalDiscount);
+      const discounts: number[] = [];
+      const maxDiscountPounds = Math.floor(totalDiscount);
+      for (let i = 1; i <= 20; i++) {
+        if (i <= maxDiscountPounds) {
+          discounts.push(i);
+        }
+      }
+      setAvailableDiscounts(discounts);
+    } catch (error) {
+      console.error('Error redeeming discount:', error);
+      setError(error instanceof Error ? error.message : 'Failed to redeem discount');
+    } finally {
+      setLoading(false);
+      setShowDiscountConfirmation(false);
+      setSelectedDiscount(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold mb-8">Rewards</h1>
@@ -227,6 +321,75 @@ export default function RewardsPage() {
             <p className="text-lg font-semibold">{pointsData.tier}</p>
           </div>
         </div>
+      </div>
+
+      {/* Available Discounts Summary */}
+      <div className="bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg rounded-lg p-6 text-white">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-xl font-semibold">Available Discounts</h2>
+            <p className="text-4xl font-bold mt-2">£{availableDiscount.toFixed(2)}</p>
+            <p className="text-sm text-green-100 mt-2">
+              {pointsData.points} points = £{availableDiscount.toFixed(2)} value (£{pointFaceValue.toFixed(2)} per point)
+            </p>
+          </div>
+          <div className="text-5xl">🎟️</div>
+        </div>
+      </div>
+
+      {/* Discount Vouchers */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <h2 className="text-xl font-semibold mb-4">Discount Vouchers</h2>
+        <p className="text-gray-600 mb-4">Redeem your points for instant discount vouchers (£1 to £20)</p>
+        
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-500 mx-auto"></div>
+            <p className="mt-2 text-gray-600">Loading discounts...</p>
+          </div>
+        ) : availableDiscounts.length === 0 ? (
+          <div className="text-center py-8 bg-gray-50 rounded-lg">
+            <p className="text-gray-600">You need at least 100 points (£1.00 value) to redeem discount vouchers.</p>
+            <p className="text-sm text-gray-500 mt-2">Current: {pointsData.points} points = £{availableDiscount.toFixed(2)}</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            {[...Array(20)].map((_, index) => {
+              const discountAmount = index + 1;
+              const isAvailable = availableDiscounts.includes(discountAmount);
+              const requiredPoints = Math.ceil(discountAmount / pointFaceValue);
+              
+              return (
+                <button
+                  key={discountAmount}
+                  onClick={() => isAvailable && handleDiscountSelect(discountAmount)}
+                  disabled={!isAvailable || loading}
+                  className={`
+                    relative p-4 rounded-lg border-2 transition-all duration-200
+                    ${isAvailable 
+                      ? 'border-green-500 bg-green-50 hover:bg-green-100 hover:scale-105 cursor-pointer' 
+                      : 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
+                    }
+                  `}
+                >
+                  <div className="text-center">
+                    <p className={`text-2xl font-bold ${isAvailable ? 'text-green-600' : 'text-gray-400'}`}>
+                      £{discountAmount}
+                    </p>
+                    <p className={`text-xs mt-1 ${isAvailable ? 'text-green-700' : 'text-gray-400'}`}>
+                      {requiredPoints} pts
+                    </p>
+                  </div>
+                  {isAvailable && (
+                    <div className="absolute top-1 right-1">
+                      <span className="text-green-600 text-lg">✓</span>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Available Rewards */}
@@ -351,9 +514,9 @@ export default function RewardsPage() {
         )}
       </div>
 
-      {/* Confirmation Modal */}
+      {/* Reward Confirmation Modal */}
       {showConfirmation && selectedReward && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
             <h3 className="text-lg font-semibold mb-4">Confirm Reward</h3>
             <p className="text-gray-600 mb-4">
@@ -377,6 +540,49 @@ export default function RewardsPage() {
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
               >
                 {loading ? 'Creating...' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Discount Confirmation Modal */}
+      {showDiscountConfirmation && selectedDiscount && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-semibold mb-4">Confirm Discount Redemption</h3>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+              <p className="text-2xl font-bold text-green-600 text-center mb-2">
+                £{selectedDiscount} Discount
+              </p>
+              <p className="text-sm text-gray-600 text-center">
+                This will deduct {Math.ceil(selectedDiscount / pointFaceValue)} points from your balance
+              </p>
+            </div>
+            <p className="text-gray-600 mb-4">
+              Are you sure you want to redeem this discount?
+            </p>
+            <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mb-4">
+              <p className="text-xs text-yellow-800">
+                ⓘ This discount will be recorded as a "SPENT" transaction in your history
+              </p>
+            </div>
+            <div className="flex justify-end space-x-4">
+              <button
+                onClick={() => {
+                  setShowDiscountConfirmation(false);
+                  setSelectedDiscount(null);
+                }}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={redeemDiscount}
+                disabled={loading}
+                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+              >
+                {loading ? 'Redeeming...' : 'Confirm'}
               </button>
             </div>
           </div>

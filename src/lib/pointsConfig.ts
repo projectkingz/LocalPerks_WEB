@@ -25,6 +25,8 @@ export interface TenantPointsConfig {
   minimumSpend: number;
   roundPointsUp: boolean; // Whether to round points up to nearest whole number
   bankHolidayBonus: number; // Multiplier for bank holidays
+  pointFaceValue: number; // Face value per point in pounds (e.g., 0.01 = £0.01 per point)
+  platformChargePercentage: number; // Platform charge percentage on transactions (e.g., 2.5 = 2.5%)
 }
 
 // Helper function to round amount to nearest penny, 5p, 10p, or pound
@@ -92,7 +94,9 @@ export const defaultPointsConfig: TenantPointsConfig = {
   roundingRule: 'PENNY',
   minimumSpend: 0,
   roundPointsUp: true,
-  bankHolidayBonus: 2
+  bankHolidayBonus: 2,
+  pointFaceValue: 0.01, // £0.01 per point (100 points = £1)
+  platformChargePercentage: 2.5 // 2.5% platform charge
 };
 
 export const BONUS_RULES = [

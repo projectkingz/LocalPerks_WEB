@@ -112,3 +112,65 @@ export async function calculatePointsForTransaction(
   return calculatePointsWithConfig(amount, config);
 }
 
+/**
+ * Calculate the face value (monetary value) of points
+ * @param points - Number of points
+ * @param config - Tenant points configuration
+ * @returns Face value in pounds (e.g., 100 points with 0.01 = £1.00)
+ */
+export function calculatePointsFaceValue(
+  points: number,
+  config: TenantPointsConfig
+): number {
+  return points * config.pointFaceValue;
+}
+
+/**
+ * Calculate how many points are needed for a specific discount amount
+ * @param discountAmount - Discount amount in pounds (e.g., 1 for £1)
+ * @param config - Tenant points configuration
+ * @returns Number of points required
+ */
+export function calculatePointsForDiscount(
+  discountAmount: number,
+  config: TenantPointsConfig
+): number {
+  return Math.ceil(discountAmount / config.pointFaceValue);
+}
+
+/**
+ * Calculate platform charge for a transaction
+ * @param amount - Transaction amount in pounds
+ * @param config - Tenant points configuration
+ * @returns Platform charge amount in pounds
+ */
+export function calculatePlatformCharge(
+  amount: number,
+  config: TenantPointsConfig
+): number {
+  return (amount * config.platformChargePercentage) / 100;
+}
+
+/**
+ * Get available discount tiers for a given points balance
+ * @param points - Customer's points balance
+ * @param config - Tenant points configuration
+ * @returns Array of discount amounts the customer can redeem
+ */
+export function getAvailableDiscounts(
+  points: number,
+  config: TenantPointsConfig
+): number[] {
+  const availableDiscounts: number[] = [];
+  const maxDiscountPounds = Math.floor(calculatePointsFaceValue(points, config));
+  
+  // Generate discount tiers from £1 to £20
+  for (let i = 1; i <= 20; i++) {
+    if (i <= maxDiscountPounds) {
+      availableDiscounts.push(i);
+    }
+  }
+  
+  return availableDiscounts;
+}
+

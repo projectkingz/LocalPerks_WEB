@@ -346,55 +346,70 @@ export default function RewardsPage() {
 
       {/* Discount Vouchers */}
       <div className="bg-white shadow rounded-lg p-6">
-        <h2 className="text-xl font-semibold mb-4">Discount Vouchers</h2>
-        <p className="text-gray-600 mb-4">Redeem your points for instant discount vouchers (£1 to £20)</p>
+        <h2 className="text-xl font-semibold mb-4">Redeem Discount Voucher</h2>
+        <p className="text-gray-600 mb-6">Enter any amount up to your available discount balance</p>
         
         {loading ? (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-500 mx-auto"></div>
-            <p className="mt-2 text-gray-600">Loading discounts...</p>
+            <p className="mt-2 text-gray-600">Loading...</p>
           </div>
-        ) : availableDiscounts.length === 0 ? (
+        ) : Math.floor(availableDiscount) < 1 ? (
           <div className="text-center py-8 bg-gray-50 rounded-lg">
             <p className="text-gray-600">You need at least 100 points (£1.00 value) to redeem discount vouchers.</p>
             <p className="text-sm text-gray-500 mt-2">Current: {pointsData.points} points = £{availableDiscount.toFixed(2)}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            {[...Array(20)].map((_, index) => {
-              const discountAmount = index + 1;
-              const isAvailable = availableDiscounts.includes(discountAmount);
-              const requiredPoints = Math.ceil(discountAmount / pointFaceValue);
-              
-              return (
-                <button
-                  key={discountAmount}
-                  onClick={() => isAvailable && handleDiscountSelect(discountAmount)}
-                  disabled={!isAvailable || loading}
-                  className={`
-                    relative p-4 rounded-lg border-2 transition-all duration-200
-                    ${isAvailable 
-                      ? 'border-green-500 bg-green-50 hover:bg-green-100 hover:scale-105 cursor-pointer' 
-                      : 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
+          <div className="max-w-md mx-auto">
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Discount Amount (£)
+              </label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-semibold text-gray-600">£</span>
+                <input
+                  type="number"
+                  min="1"
+                  max={Math.floor(availableDiscount)}
+                  step="1"
+                  value={selectedDiscount || ''}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value);
+                    if (!isNaN(value) && value > 0) {
+                      setSelectedDiscount(value);
+                    } else {
+                      setSelectedDiscount(null);
                     }
-                  `}
-                >
-                  <div className="text-center">
-                    <p className={`text-2xl font-bold ${isAvailable ? 'text-green-600' : 'text-gray-400'}`}>
-                      £{discountAmount}
-                    </p>
-                    <p className={`text-xs mt-1 ${isAvailable ? 'text-green-700' : 'text-gray-400'}`}>
-                      {requiredPoints} pts
-                    </p>
-                  </div>
-                  {isAvailable && (
-                    <div className="absolute top-1 right-1">
-                      <span className="text-green-600 text-lg">✓</span>
-                    </div>
-                  )}
-                </button>
-              );
-            })}
+                  }}
+                  placeholder="0"
+                  className="block w-full pl-12 pr-4 py-4 text-3xl font-bold border-2 border-gray-300 rounded-xl focus:border-green-500 focus:ring-2 focus:ring-green-200 transition"
+                />
+              </div>
+              <div className="mt-2 flex items-center justify-between text-sm">
+                <span className="text-gray-500">
+                  Maximum: £{Math.floor(availableDiscount)}
+                </span>
+                {selectedDiscount && (
+                  <span className="text-green-600 font-medium">
+                    {Math.ceil(selectedDiscount / pointFaceValue)} points required
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={() => selectedDiscount && handleDiscountSelect(selectedDiscount)}
+              disabled={!selectedDiscount || selectedDiscount > Math.floor(availableDiscount) || loading}
+              className="w-full py-4 px-6 bg-green-600 text-white text-lg font-semibold rounded-xl hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition"
+            >
+              {selectedDiscount ? `Redeem £${selectedDiscount} Discount` : 'Enter Amount'}
+            </button>
+
+            <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-800">
+                💡 <strong>Tip:</strong> You can enter any whole pound amount from £1 to £{Math.floor(availableDiscount)}
+              </p>
+            </div>
           </div>
         )}
       </div>

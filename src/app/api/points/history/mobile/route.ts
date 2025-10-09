@@ -135,7 +135,11 @@ function getTransactionDescription(transaction: any): string {
       return 'Points earned';
     }
   } else if (type === 'SPENT') {
-    return 'Reward redemption';
+    if (amount > 0) {
+      return `Redemption - £${amount.toFixed(2)}`;
+    } else {
+      return 'Reward redemption';
+    }
   } else if (transaction.status === 'VOID') {
     return 'Transaction voided';
   }

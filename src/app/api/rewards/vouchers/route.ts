@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { pointsUtil } from '@/lib/pointsUtil';
 import { generateUniqueVoucherCode, checkAndUpdateExpiredVouchers } from '@/lib/utils/voucher';
+import { getTenantPointsConfig, calculatePointsFaceValue } from '@/lib/pointsCalculation';
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -161,6 +162,16 @@ export async function POST(request: Request) {
 
     console.log('Transaction validation passed:', validation);
 
+    // Get tenant configuration to calculate face value
+    const config = await getTenantPointsConfig(customer.tenantId);
+    const faceValueAmount = calculatePointsFaceValue(points, config);
+
+    console.log('Calculating face value:', {
+      points,
+      pointFaceValue: config.pointFaceValue,
+      faceValueAmount
+    });
+
     // Create redemption and update customer points in a transaction
     const result = await prisma.$transaction(async (tx) => {
       // Ensure customer has a corresponding User record for transactions
@@ -219,11 +230,11 @@ export async function POST(request: Request) {
         }
       });
 
-      // Create a transaction record for points spent
+      // Create a transaction record for points spent with face value
       const transaction = await tx.transaction.create({
         data: {
-          amount: 0, // No monetary amount for redemption
-          points: -points, // Negative points for spending
+          amount: faceValueAmount, // Monetary face value of points (e.g., 130 points × £0.01 = £1.30)
+          points: points, // Store positive points value (will be treated as negative when type is SPENT)
           type: 'SPENT',
           status: 'APPROVED',
           userId: userId, // Use the customer's User record

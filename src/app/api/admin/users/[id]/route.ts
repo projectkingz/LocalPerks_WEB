@@ -149,74 +149,56 @@ export async function DELETE(
     // If force delete is enabled, delete related data first
     if (forceDelete && relatedData.length > 0) {
       // Delete in transaction to ensure data consistency
+      // Increase timeout for complex deletions with lots of related data
       await prisma.$transaction(async (tx) => {
-        // Delete transactions
-        if (targetUser.transactions.length > 0) {
-          await tx.transaction.deleteMany({
-            where: { userId: params.id }
-          });
+        // Get tenant IDs and customer IDs for bulk operations
+        const tenantIds = targetUser.partnerTenants.map(t => t.id);
+        
+        // Get all customer IDs that will be deleted
+        const customerIds: string[] = [];
+        const customer = await tx.customer.findUnique({
+          where: { email: targetUser.email },
+          select: { id: true }
+        });
+        if (customer) {
+          customerIds.push(customer.id);
         }
+        
+        if (tenantIds.length > 0) {
+          const tenantCustomers = await tx.customer.findMany({
+            where: { tenantId: { in: tenantIds } },
+            select: { id: true }
+          });
+          customerIds.push(...tenantCustomers.map(c => c.id));
+        }
+
+        // Delete all transactions in one go
+        const deleteConditions: any[] = [{ userId: params.id }];
+        if (customerIds.length > 0) {
+          deleteConditions.push({ customerId: { in: customerIds } });
+        }
+        if (tenantIds.length > 0) {
+          deleteConditions.push({ tenantId: { in: tenantIds } });
+        }
+        
+        await tx.transaction.deleteMany({
+          where: { OR: deleteConditions }
+        });
 
         // Delete activities
-        if (targetUser.activities.length > 0) {
-          await tx.activity.deleteMany({
-            where: { userId: params.id }
-          });
-        }
-
-        // Handle tenant associations
-        if (targetUser.tenant) {
-          await tx.user.update({
-            where: { id: params.id },
-            data: { tenantId: null }
-          });
-        }
-
-        // Delete customer record if user has one
-        const customer = await tx.customer.findUnique({
-          where: { email: targetUser.email }
+        await tx.activity.deleteMany({
+          where: { userId: params.id }
         });
-        
-        if (customer) {
-          // Delete customer transactions first
-          await tx.transaction.deleteMany({
-            where: { customerId: customer.id }
-          });
-          
-          // Then delete the customer (redemptions and vouchers will cascade)
-          await tx.customer.delete({
-            where: { id: customer.id }
+
+        // Delete customers (redemptions and vouchers will cascade)
+        if (customerIds.length > 0) {
+          await tx.customer.deleteMany({
+            where: { id: { in: customerIds } }
           });
         }
 
-        // Handle partner tenants (this is more complex - we might want to reassign or delete tenants)
-        if (targetUser.partnerTenants.length > 0) {
-          // First, delete all customers and their data associated with these tenants
-          for (const tenant of targetUser.partnerTenants) {
-            // Get all customers for this tenant
-            const customers = await tx.customer.findMany({
-              where: { tenantId: tenant.id }
-            });
-            
-            // Delete customer transactions first
-            for (const customer of customers) {
-              await tx.transaction.deleteMany({
-                where: { customerId: customer.id }
-              });
-            }
-            
-            // Delete customers (redemptions and vouchers will cascade)
-            await tx.customer.deleteMany({
-              where: { tenantId: tenant.id }
-            });
-            
-            // Delete tenant transactions
-            await tx.transaction.deleteMany({
-              where: { tenantId: tenant.id }
-            });
-          }
-          
-          // Then delete the tenants
+        // Delete partner tenants
+        if (tenantIds.length > 0) {
           await tx.tenant.deleteMany({
             where: { partnerUserId: params.id }
           });
@@ -226,6 +208,9 @@ export async function DELETE(
         await tx.user.delete({
           where: { id: params.id }
         });
+      }, {
+        maxWait: 10000, // 10 seconds max wait
+        timeout: 20000, // 20 seconds timeout
       });
 
       return NextResponse.json({ 

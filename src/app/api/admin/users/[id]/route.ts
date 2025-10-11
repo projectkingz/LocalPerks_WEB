@@ -197,8 +197,15 @@ export async function DELETE(
           });
         }
 
-        // Delete partner tenants
+        // Before deleting tenants, we need to handle users associated with those tenants
         if (tenantIds.length > 0) {
+          // First, remove tenant associations from users who belong to these tenants
+          await tx.user.updateMany({
+            where: { tenantId: { in: tenantIds } },
+            data: { tenantId: null }
+          });
+          
+          // Now we can safely delete the tenants
           await tx.tenant.deleteMany({
             where: { partnerUserId: params.id }
           });

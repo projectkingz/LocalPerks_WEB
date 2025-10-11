@@ -1,18 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Building,
   Mail,
   Phone,
   MapPin,
-  Clock,
   Settings,
   CreditCard,
   Save,
   QrCode,
-  Lock
+  Lock,
+  Edit
 } from 'lucide-react';
 import QRScanner from '@/components/QRScanner';
 import TransactionForm from '@/components/TransactionForm';
@@ -21,26 +21,55 @@ import PasswordChangeForm from '@/components/PasswordChangeForm';
 export default function PartnerProfile() {
   const [customerQRCode, setCustomerQRCode] = useState<string | null>(null);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
-  // This would be fetched from the API
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [businessProfile, setBusinessProfile] = useState({
-    name: "Joe's Coffee Shop",
-    email: "joe@joescoffee.test",
-    phone: "(555) 123-4567",
-    address: "123 Main St, Anytown, ST 12345",
-    hours: {
-      monday: "7:00 AM - 7:00 PM",
-      tuesday: "7:00 AM - 7:00 PM",
-      wednesday: "7:00 AM - 7:00 PM",
-      thursday: "7:00 AM - 7:00 PM",
-      friday: "7:00 AM - 8:00 PM",
-      saturday: "8:00 AM - 8:00 PM",
-      sunday: "8:00 AM - 6:00 PM"
-    },
+    businessName: "",
+    contactName: "",
+    email: "",
+    mobile: "",
     pointsConfig: {
-      pointsPerPound: 10,
+      pointsPerPound: 5,
       minimumPurchase: 5
     }
   });
+  const [editFormData, setEditFormData] = useState({
+    businessName: "",
+    contactName: "",
+    email: "",
+    mobile: ""
+  });
+
+  // Fetch business profile data
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await fetch('/api/tenants/profile');
+        if (response.ok) {
+          const data = await response.json();
+          setBusinessProfile(prev => ({
+            ...prev,
+            businessName: data.businessName || data.name || "",
+            contactName: data.contactName || "",
+            email: data.email || "",
+            mobile: data.mobile || data.phone || ""
+          }));
+          setEditFormData({
+            businessName: data.businessName || data.name || "",
+            contactName: data.contactName || "",
+            email: data.email || "",
+            mobile: data.mobile || data.phone || ""
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, []);
 
   const handleScanSuccess = (qrCode: string) => {
     setCustomerQRCode(qrCode);
@@ -78,6 +107,23 @@ export default function PartnerProfile() {
 
   const handlePasswordSuccess = () => {
     setShowPasswordForm(false);
+  };
+
+  const handleEditSave = async () => {
+    try {
+      // Here you would implement the API call to update the business profile
+      // For now, we'll just update the local state
+      setBusinessProfile(prev => ({
+        ...prev,
+        businessName: editFormData.businessName,
+        contactName: editFormData.contactName,
+        email: editFormData.email,
+        mobile: editFormData.mobile
+      }));
+      setShowEditModal(false);
+    } catch (error) {
+      console.error('Error saving profile:', error);
+    }
   };
 
   return (
@@ -163,96 +209,61 @@ export default function PartnerProfile() {
             animate={{ opacity: 1, y: 0 }}
             className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100"
           >
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-              <Building className="h-5 w-5 text-blue-600 mr-2" />
-              Business Information
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Business Name</label>
-                <input
-                  type="text"
-                  value={businessProfile.name}
-                  onChange={(e) => setBusinessProfile({ ...businessProfile, name: e.target.value })}
-                  className="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Email</label>
-                  <div className="mt-1 flex rounded-xl shadow-sm">
-                    <span className="inline-flex items-center px-3 rounded-l-xl border border-r-0 border-gray-300 bg-gray-50 text-gray-500">
-                      <Mail className="h-4 w-4" />
-                    </span>
-                    <input
-                      type="email"
-                      value={businessProfile.email}
-                      onChange={(e) => setBusinessProfile({ ...businessProfile, email: e.target.value })}
-                      className="flex-1 block w-full rounded-none rounded-r-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Phone</label>
-                  <div className="mt-1 flex rounded-xl shadow-sm">
-                    <span className="inline-flex items-center px-3 rounded-l-xl border border-r-0 border-gray-300 bg-gray-50 text-gray-500">
-                      <Phone className="h-4 w-4" />
-                    </span>
-                    <input
-                      type="tel"
-                      value={businessProfile.phone}
-                      onChange={(e) => setBusinessProfile({ ...businessProfile, phone: e.target.value })}
-                      className="flex-1 block w-full rounded-none rounded-r-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Address</label>
-                <div className="mt-1 flex rounded-xl shadow-sm">
-                  <span className="inline-flex items-center px-3 rounded-l-xl border border-r-0 border-gray-300 bg-gray-50 text-gray-500">
-                    <MapPin className="h-4 w-4" />
-                  </span>
-                  <input
-                    type="text"
-                    value={businessProfile.address}
-                    onChange={(e) => setBusinessProfile({ ...businessProfile, address: e.target.value })}
-                    className="flex-1 block w-full rounded-none rounded-r-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                <Building className="h-5 w-5 text-blue-600 mr-2" />
+                Business Information
+              </h2>
+              <button
+                onClick={() => setShowEditModal(true)}
+                className="flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit
+              </button>
             </div>
+            
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Business Name</label>
+                    <div className="p-3 bg-gray-50 rounded-lg border">
+                      <p className="text-gray-900 font-medium">{businessProfile.businessName}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Contact Name</label>
+                    <div className="p-3 bg-gray-50 rounded-lg border">
+                      <p className="text-gray-900 font-medium">{businessProfile.contactName}</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                    <div className="p-3 bg-gray-50 rounded-lg border flex items-center">
+                      <Mail className="h-4 w-4 text-gray-500 mr-3" />
+                      <p className="text-gray-900">{businessProfile.email}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Mobile Number</label>
+                    <div className="p-3 bg-gray-50 rounded-lg border flex items-center">
+                      <Phone className="h-4 w-4 text-gray-500 mr-3" />
+                      <p className="text-gray-900">{businessProfile.mobile}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100"
-          >
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-              <Clock className="h-5 w-5 text-blue-600 mr-2" />
-              Business Hours
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Object.entries(businessProfile.hours).map(([day, hours]) => (
-                <div key={day}>
-                  <label className="block text-sm font-medium text-gray-700 capitalize">
-                    {day}
-                  </label>
-                  <input
-                    type="text"
-                    value={hours}
-                    onChange={(e) => setBusinessProfile({
-                      ...businessProfile,
-                      hours: { ...businessProfile.hours, [day]: e.target.value }
-                    })}
-                    className="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  />
-                </div>
-              ))}
-            </div>
-          </motion.div>
 
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -298,22 +309,78 @@ export default function PartnerProfile() {
             </div>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="flex justify-end"
-          >
-            <button
-              type="button"
-              className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-xl shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              <Save className="h-5 w-5 mr-2" />
-              Save Changes
-            </button>
-          </motion.div>
         </div>
       </div>
+
+      {/* Edit Business Information Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md"
+          >
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Edit Business Information</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Business Name</label>
+                <input
+                  type="text"
+                  value={editFormData.businessName}
+                  onChange={(e) => setEditFormData({ ...editFormData, businessName: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Contact Name</label>
+                <input
+                  type="text"
+                  value={editFormData.contactName}
+                  onChange={(e) => setEditFormData({ ...editFormData, contactName: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                <input
+                  type="email"
+                  value={editFormData.email}
+                  onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Mobile Number</label>
+                <input
+                  type="tel"
+                  value={editFormData.mobile}
+                  onChange={(e) => setEditFormData({ ...editFormData, mobile: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            </div>
+            
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEditSave}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Save Changes
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 } 

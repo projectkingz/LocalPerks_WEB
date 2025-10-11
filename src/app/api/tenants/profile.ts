@@ -10,10 +10,32 @@ export async function GET() {
   }
   const tenant = await prisma.tenant.findUnique({
     where: { id: session.user.tenantId },
-    select: { name: true, mobile: true },
+    select: { 
+      name: true, 
+      mobile: true,
+      partnerUser: {
+        select: {
+          name: true,
+          email: true,
+          mobile: true
+        }
+      }
+    },
   });
   if (!tenant) {
     return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
   }
-  return NextResponse.json(tenant);
+  
+  // Format the response with business and contact information
+  const response = {
+    businessName: tenant.name,
+    contactName: tenant.partnerUser.name,
+    email: tenant.partnerUser.email,
+    mobile: tenant.mobile || tenant.partnerUser.mobile,
+    // Legacy fields for backward compatibility
+    name: tenant.name,
+    phone: tenant.mobile || tenant.partnerUser.mobile,
+  };
+  
+  return NextResponse.json(response);
 } 

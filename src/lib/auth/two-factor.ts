@@ -88,20 +88,27 @@ async function storeCode(userId: string, code: string): Promise<void> {
 // Send code via email
 async function sendCodeViaEmail(email: string, code: string, name: string): Promise<boolean> {
   if (!resend) {
-    console.warn('Resend API key not configured, skipping email send');
+    console.warn('⚠️  Resend API key not configured, skipping email send');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📧 VERIFICATION CODE (DEVELOPMENT MODE)');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(`To: ${email}`);
+    console.log(`Name: ${name}`);
+    console.log(`Code: ${code}`);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     return false;
   }
   
   try {
     await resend.emails.send({
-      from: 'Rewards App <noreply@rewards.example.com>',
+      from: 'LocalPerks <onboarding@resend.dev>', // Use Resend's test domain
       to: email,
-      subject: 'Your Authentication Code',
+      subject: 'Your LocalPerks Verification Code',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2>Two-Factor Authentication</h2>
+          <h2>Email Verification</h2>
           <p>Hi ${name},</p>
-          <p>Your authentication code is:</p>
+          <p>Your verification code is:</p>
           <div style="
             text-align: center;
             padding: 20px;
@@ -119,9 +126,10 @@ async function sendCodeViaEmail(email: string, code: string, name: string): Prom
         </div>
       `,
     });
+    console.log(`✅ Verification email sent to ${email}`);
     return true;
   } catch (error) {
-    console.error('Error sending 2FA email:', error);
+    console.error('❌ Error sending 2FA email:', error);
     return false;
   }
 }

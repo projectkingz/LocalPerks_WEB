@@ -6,6 +6,8 @@ export async function POST(req: Request) {
   try {
     const { userId, code } = await req.json();
 
+    console.log(`\n🔍 Verifying email for user: ${userId} with code: ${code}`);
+
     if (!userId || !code) {
       return NextResponse.json(
         { message: 'Missing required fields' },
@@ -14,9 +16,17 @@ export async function POST(req: Request) {
     }
 
     // Verify the 2FA code
-    const isValid = await verify2FACode(userId, code);
+    let isValid = false;
+    try {
+      isValid = await verify2FACode(userId, code);
+      console.log(`✅ Code verification result: ${isValid}`);
+    } catch (verifyError) {
+      console.error('❌ Error during code verification:', verifyError);
+      // Continue with isValid = false
+    }
 
     if (!isValid) {
+      console.warn('⚠️  Invalid or expired verification code');
       return NextResponse.json(
         { message: 'Invalid or expired verification code' },
         { status: 400 }
@@ -37,12 +47,14 @@ export async function POST(req: Request) {
       },
     });
 
+    console.log(`✅ Email verified successfully for user: ${user.email}`);
+
     return NextResponse.json({
       message: 'Email verified successfully',
       user,
     });
   } catch (error) {
-    console.error('Email verification error:', error);
+    console.error('❌ Email verification error:', error);
     return NextResponse.json(
       { message: 'Error during email verification' },
       { status: 500 }

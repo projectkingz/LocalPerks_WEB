@@ -263,36 +263,54 @@ export async function verify2FACode(userId: string, code: string): Promise<boole
     const key = `2fa:${userId}`;
     let storedCode: string | null = null;
     
+    console.log(`\n🔑 Verifying 2FA code for key: ${key}`);
+    console.log(`📝 Provided code: ${code}`);
+    console.log(`💾 Redis available: ${redis ? 'Yes' : 'No'}`);
+    console.log(`💾 Memory store size: ${memoryStore.size}`);
+    
     if (redis) {
       try {
+        console.log('🔄 Attempting Redis lookup...');
         storedCode = await redis.get<string>(key);
+        console.log(`📦 Redis returned: ${storedCode}`);
         if (storedCode === code) {
           await redis.del(key);
+          console.log('✅ Code matched in Redis!');
           return true;
         }
       } catch (error) {
-        console.warn('Redis verification failed, trying memory fallback:', error);
+        console.warn('⚠️  Redis verification failed, trying memory fallback');
+        // Don't log the full error, just continue to fallback
       }
     }
     
     // Check memory fallback
+    console.log('🔄 Checking memory fallback...');
     const memoryEntry = memoryStore.get(key);
+    console.log(`📦 Memory entry:`, memoryEntry ? `code=${memoryEntry.code}, expires=${new Date(memoryEntry.expires)}` : 'Not found');
+    
     if (memoryEntry) {
       // Check if expired
       if (Date.now() > memoryEntry.expires) {
+        console.log('⏰ Code expired');
         memoryStore.delete(key);
         return false;
       }
       
       if (memoryEntry.code === code) {
         memoryStore.delete(key);
+        console.log('✅ Code matched in memory store!');
         return true;
+      } else {
+        console.log(`❌ Code mismatch. Expected: ${memoryEntry.code}, Got: ${code}`);
       }
+    } else {
+      console.log('❌ No code found in memory store');
     }
     
     return false;
   } catch (error) {
-    console.error('Error verifying 2FA code:', error);
+    console.error('❌ Error verifying 2FA code:', error);
     return false;
   }
 }

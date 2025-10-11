@@ -196,30 +196,65 @@ async function sendCodeViaSMS(phone: string, code: string): Promise<boolean> {
   }
 }
 
+// Normalize phone number to E.164 format
+function normalizePhoneNumber(phone: string): string {
+  // Remove all non-digit characters except +
+  let normalized = phone.replace(/[^\d+]/g, '');
+  
+  console.log(`📞 Original phone: ${phone}`);
+  
+  // If it starts with 0, assume it's a UK number (remove leading 0 and add +44)
+  if (normalized.startsWith('0')) {
+    normalized = '+44' + normalized.substring(1);
+    console.log(`🇬🇧 Detected UK number, converted to: ${normalized}`);
+  }
+  // If it doesn't start with +, add +44 (UK default)
+  else if (!normalized.startsWith('+')) {
+    normalized = '+44' + normalized;
+    console.log(`🇬🇧 Added UK country code: ${normalized}`);
+  }
+  // If it starts with +0, it's invalid - fix it
+  else if (normalized.startsWith('+0')) {
+    normalized = '+44' + normalized.substring(2);
+    console.log(`🔧 Fixed invalid +0 prefix to: ${normalized}`);
+  }
+  
+  console.log(`✅ Normalized phone: ${normalized}`);
+  return normalized;
+}
+
 // Send code via WhatsApp
 async function sendCodeViaWhatsApp(phone: string, code: string): Promise<boolean> {
   try {
     if (!twilio) {
-      console.error('Twilio not configured. Please set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in your .env file.');
+      console.error('⚠️  Twilio not configured. Please set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in your .env file.');
+      console.log(`📱 WhatsApp code for ${phone}: ${code}`);
       return false;
     }
     
-    // Format phone number for WhatsApp (remove + and add whatsapp: prefix)
-    const whatsappNumber = phone.startsWith('+') ? phone.substring(1) : phone;
-    const whatsappTo = `whatsapp:+${whatsappNumber}`;
+    // Normalize phone number
+    const normalizedPhone = normalizePhoneNumber(phone);
+    
+    // Format phone number for WhatsApp (add whatsapp: prefix)
+    const whatsappTo = `whatsapp:${normalizedPhone}`;
     
     // Use Twilio WhatsApp sandbox number for testing
     // In production, you'd use your approved WhatsApp Business number
     const whatsappFrom = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+14155238886';
+    
+    console.log(`📤 Sending WhatsApp to: ${whatsappTo}`);
     
     await twilio.messages.create({
       body: `Your LocalPerks verification code is: ${code}. Valid for 10 minutes.`,
       to: whatsappTo,
       from: whatsappFrom,
     });
+    
+    console.log(`✅ WhatsApp sent successfully to ${normalizedPhone}`);
     return true;
   } catch (error) {
-    console.error('Error sending 2FA WhatsApp:', error);
+    console.error('❌ Error sending 2FA WhatsApp:', error);
+    console.log(`📱 WhatsApp code (fallback) for ${phone}: ${code}`);
     return false;
   }
 }

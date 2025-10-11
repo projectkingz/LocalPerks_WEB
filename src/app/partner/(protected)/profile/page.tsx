@@ -8,7 +8,6 @@ import {
   Phone,
   MapPin,
   Settings,
-  CreditCard,
   Save,
   QrCode,
   Lock,
@@ -262,51 +261,6 @@ export default function PartnerProfile() {
                 </div>
               </div>
             )}
-          </motion.div>
-
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100"
-          >
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-              <CreditCard className="h-5 w-5 text-blue-600 mr-2" />
-              Points Configuration
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Points per Pound</label>
-                <input
-                  type="number"
-                  value={businessProfile.pointsConfig.pointsPerPound}
-                  onChange={(e) => setBusinessProfile({
-                    ...businessProfile,
-                    pointsConfig: { 
-                      ...businessProfile.pointsConfig, 
-                      pointsPerPound: parseInt(e.target.value) || 0 
-                    }
-                  })}
-                  className="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Minimum Purchase (£)</label>
-                <input
-                  type="number"
-                  value={businessProfile.pointsConfig.minimumPurchase}
-                  onChange={(e) => setBusinessProfile({
-                    ...businessProfile,
-                    pointsConfig: { 
-                      ...businessProfile.pointsConfig, 
-                      minimumPurchase: parseInt(e.target.value) || 0 
-                    }
-                  })}
-                  className="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                />
-              </div>
-            </div>
           </motion.div>
 
         </div>

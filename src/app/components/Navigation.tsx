@@ -251,16 +251,18 @@ export default function Navigation() {
             </div>
           </div>
           <div className="hidden sm:ml-6 sm:flex sm:items-center space-x-4">
-            <Link
-              href={isAdmin ? "/admin" : isPartner ? "/partner/profile" : "/customer/profile"}
-              className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
-                isActive(isAdmin ? '/admin' : isPartner ? '/partner/profile' : '/customer/profile')
-                  ? 'border-blue-500 text-gray-900'
-                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-              }`}
-            >
-              {isAdmin ? 'Admin' : isPartner ? 'Profile' : 'Profile'}
-            </Link>
+            {!isAdmin && (
+              <Link
+                href={isPartner ? "/partner/profile" : "/customer/profile"}
+                className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
+                  isActive(isPartner ? '/partner/profile' : '/customer/profile')
+                    ? 'border-blue-500 text-gray-900'
+                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                }`}
+              >
+                Profile
+              </Link>
+            )}
             <button
               onClick={handleSignOut}
               className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 focus:outline-none"

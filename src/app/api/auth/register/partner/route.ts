@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { hash } from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
+import { generateAndSend2FACode } from '@/lib/auth/two-factor';
 
 export async function POST(req: Request) {
   try {
@@ -31,13 +32,14 @@ export async function POST(req: Request) {
 
     // Create tenant and user in transaction
     const result = await prisma.$transaction(async (tx) => {
-      // Create user with hashed password first
+      // Create user with hashed password first (unverified)
       const user = await tx.user.create({
         data: {
           name,
           email,
           password: hashedPassword,
           role: 'PARTNER',
+          approvalStatus: 'PENDING_EMAIL_VERIFICATION', // Mark as pending email verification
         },
       });
 
@@ -59,15 +61,32 @@ export async function POST(req: Request) {
       return { tenant, user: updatedUser };
     });
 
+    // Send email verification code
+    try {
+      const emailResult = await generateAndSend2FACode({
+        userId: result.user.id,
+        method: 'email',
+        email: email,
+      });
+
+      if (!emailResult.success) {
+        console.warn('Failed to send email verification:', emailResult.message);
+      }
+    } catch (error) {
+      console.error('Error sending email verification:', error);
+    }
+
     return NextResponse.json(
       {
-        message: 'Registration successful',
+        message: 'Registration successful. Please check your email for verification code.',
+        requiresEmailVerification: true,
         user: {
           id: result.user.id,
           name: result.user.name,
           email: result.user.email,
           role: result.user.role,
           tenantId: result.user.tenantId,
+          approvalStatus: result.user.approvalStatus,
         },
         tenant: {
           id: result.tenant.id,

@@ -54,8 +54,12 @@ export default function PartnerRegistration() {
         throw new Error(data.message || 'Registration failed');
       }
 
-      // Redirect to sign in page
-      router.push('/auth/signin?registered=true');
+      // Check if email verification is required
+      if (data.requiresEmailVerification) {
+        router.push(`/auth/verify-email?userId=${data.user.id}&email=${formData.email}`);
+      } else {
+        router.push('/auth/signin?registered=true');
+      }
     } catch (err: any) {
       setError(err.message || 'An error occurred during registration');
     } finally {

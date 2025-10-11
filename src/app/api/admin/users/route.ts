@@ -22,27 +22,27 @@ export async function GET(req: NextRequest) {
   const users = await prisma.$queryRaw`
     SELECT 
       u.id, u.name, u.email, u.role, u.suspended, 
-      u."approvalStatus", u."createdAt", u."updatedAt", 
-      u."tenantId",
-      COALESCE(CAST(earned_points.total_earned AS INTEGER), 0) - COALESCE(CAST(spent_points.total_spent AS INTEGER), 0) as points
-    FROM "User" u 
+      u.approvalStatus, u.createdAt, u.updatedAt, 
+      u.tenantId,
+      COALESCE(CAST(earned_points.total_earned AS SIGNED), 0) - COALESCE(CAST(spent_points.total_spent AS SIGNED), 0) as points
+    FROM User u 
     LEFT JOIN (
       SELECT 
-        "userId",
+        userId,
         SUM(points) as total_earned
-      FROM "Transaction" 
+      FROM Transaction 
       WHERE type = 'EARNED' AND status = 'APPROVED'
-      GROUP BY "userId"
-    ) earned_points ON u.id = earned_points."userId"
+      GROUP BY userId
+    ) earned_points ON u.id = earned_points.userId
     LEFT JOIN (
       SELECT 
         c.email,
         SUM(r.points) as total_spent
-      FROM "Redemption" r
-      JOIN "Customer" c ON r."customerId" = c.id
+      FROM Redemption r
+      JOIN Customer c ON r.customerId = c.id
       GROUP BY c.email
     ) spent_points ON u.email = spent_points.email
-    ORDER BY u."createdAt" DESC
+    ORDER BY u.createdAt DESC
   `;
   
   return NextResponse.json(users);

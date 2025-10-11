@@ -210,9 +210,12 @@ export async function generateAndSend2FACode(options: TwoFactorOptions): Promise
     const code = generateCode();
     await storeCode(userId, code);
 
+    console.log(`\n🔐 Generated 2FA code for user ${userId}: ${code}`);
+
     if (method === 'email' && email) {
       const sent = await sendCodeViaEmail(email, code, user.name || 'User');
       if (!sent) {
+        console.log(`\n⚠️  IMPORTANT: Email not configured. Use this code for verification: ${code}\n`);
         return {
           success: false,
           message: 'Failed to send code via email',

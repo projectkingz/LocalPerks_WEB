@@ -64,20 +64,24 @@ export async function POST(req: Request) {
     // Send email verification code
     let emailVerificationSent = false;
     try {
+      console.log(`\n📤 Attempting to send verification email to: ${email}`);
       const emailResult = await generateAndSend2FACode({
         userId: result.user.id,
         method: 'email',
         email: email,
       });
 
+      console.log(`\n📬 Email result:`, emailResult);
+
       if (emailResult.success) {
         emailVerificationSent = true;
-        console.log('Email verification sent successfully');
+        console.log('✅ Email verification sent successfully');
       } else {
-        console.warn('Failed to send email verification:', emailResult.message);
+        console.warn('⚠️  Failed to send email verification:', emailResult.message);
+        console.warn('💡 Check the console above for the verification code');
       }
     } catch (error) {
-      console.error('Error sending email verification:', error);
+      console.error('❌ Error sending email verification:', error);
     }
 
     return NextResponse.json(

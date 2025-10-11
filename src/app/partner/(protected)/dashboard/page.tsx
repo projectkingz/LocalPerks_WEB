@@ -9,7 +9,9 @@ import {
   Award,
   TrendingUp,
   Calendar,
-  PoundSterling
+  PoundSterling,
+  CreditCard,
+  Activity
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 
@@ -41,12 +43,10 @@ export default function PartnerDashboard() {
 
   // Fetch stats from API
   const [stats, setStats] = useState({
-    totalCustomers: 0,
+    totalTransactions: 0,
     pointsIssued: 0,
     averageTransaction: 0,
-    totalRewards: 45, // keep mock for now
-    revenueGenerated: 5680.50, // keep mock for now
-    customerRetention: 85 // keep mock for now
+    pointsIssueCharge: 0,
   });
   const [recentPointsIssued, setRecentPointsIssued] = useState<RecentActivity[]>([]);
   const [recentPointsRedeemed, setRecentPointsRedeemed] = useState<RecentActivity[]>([]);
@@ -59,27 +59,49 @@ export default function PartnerDashboard() {
   useEffect(() => {
     setStatsLoading(true);
     setStatsError(null);
-    fetch('/api/dashboard-stats')
+    
+    // Convert dateRange to days
+    const periodMap: Record<string, number> = {
+      week: 7,
+      month: 30,
+      quarter: 90,
+      halfyear: 180,
+      year: 365,
+    };
+    const periodDays = periodMap[dateRange] || 7;
+    
+    fetch(`/api/partner/stats?period=${periodDays}`)
       .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch dashboard stats');
+        if (!res.ok) throw new Error('Failed to fetch partner stats');
         return res.json();
       })
       .then(data => {
-        setStats(prev => ({
-          ...prev,
-          totalCustomers: data.totalCustomers,
-          pointsIssued: data.pointsIssued,
-          averageTransaction: data.avgTransaction
-        }));
-        setRecentPointsIssued(data.recentPointsIssued || []);
-        setRecentPointsRedeemed(data.recentPointsRedeemed || []);
+        setStats({
+          totalTransactions: data.totalTransactions || 0,
+          pointsIssued: data.pointsIssued || 0,
+          averageTransaction: data.averageTransaction || 0,
+          pointsIssueCharge: data.pointsIssueCharge || 0,
+        });
         setStatsLoading(false);
       })
       .catch((err) => {
-        setStatsError(err.message || 'Error loading dashboard stats');
+        setStatsError(err.message || 'Error loading partner stats');
         setStatsLoading(false);
       });
-  }, []);
+    
+    // Also fetch recent activity
+    fetch('/api/dashboard-stats')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data) {
+          setRecentPointsIssued(data.recentPointsIssued || []);
+          setRecentPointsRedeemed(data.recentPointsRedeemed || []);
+        }
+      })
+      .catch((err) => {
+        console.error('Error loading activity:', err);
+      });
+  }, [dateRange]);
 
   useEffect(() => {
     setPopularLoading(true);
@@ -129,20 +151,21 @@ export default function PartnerDashboard() {
             <select
               value={dateRange}
               onChange={(e) => setDateRange(e.target.value)}
-              className="rounded-lg border-gray-300 text-gray-700 text-sm focus:ring-blue-500 focus:border-blue-500"
+              className="rounded-lg border-gray-300 text-gray-700 text-sm focus:ring-blue-500 focus:border-blue-500 px-4 py-2"
             >
               <option value="week">Last 7 days</option>
               <option value="month">Last 30 days</option>
               <option value="quarter">Last 3 months</option>
+              <option value="halfyear">Last 6 months</option>
               <option value="year">Last 12 months</option>
             </select>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {statsLoading ? (
             <>
-              {[1, 2, 3].map((i) => (
+              {[1, 2, 3, 4].map((i) => (
                 <motion.div
                   key={i}
                   initial={{ opacity: 0, y: 20 }}
@@ -168,6 +191,7 @@ export default function PartnerDashboard() {
             </div>
           ) : (
             <>
+              {/* Total Transactions */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -176,17 +200,11 @@ export default function PartnerDashboard() {
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Total Customers</p>
-                    <p className="text-2xl font-semibold text-gray-900">{stats?.totalCustomers || 0}</p>
+                    <p className="text-sm font-medium text-gray-600">Total Transactions</p>
+                    <p className="text-2xl font-semibold text-gray-900">{stats.totalTransactions}</p>
                   </div>
                   <div className="p-3 bg-blue-50 rounded-xl">
-                    <Users className="h-6 w-6 text-blue-600" />
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <div className="flex items-center">
-                    {/* <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
-                    <span className="text-sm text-green-500">+12% from last month</span> */}
+                    <Activity className="h-6 w-6 text-blue-600" />
                   </div>
                 </div>
               </motion.div>
@@ -214,6 +232,7 @@ export default function PartnerDashboard() {
                 </div>
               </motion.div>
 
+              {/* Average Transaction */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -223,16 +242,28 @@ export default function PartnerDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Average Transaction</p>
-                    <p className="text-2xl font-semibold text-gray-900">£{(stats?.averageTransaction || 0).toFixed(2)}</p>
+                    <p className="text-2xl font-semibold text-gray-900">£{stats.averageTransaction.toFixed(2)}</p>
                   </div>
                   <div className="p-3 bg-green-50 rounded-xl">
                     <PoundSterling className="h-6 w-6 text-green-600" />
                   </div>
                 </div>
-                <div className="mt-4">
-                  <div className="flex items-center">
-                    {/* <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
-                    <span className="text-sm text-green-500">+5% from last week</span> */}
+              </motion.div>
+
+              {/* Points Issue Charge */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Points Issue Charge</p>
+                    <p className="text-2xl font-semibold text-gray-900">£{stats.pointsIssueCharge.toFixed(2)}</p>
+                  </div>
+                  <div className="p-3 bg-orange-50 rounded-xl">
+                    <CreditCard className="h-6 w-6 text-orange-600" />
                   </div>
                 </div>
               </motion.div>

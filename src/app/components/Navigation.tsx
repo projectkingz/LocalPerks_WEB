@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
@@ -17,17 +17,37 @@ import {
   Settings,
   BarChart3,
   UserCheck,
-  CreditCard
+  CreditCard,
+  ChevronDown
 } from 'lucide-react';
 
 export default function Navigation() {
   const { data: session } = useSession();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isAdminDropdownOpen, setIsAdminDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const isActive = (path: string) => {
     return pathname === path;
   };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsAdminDropdownOpen(false);
+      }
+    };
+
+    if (isAdminDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isAdminDropdownOpen]);
 
   // Check if user is a partner (should access partner routes)
   const isPartner = session?.user?.role === 'PARTNER';
@@ -52,15 +72,22 @@ export default function Navigation() {
     await signOut({ callbackUrl: '/' });
   };
 
-  // Admin navigation items
-  const adminNavItems = [
+  // Admin dropdown items
+  const adminDropdownItems = [
     { name: 'Dashboard', href: '/admin', icon: BarChart3 },
+    { name: 'System Config', href: '/admin/system-config', icon: Settings },
+  ];
+
+  // Other admin navigation items
+  const adminNavItems = [
     { name: 'Rewards', href: '/admin/rewards', icon: Award },
     { name: 'Redemptions', href: '/admin/redemptions', icon: Gift },
     { name: 'Vouchers', href: '/admin/vouchers', icon: CreditCard },
     { name: 'Customers', href: '/admin/customers', icon: UserCheck },
     { name: 'Pending Transactions', href: '/admin/pending-transactions', icon: Clock },
   ];
+  
+  const isAdminActive = pathname === '/admin' || pathname === '/admin/system-config';
 
   return (
     <nav className="bg-white shadow mb-8">
@@ -77,6 +104,43 @@ export default function Navigation() {
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
               {isAdmin ? (
                 <>
+                  {/* Admin Dropdown */}
+                  <div className="relative" ref={dropdownRef}>
+                    <button
+                      onClick={() => setIsAdminDropdownOpen(!isAdminDropdownOpen)}
+                      className={`inline-flex items-center px-1 pt-1 pb-1 border-b-2 text-sm font-medium h-16 ${
+                        isAdminActive
+                          ? 'border-blue-500 text-gray-900'
+                          : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                      }`}
+                    >
+                      <Shield className="h-4 w-4 mr-1" />
+                      Admin
+                      <ChevronDown className={`h-4 w-4 ml-1 transition-transform ${isAdminDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    
+                    {isAdminDropdownOpen && (
+                      <div className="absolute left-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                        {adminDropdownItems.map((item) => {
+                          const IconComponent = item.icon;
+                          return (
+                            <Link
+                              key={item.href}
+                              href={item.href}
+                              onClick={() => setIsAdminDropdownOpen(false)}
+                              className={`flex items-center px-4 py-2 text-sm hover:bg-gray-50 ${
+                                isActive(item.href) ? 'text-blue-600 bg-blue-50' : 'text-gray-700'
+                              }`}
+                            >
+                              <IconComponent className="h-4 w-4 mr-2" />
+                              {item.name}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
                   {adminNavItems.map((item) => {
                     const IconComponent = item.icon;
                     return (

@@ -13,10 +13,17 @@ export async function POST(req: Request) {
       );
     }
 
-    // Check if user exists
+    // Check if user exists and get their tenant
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, mobile: true, approvalStatus: true },
+      select: { 
+        id: true, 
+        approvalStatus: true,
+        role: true,
+        partnerTenants: {
+          select: { id: true, mobile: true }
+        }
+      },
     });
 
     if (!user) {
@@ -25,6 +32,9 @@ export async function POST(req: Request) {
         { status: 404 }
       );
     }
+
+    // For partners, get their tenant
+    const tenant = user.role === 'PARTNER' ? user.partnerTenants[0] : null;
 
     if (action === 'send') {
       // Send WhatsApp verification code
@@ -55,19 +65,25 @@ export async function POST(req: Request) {
         );
       }
 
-      // Update user mobile and status
+      // Update mobile number in tenant (for partners) and user status
+      if (tenant) {
+        await prisma.tenant.update({
+          where: { id: tenant.id },
+          data: { mobile: mobile },
+        });
+      }
+
+      // Update user approval status (mobile verification complete)
       const updatedUser = await prisma.user.update({
         where: { id: userId },
         data: { 
-          mobile: mobile,
-          // If email is already verified, mark as fully verified
-          approvalStatus: user.approvalStatus === 'ACTIVE' ? 'ACTIVE' : 'PENDING_EMAIL_VERIFICATION'
+          // Mark as active since both email and mobile are verified
+          approvalStatus: 'ACTIVE'
         },
         select: {
           id: true,
           name: true,
           email: true,
-          mobile: true,
           role: true,
           tenantId: true,
           approvalStatus: true,

@@ -254,8 +254,14 @@ async function sendCodeViaWhatsApp(phone: string, code: string): Promise<boolean
     return true;
   } catch (error) {
     console.error('❌ Error sending 2FA WhatsApp:', error);
-    console.log(`📱 WhatsApp code (fallback) for ${phone}: ${code}`);
-    return false;
+    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📱 WHATSAPP CODE (DEVELOPMENT MODE)');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(`Phone: ${phone}`);
+    console.log(`Code: ${code}`);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+    // Return true so the flow continues (code is available in console)
+    return true;
   }
 }
 

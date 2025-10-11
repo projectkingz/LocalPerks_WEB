@@ -71,17 +71,34 @@ async function storeCode(userId: string, code: string): Promise<void> {
   const key = `2fa:${userId}`;
   const expires = Date.now() + (CODE_EXPIRY * 1000);
   
+  console.log(`\n💾 Storing code for key: ${key}`);
+  console.log(`📝 Code: ${code}`);
+  console.log(`⏰ Expires: ${new Date(expires)}`);
+  
   try {
     if (redis) {
+      console.log('🔄 Attempting to store in Redis...');
       await redis.set(key, code, { ex: CODE_EXPIRY });
+      console.log('✅ Code stored in Redis');
     } else {
       // Fallback to in-memory storage
       memoryStore.set(key, { code, expires });
-      console.log('Using in-memory fallback for 2FA code storage');
+      console.log('✅ Using in-memory fallback for 2FA code storage');
+      console.log(`📊 Memory store now has ${memoryStore.size} entries`);
     }
   } catch (error) {
-    console.warn('Failed to store code in Redis, using memory fallback:', error);
+    console.warn('⚠️  Failed to store code in Redis, using memory fallback:', error);
     memoryStore.set(key, { code, expires });
+    console.log('✅ Code stored in memory fallback');
+    console.log(`📊 Memory store now has ${memoryStore.size} entries`);
+  }
+  
+  // Verify it was stored
+  const stored = memoryStore.get(key);
+  if (stored) {
+    console.log(`✅ Verified: Code is in memory store`);
+  } else if (!redis) {
+    console.error('❌ ERROR: Code was NOT stored in memory!');
   }
 }
 

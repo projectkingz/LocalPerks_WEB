@@ -3,17 +3,19 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Mail, ArrowLeft, RefreshCw } from 'lucide-react';
+import { MessageCircle, ArrowLeft, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 
-export default function VerifyEmailPage() {
+export default function VerifyMobilePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [mobile, setMobile] = useState('');
   const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [isResending, setIsResending] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
   
   const userId = searchParams.get('userId');
   const email = searchParams.get('email');
@@ -24,18 +26,55 @@ export default function VerifyEmailPage() {
     }
   }, [userId, email, router]);
 
+  const handleSendCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSending(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/auth/verify-mobile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          userId, 
+          mobile,
+          action: 'send'
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to send verification code');
+      }
+
+      setCodeSent(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to send verification code');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
     try {
-      const response = await fetch('/api/auth/verify-email', {
+      const response = await fetch('/api/auth/verify-mobile', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ userId, code }),
+        body: JSON.stringify({ 
+          userId, 
+          mobile,
+          code,
+          action: 'verify'
+        }),
       });
 
       const data = await response.json();
@@ -46,7 +85,7 @@ export default function VerifyEmailPage() {
 
       setSuccess(true);
       setTimeout(() => {
-        router.push(`/auth/verify-mobile?userId=${userId}&email=${email}`);
+        router.push('/auth/signin?verified=true');
       }, 2000);
     } catch (err: any) {
       setError(err.message || 'Verification failed');
@@ -56,16 +95,20 @@ export default function VerifyEmailPage() {
   };
 
   const handleResend = async () => {
-    setIsResending(true);
+    setIsSending(true);
     setError('');
 
     try {
-      const response = await fetch('/api/auth/resend-verification', {
+      const response = await fetch('/api/auth/verify-mobile', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ userId, email }),
+        body: JSON.stringify({ 
+          userId, 
+          mobile,
+          action: 'send'
+        }),
       });
 
       const data = await response.json();
@@ -78,7 +121,7 @@ export default function VerifyEmailPage() {
     } catch (err: any) {
       setError(err.message || 'Failed to resend verification');
     } finally {
-      setIsResending(false);
+      setIsSending(false);
     }
   };
 
@@ -101,8 +144,8 @@ export default function VerifyEmailPage() {
             transition={{ duration: 0.5 }}
             className="flex justify-center mb-6"
           >
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-              <Mail className="w-8 h-8 text-blue-600" />
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+              <MessageCircle className="w-8 h-8 text-green-600" />
             </div>
           </motion.div>
           
@@ -112,7 +155,7 @@ export default function VerifyEmailPage() {
             transition={{ delay: 0.2, duration: 0.5 }}
             className="text-3xl font-extrabold text-gray-900 mb-2"
           >
-            Verify Your Email
+            Verify Your Mobile
           </motion.h2>
           
           <motion.p
@@ -121,16 +164,10 @@ export default function VerifyEmailPage() {
             transition={{ delay: 0.3, duration: 0.5 }}
             className="text-gray-600"
           >
-            We've sent a 6-digit verification code to
-          </motion.p>
-          
-          <motion.p
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.4, duration: 0.5 }}
-            className="text-blue-600 font-semibold mt-1"
-          >
-            {email}
+            {codeSent 
+              ? 'We\'ve sent a 6-digit verification code to your WhatsApp'
+              : 'Enter your mobile number to receive a WhatsApp verification code'
+            }
           </motion.p>
         </div>
 
@@ -145,9 +182,70 @@ export default function VerifyEmailPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Email Verified!</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Mobile Verified!</h3>
             <p className="text-gray-600">Redirecting to sign in...</p>
           </motion.div>
+        ) : !codeSent ? (
+          <motion.form
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5, duration: 0.5 }}
+            className="mt-8 space-y-6"
+            onSubmit={handleSendCode}
+          >
+            <div className="relative group">
+              <input
+                type="tel"
+                value={mobile}
+                onChange={(e) => setMobile(e.target.value)}
+                required
+                className="block w-full px-4 py-3.5 text-gray-900 bg-gray-50 border-2 border-gray-200 rounded-xl appearance-none transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 peer group-hover:border-gray-300"
+                placeholder=" "
+              />
+              <label className="absolute text-sm font-medium text-gray-500 duration-200 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-gray-50 px-2 peer-focus:px-2 peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1 peer-focus:bg-gray-50 group-hover:bg-gray-50">
+                Mobile Number (with country code)
+              </label>
+            </div>
+
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="rounded-xl bg-red-50 p-4 border border-red-100"
+              >
+                <p className="text-sm font-medium text-red-800" role="alert">
+                  {error}
+                </p>
+              </motion.div>
+            )}
+
+            <motion.div
+              whileHover={{ scale: isSending ? 1 : 1.02 }}
+              whileTap={{ scale: isSending ? 1 : 0.98 }}
+            >
+              <button
+                type="submit"
+                disabled={isSending || !mobile}
+                className={`group relative w-full flex justify-center py-3.5 px-4 border border-transparent text-lg font-semibold rounded-xl text-white shadow-sm ${
+                  isSending || !mobile
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-200'
+                }`}
+              >
+                {isSending ? (
+                  <div className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Sending...
+                  </div>
+                ) : (
+                  'Send WhatsApp Code'
+                )}
+              </button>
+            </motion.div>
+          </motion.form>
         ) : (
           <motion.form
             initial={{ opacity: 0 }}
@@ -156,6 +254,12 @@ export default function VerifyEmailPage() {
             className="mt-8 space-y-6"
             onSubmit={handleVerify}
           >
+            <div className="text-center">
+              <p className="text-sm text-gray-600 mb-2">
+                Code sent to WhatsApp: <span className="font-semibold">{mobile}</span>
+              </p>
+            </div>
+
             <div className="relative group">
               <input
                 type="text"
@@ -190,7 +294,7 @@ export default function VerifyEmailPage() {
                 className={`group relative w-full flex justify-center py-3.5 px-4 border border-transparent text-lg font-semibold rounded-xl text-white shadow-sm ${
                   isLoading || code.length !== 6
                     ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200'
+                    : 'bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-200'
                 }`}
               >
                 {isLoading ? (
@@ -202,22 +306,19 @@ export default function VerifyEmailPage() {
                     Verifying...
                   </div>
                 ) : (
-                  'Verify Email'
+                  'Verify Mobile'
                 )}
               </button>
             </motion.div>
 
             <div className="text-center">
-              <p className="text-sm text-gray-600 mb-4">
-                Didn't receive the code?
-              </p>
               <button
                 type="button"
                 onClick={handleResend}
-                disabled={isResending}
-                className="flex items-center justify-center mx-auto px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50"
+                disabled={isSending}
+                className="flex items-center justify-center mx-auto px-4 py-2 text-sm font-medium text-green-600 bg-green-50 rounded-lg hover:bg-green-100 transition-colors disabled:opacity-50"
               >
-                {isResending ? (
+                {isSending ? (
                   <>
                     <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
                     Sending...

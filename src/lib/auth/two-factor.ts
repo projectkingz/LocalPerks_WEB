@@ -30,7 +30,7 @@ if (process.env.TWILIO_ACCOUNT_SID &&
 const CODE_EXPIRY = 10 * 60; // 10 minutes in seconds
 const CODE_LENGTH = 6;
 
-export type TwoFactorMethod = 'email' | 'sms';
+export type TwoFactorMethod = 'email' | 'sms' | 'whatsapp';
 
 interface TwoFactorOptions {
   userId: string;
@@ -105,13 +105,41 @@ async function sendCodeViaSMS(phone: string, code: string): Promise<boolean> {
     }
 
     await twilio.messages.create({
-      body: `Your Rewards App verification code is: ${code}. Valid for 10 minutes.`,
+      body: `Your LocalPerks verification code is: ${code}. Valid for 10 minutes.`,
       to: phone,
       from: process.env.TWILIO_PHONE_NUMBER,
     });
     return true;
   } catch (error) {
     console.error('Error sending 2FA SMS:', error);
+    return false;
+  }
+}
+
+// Send code via WhatsApp
+async function sendCodeViaWhatsApp(phone: string, code: string): Promise<boolean> {
+  try {
+    if (!twilio) {
+      console.error('Twilio not configured. Please set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in your .env file.');
+      return false;
+    }
+    
+    // Format phone number for WhatsApp (remove + and add whatsapp: prefix)
+    const whatsappNumber = phone.startsWith('+') ? phone.substring(1) : phone;
+    const whatsappTo = `whatsapp:+${whatsappNumber}`;
+    
+    // Use Twilio WhatsApp sandbox number for testing
+    // In production, you'd use your approved WhatsApp Business number
+    const whatsappFrom = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+14155238886';
+    
+    await twilio.messages.create({
+      body: `Your LocalPerks verification code is: ${code}. Valid for 10 minutes.`,
+      to: whatsappTo,
+      from: whatsappFrom,
+    });
+    return true;
+  } catch (error) {
+    console.error('Error sending 2FA WhatsApp:', error);
     return false;
   }
 }
@@ -153,6 +181,14 @@ export async function generateAndSend2FACode(options: TwoFactorOptions): Promise
         return {
           success: false,
           message: 'Failed to send code via SMS - Twilio not configured',
+        };
+      }
+    } else if (method === 'whatsapp' && phone) {
+      const sent = await sendCodeViaWhatsApp(phone, code);
+      if (!sent) {
+        return {
+          success: false,
+          message: 'Failed to send code via WhatsApp - Twilio not configured',
         };
       }
     } else {

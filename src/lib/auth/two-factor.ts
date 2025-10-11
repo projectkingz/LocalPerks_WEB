@@ -18,17 +18,37 @@ try {
 }
 
 // In-memory fallback for when Redis is unavailable
-const memoryStore = new Map<string, { code: string; expires: number }>();
+// Use global to persist across module reloads in development
+declare global {
+  var __2fa_memory_store__: Map<string, { code: string; expires: number }> | undefined;
+  var __2fa_cleanup_interval__: NodeJS.Timeout | undefined;
+}
+
+const memoryStore = global.__2fa_memory_store__ ?? new Map<string, { code: string; expires: number }>();
+if (!global.__2fa_memory_store__) {
+  global.__2fa_memory_store__ = memoryStore;
+  console.log('🆕 Created new global memory store for 2FA codes');
+} else {
+  console.log('♻️  Reusing existing global memory store for 2FA codes');
+}
 
 // Cleanup expired entries from memory store every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of memoryStore.entries()) {
-    if (now > entry.expires) {
-      memoryStore.delete(key);
+// Only set up interval once
+if (!global.__2fa_cleanup_interval__) {
+  global.__2fa_cleanup_interval__ = setInterval(() => {
+    const now = Date.now();
+    let cleaned = 0;
+    for (const [key, entry] of memoryStore.entries()) {
+      if (now > entry.expires) {
+        memoryStore.delete(key);
+        cleaned++;
+      }
     }
-  }
-}, 5 * 60 * 1000); // 5 minutes
+    if (cleaned > 0) {
+      console.log(`🧹 Cleaned up ${cleaned} expired 2FA codes`);
+    }
+  }, 5 * 60 * 1000) as any; // 5 minutes
+}
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 

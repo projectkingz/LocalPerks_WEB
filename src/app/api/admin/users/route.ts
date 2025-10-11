@@ -45,7 +45,13 @@ export async function GET(req: NextRequest) {
     ORDER BY u.createdAt DESC
   `;
   
-  return NextResponse.json(users);
+  // Convert BigInt values to numbers for JSON serialization
+  const serializedUsers = (users as any[]).map(user => ({
+    ...user,
+    points: Number(user.points),
+  }));
+  
+  return NextResponse.json(serializedUsers);
 }
 
 export async function POST(req: NextRequest) {

@@ -3,10 +3,32 @@ import { Resend } from 'resend';
 import { Twilio } from 'twilio';
 import { prisma } from '@/lib/prisma';
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL || '',
-  token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
-});
+// Initialize Redis with error handling
+let redis: Redis | null = null;
+try {
+  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    redis = new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    });
+  }
+} catch (error) {
+  console.warn('Redis initialization failed:', error);
+  redis = null;
+}
+
+// In-memory fallback for when Redis is unavailable
+const memoryStore = new Map<string, { code: string; expires: number }>();
+
+// Cleanup expired entries from memory store every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of memoryStore.entries()) {
+    if (now > entry.expires) {
+      memoryStore.delete(key);
+    }
+  }
+}, 5 * 60 * 1000); // 5 minutes
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
@@ -44,10 +66,23 @@ function generateCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// Store 2FA code in Redis
+// Store 2FA code in Redis or memory fallback
 async function storeCode(userId: string, code: string): Promise<void> {
   const key = `2fa:${userId}`;
-  await redis.set(key, code, { ex: CODE_EXPIRY });
+  const expires = Date.now() + (CODE_EXPIRY * 1000);
+  
+  try {
+    if (redis) {
+      await redis.set(key, code, { ex: CODE_EXPIRY });
+    } else {
+      // Fallback to in-memory storage
+      memoryStore.set(key, { code, expires });
+      console.log('Using in-memory fallback for 2FA code storage');
+    }
+  } catch (error) {
+    console.warn('Failed to store code in Redis, using memory fallback:', error);
+    memoryStore.set(key, { code, expires });
+  }
 }
 
 // Send code via email
@@ -215,15 +250,36 @@ export async function generateAndSend2FACode(options: TwoFactorOptions): Promise
 export async function verify2FACode(userId: string, code: string): Promise<boolean> {
   try {
     const key = `2fa:${userId}`;
-    const storedCode = await redis.get<string>(key);
-
-    if (!storedCode || storedCode !== code) {
-      return false;
+    let storedCode: string | null = null;
+    
+    if (redis) {
+      try {
+        storedCode = await redis.get<string>(key);
+        if (storedCode === code) {
+          await redis.del(key);
+          return true;
+        }
+      } catch (error) {
+        console.warn('Redis verification failed, trying memory fallback:', error);
+      }
     }
-
-    // Delete the code after successful verification
-    await redis.del(key);
-    return true;
+    
+    // Check memory fallback
+    const memoryEntry = memoryStore.get(key);
+    if (memoryEntry) {
+      // Check if expired
+      if (Date.now() > memoryEntry.expires) {
+        memoryStore.delete(key);
+        return false;
+      }
+      
+      if (memoryEntry.code === code) {
+        memoryStore.delete(key);
+        return true;
+      }
+    }
+    
+    return false;
   } catch (error) {
     console.error('Error verifying 2FA code:', error);
     return false;
@@ -234,8 +290,28 @@ export async function verify2FACode(userId: string, code: string): Promise<boole
 export async function hasPending2FAVerification(userId: string): Promise<boolean> {
   try {
     const key = `2fa:${userId}`;
-    const exists = await redis.exists(key);
-    return exists === 1;
+    
+    if (redis) {
+      try {
+        const exists = await redis.exists(key);
+        return exists === 1;
+      } catch (error) {
+        console.warn('Redis status check failed, checking memory fallback:', error);
+      }
+    }
+    
+    // Check memory fallback
+    const memoryEntry = memoryStore.get(key);
+    if (memoryEntry) {
+      // Check if expired
+      if (Date.now() > memoryEntry.expires) {
+        memoryStore.delete(key);
+        return false;
+      }
+      return true;
+    }
+    
+    return false;
   } catch (error) {
     console.error('Error checking 2FA status:', error);
     return false;

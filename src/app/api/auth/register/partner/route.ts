@@ -62,6 +62,7 @@ export async function POST(req: Request) {
     });
 
     // Send email verification code
+    let emailVerificationSent = false;
     try {
       const emailResult = await generateAndSend2FACode({
         userId: result.user.id,
@@ -69,7 +70,10 @@ export async function POST(req: Request) {
         email: email,
       });
 
-      if (!emailResult.success) {
+      if (emailResult.success) {
+        emailVerificationSent = true;
+        console.log('Email verification sent successfully');
+      } else {
         console.warn('Failed to send email verification:', emailResult.message);
       }
     } catch (error) {
@@ -78,8 +82,11 @@ export async function POST(req: Request) {
 
     return NextResponse.json(
       {
-        message: 'Registration successful. Please check your email for verification code.',
-        requiresEmailVerification: true,
+        message: emailVerificationSent 
+          ? 'Registration successful. Please check your email for verification code.'
+          : 'Registration successful. Please contact support for account activation.',
+        requiresEmailVerification: emailVerificationSent,
+        emailVerificationSent,
         user: {
           id: result.user.id,
           name: result.user.name,

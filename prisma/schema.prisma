@@ -192,3 +192,14 @@ model Activity {
 
   @@index([userId])
 }
+
+model SystemConfig {
+  id                      String   @id @default(cuid())
+  pointFaceValue          Float    @default(0.01) // £0.01 per point
+  systemFixedCharge       Float    @default(0.001) // £0.001 per point
+  systemVariableCharge    Float    @default(0.06) // 6% issuance margin
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  
+  @@map("system_config")
+}

@@ -52,6 +52,7 @@ model User {
   activities     Activity[]
   sessions       Session[]
   partnerTenants Tenant[]      @relation("PartnerUser")
+  adminProfile   Admin?        @relation("AdminUser")
   transactions   Transaction[]
   tenant         Tenant?       @relation(fields: [tenantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
@@ -202,4 +203,16 @@ model SystemConfig {
   updatedAt               DateTime @updatedAt
   
   @@map("system_config")
+}
+
+model Admin {
+  id            String   @id @default(cuid())
+  name          String
+  mobile        String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  adminUserId   String   @unique
+  adminUser     User     @relation("AdminUser", fields: [adminUserId], references: [id], onDelete: Cascade)
+  
+  @@index([adminUserId])
 }

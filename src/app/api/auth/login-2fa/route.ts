@@ -20,11 +20,7 @@ export async function POST(req: Request) {
     const user = await prisma.user.findUnique({
       where: email ? { email } : { id: userId },
       include: {
-        partnerTenants: {
-          include: {
-            tenant: true
-          }
-        }
+        partnerTenants: true
       }
     });
 
@@ -43,7 +39,7 @@ export async function POST(req: Request) {
     }
 
     // Get tenant mobile number
-    const tenant = user.partnerTenants[0]?.tenant;
+    const tenant = user.partnerTenants[0];
     if (!tenant || !tenant.mobile) {
       return NextResponse.json(
         { message: 'Mobile number not found for this partner account' },

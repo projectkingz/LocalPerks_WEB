@@ -21,11 +21,7 @@ export async function POST(req: Request) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        partnerTenants: {
-          include: {
-            tenant: true
-          }
-        }
+        partnerTenants: true
       }
     });
 

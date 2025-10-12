@@ -167,7 +167,13 @@ export const authOptions: NextAuthOptions = {
         } catch (error: any) {
           console.error('Error in authorize:', error);
           // Re-throw specific errors so they can be caught by the client
-          if (error.message && error.message.startsWith('ACCOUNT_') || error.message.startsWith('EMAIL_') || error.message.startsWith('PENDING_')) {
+          if (error.message && (
+            error.message.startsWith('ACCOUNT_') || 
+            error.message.startsWith('EMAIL_') || 
+            error.message.startsWith('PENDING_') ||
+            error.message.startsWith('PARTNER_') ||
+            error.message === '2FA_REQUIRED'
+          )) {
             throw error;
           }
           return null;

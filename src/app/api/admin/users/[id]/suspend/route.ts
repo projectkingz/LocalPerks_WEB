@@ -1,59 +1,72 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '../../../../auth/auth.config';
+import { authOptions } from '@/app/api/auth/auth.config';
 import { prisma } from '@/lib/prisma';
-
-// Helper to check admin access
-async function requireAdmin(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session || !session.user || !['ADMIN', 'SUPER_ADMIN'].includes(session.user.role)) {
-    return null;
-  }
-  return session.user;
-}
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const admin = await requireAdmin(req);
-  if (!admin) {
+  const session = await getServerSession(authOptions);
+  
+  if (!session || !session.user) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
 
-  const data = await req.json();
-  
-  // Get the user being suspended
-  const targetUser = await prisma.user.findUnique({
-    where: { id: params.id }
-  });
+  const isAdmin = session.user.role === 'ADMIN';
+  const isSuperAdmin = session.user.role === 'SUPER_ADMIN';
 
-  if (!targetUser) {
-    return NextResponse.json({ message: 'User not found' }, { status: 404 });
-  }
-
-  // Check permissions
-  if (['ADMIN', 'SUPER_ADMIN'].includes(targetUser.role) && admin.role !== 'SUPER_ADMIN') {
-    return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
-  }
-
-  // Prevent self-suspension
-  if (targetUser.id === admin.id) {
-    return NextResponse.json({ message: 'Cannot suspend your own account' }, { status: 400 });
+  if (!isAdmin && !isSuperAdmin) {
+    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
 
   try {
+    const { suspended } = await req.json();
+
+    // Get the target user
+    const targetUser = await prisma.user.findUnique({
+      where: { id: params.id },
+      select: { role: true, email: true },
+    });
+
+    if (!targetUser) {
+      return NextResponse.json({ message: 'User not found' }, { status: 404 });
+    }
+
+    // Permission check: Regular ADMIN can only manage CUSTOMER and PARTNER accounts
+    if (isAdmin && !isSuperAdmin) {
+      if (targetUser.role === 'ADMIN' || targetUser.role === 'SUPER_ADMIN') {
+        return NextResponse.json(
+          { message: 'Only Super Admin can manage admin accounts' },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Update suspension status
     const updatedUser = await prisma.user.update({
       where: { id: params.id },
-      data: {
-        suspended: data.suspended
+      data: { 
+        suspended,
+        // If activating (unsuspending), update approval status
+        approvalStatus: suspended ? 'SUSPENDED' : 'ACTIVE'
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        suspended: true,
+        approvalStatus: true,
       },
     });
 
-    // Return user info except password
-    const { password, ...userInfo } = updatedUser;
-    return NextResponse.json(userInfo);
+    return NextResponse.json(updatedUser);
   } catch (error: any) {
-    return NextResponse.json({ message: error.message }, { status: 400 });
+    console.error('Error updating user suspension:', error);
+    return NextResponse.json(
+      { message: error.message || 'Failed to update user' },
+      { status: 500 }
+    );
   }
-} 
+}

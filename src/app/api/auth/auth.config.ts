@@ -114,6 +114,18 @@ export const authOptions: NextAuthOptions = {
 
           console.log('Password verified successfully');
 
+          // Check if account is suspended
+          if (user.suspended) {
+            console.log('Account is suspended:', user.approvalStatus);
+            if (user.approvalStatus === 'UNDER_REVIEW') {
+              throw new Error('ACCOUNT_UNDER_REVIEW');
+            } else if (user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
+              throw new Error('EMAIL_VERIFICATION_REQUIRED');
+            } else {
+              throw new Error('ACCOUNT_SUSPENDED');
+            }
+          }
+
           // Check if 2FA verification is pending
           const has2FA = await hasPending2FAVerification(user.id);
           if (has2FA) {

@@ -32,13 +32,14 @@ export async function POST(req: Request) {
 
     // Create tenant and user in transaction
     const result = await prisma.$transaction(async (tx) => {
-      // Create user with hashed password first (unverified)
+      // Create user with hashed password first (suspended, pending verification)
       const user = await tx.user.create({
         data: {
           name,
           email,
           password: hashedPassword,
           role: 'PARTNER',
+          suspended: true, // Account suspended until admin approval
           approvalStatus: 'PENDING_EMAIL_VERIFICATION', // Mark as pending email verification
         },
       });

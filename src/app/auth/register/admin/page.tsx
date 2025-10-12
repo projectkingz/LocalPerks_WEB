@@ -57,7 +57,9 @@ export default function AdminRegisterPage() {
       const data = await response.json();
 
       if (response.ok) {
-        router.push('/auth/signin?type=admin&registered=true');
+        // Show success message and redirect
+        alert(data.message || 'Account created successfully. Your account is under review.');
+        router.push('/auth/signin?type=admin&message=account_under_review');
       } else {
         setError(data.message || 'Registration failed');
       }

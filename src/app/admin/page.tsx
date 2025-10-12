@@ -367,26 +367,20 @@ export default function AdminDashboard() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {user.role === 'PARTNER' ? (
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        user.approvalStatus === 'PENDING'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : user.approvalStatus === 'SUSPENDED' || user.suspended
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-green-100 text-green-800'
-                      }`}>
-                        {user.approvalStatus === 'PENDING' ? 'Pending Approval' : 
-                         user.approvalStatus === 'SUSPENDED' || user.suspended ? 'ACCOUNT SUSPENDED' : 'Active'}
-                      </span>
-                    ) : (
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        user.suspended 
-                          ? 'bg-red-100 text-red-800' 
-                          : 'bg-green-100 text-green-800'
-                      }`}>
-                        {user.suspended ? 'ACCOUNT SUSPENDED' : 'Active'}
-                      </span>
-                    )}
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      user.approvalStatus === 'UNDER_REVIEW'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : user.approvalStatus === 'PENDING' || user.approvalStatus === 'PENDING_EMAIL_VERIFICATION'
+                        ? 'bg-orange-100 text-orange-800'
+                        : user.approvalStatus === 'SUSPENDED' || user.suspended
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-green-100 text-green-800'
+                    }`}>
+                      {user.approvalStatus === 'UNDER_REVIEW' ? 'Under Review' :
+                       user.approvalStatus === 'PENDING' ? 'Pending Approval' : 
+                       user.approvalStatus === 'PENDING_EMAIL_VERIFICATION' ? 'Email Verification Required' :
+                       user.approvalStatus === 'SUSPENDED' || user.suspended ? 'Suspended' : 'Active'}
+                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {user.points.toLocaleString()}
@@ -403,14 +397,14 @@ export default function AdminDashboard() {
                         </button>
                       )}
                       
-                      {/* Partner Approval Button */}
-                      {user.role === 'PARTNER' && user.approvalStatus === 'PENDING' && canManageUser(user) && (
+                      {/* Approval Button for Pending/Under Review accounts */}
+                      {(user.approvalStatus === 'PENDING' || user.approvalStatus === 'UNDER_REVIEW' || user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') && canManageUser(user) && (
                         <button
                           onClick={() => handleApprovePartner(user.id)}
                           className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-green-700 bg-green-100 hover:bg-green-200"
                         >
                           <CheckCircle className="h-3 w-3 mr-1" />
-                          Approve
+                          Activate
                         </button>
                       )}
                       

@@ -72,7 +72,13 @@ function SignInContent() {
         setError(errorParam);
       }
     }
-  }, [errorParam]);
+    
+    // Handle success messages
+    const messageParam = searchParams.get('message');
+    if (messageParam === 'account_under_review') {
+      setError('✅ Account created successfully! Your account is under review and will be activated by an administrator.');
+    }
+  }, [errorParam, searchParams]);
 
   const validateEmail = (email: string): string => {
     if (!email) {
@@ -147,6 +153,12 @@ function SignInContent() {
           // Redirect to 2FA verification page
           window.location.href = `/auth/verify?email=${encodeURIComponent(email)}`;
           return;
+        } else if (result.error === 'ACCOUNT_UNDER_REVIEW') {
+          setError('Your account is under review. You will be notified once your account has been activated by an administrator.');
+        } else if (result.error === 'EMAIL_VERIFICATION_REQUIRED') {
+          setError('Please verify your email before signing in. Check your email for the verification link.');
+        } else if (result.error === 'ACCOUNT_SUSPENDED') {
+          setError('Your account has been suspended. Please contact support for assistance.');
         } else if (result.error === 'SOCIAL_LOGIN_ONLY') {
           setError('This account was created with social login. Please sign in using the same social login provider you used when signing up.');
         } else if (result.error === 'CredentialsSignin') {

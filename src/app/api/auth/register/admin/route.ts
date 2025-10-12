@@ -39,14 +39,15 @@ export async function POST(req: NextRequest) {
 
     // Create admin user and admin profile in a transaction
     const result = await prisma.$transaction(async (tx) => {
-      // Create user
+      // Create user (suspended, pending approval)
       const user = await tx.user.create({
         data: {
           name,
           email,
           password: hashedPassword,
           role,
-          approvalStatus: 'ACTIVE',
+          suspended: true, // Account suspended until superadmin approval
+          approvalStatus: 'UNDER_REVIEW',
           emailVerified: new Date(),
         },
       });
@@ -65,13 +66,15 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(
       {
-        message: 'Admin account created successfully',
+        message: 'Account created successfully. Your account is under review and will be activated by a Super Administrator.',
+        accountStatus: 'UNDER_REVIEW',
         user: {
           id: result.user.id,
           name: result.user.name,
           email: result.user.email,
           role: result.user.role,
           approvalStatus: result.user.approvalStatus,
+          suspended: result.user.suspended,
         },
         adminProfile: {
           id: result.adminProfile.id,

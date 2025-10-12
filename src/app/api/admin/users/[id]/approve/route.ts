@@ -1,62 +1,71 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/auth.config';
 import { prisma } from '@/lib/prisma';
 
 export async function PATCH(
-  request: Request,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const session = await getServerSession(authOptions);
   
-  if (!session?.user?.role || !['ADMIN', 'SUPER_ADMIN'].includes(session.user.role)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!session || !session.user) {
+    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+  }
+
+  const isAdmin = session.user.role === 'ADMIN';
+  const isSuperAdmin = session.user.role === 'SUPER_ADMIN';
+
+  if (!isAdmin && !isSuperAdmin) {
+    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    const { approvalStatus } = await request.json();
-    const userId = params.id;
+    const { approvalStatus } = await req.json();
 
-    // Get the user to check if they're a partner
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
+    // Get the target user
+    const targetUser = await prisma.user.findUnique({
+      where: { id: params.id },
+      select: { role: true, email: true },
     });
 
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (!targetUser) {
+      return NextResponse.json({ message: 'User not found' }, { status: 404 });
     }
 
-    // Only partners can have approval status changed
-    if (user.role !== 'PARTNER') {
-      return NextResponse.json({ error: 'Only partner accounts can be approved' }, { status: 400 });
+    // Permission check: Regular ADMIN can only manage CUSTOMER and PARTNER accounts
+    if (isAdmin && !isSuperAdmin) {
+      if (targetUser.role === 'ADMIN' || targetUser.role === 'SUPER_ADMIN') {
+        return NextResponse.json(
+          { message: 'Only Super Admin can manage admin accounts' },
+          { status: 403 }
+        );
+      }
     }
 
-    // Update the user's approval status
+    // Update approval status and unsuspend if activating
     const updatedUser = await prisma.user.update({
-      where: { id: userId },
+      where: { id: params.id },
       data: { 
-        approvalStatus: approvalStatus,
-        // If approving, also ensure they're not suspended
-        suspended: approvalStatus === 'ACTIVE' ? false : user.suspended
+        approvalStatus,
+        suspended: approvalStatus === 'ACTIVE' ? false : true
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        suspended: true,
+        approvalStatus: true,
       },
     });
 
-    return NextResponse.json({
-      message: 'Partner approval status updated successfully',
-      user: {
-        id: updatedUser.id,
-        name: updatedUser.name,
-        email: updatedUser.email,
-        role: updatedUser.role,
-        approvalStatus: updatedUser.approvalStatus,
-        suspended: updatedUser.suspended,
-      }
-    });
-  } catch (error) {
-    console.error('Error updating partner approval status:', error);
+    return NextResponse.json(updatedUser);
+  } catch (error: any) {
+    console.error('Error updating user approval:', error);
     return NextResponse.json(
-      { error: 'Failed to update partner approval status' },
+      { message: error.message || 'Failed to update user' },
       { status: 500 }
     );
   }
-} 
+}

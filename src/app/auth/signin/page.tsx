@@ -84,6 +84,10 @@ function SignInContent() {
     const messageParam = searchParams.get('message');
     if (messageParam === 'account_under_review') {
       setError('✅ Account created successfully! Your account is under review and will be activated by an administrator.');
+    } else if (messageParam === 'verification_complete_pending_approval') {
+      setError('✅ Verification complete! Your account is now pending admin approval. You will be able to sign in once an administrator activates your account.');
+    } else if (messageParam === 'verification_complete') {
+      setError('✅ Verification complete! You can now sign in with your credentials.');
     }
   }, [errorParam, searchParams]);
 
@@ -163,6 +167,26 @@ function SignInContent() {
         if (result.error === '2FA_REQUIRED') {
           // Redirect to 2FA verification page
           window.location.href = `/auth/verify?email=${encodeURIComponent(email)}`;
+          return;
+        } else if (result.error === 'PARTNER_EMAIL_VERIFICATION_REQUIRED') {
+          // Get userId from the user - we need to fetch it
+          const userResponse = await fetch(`/api/auth/user-by-email?email=${encodeURIComponent(email)}`);
+          if (userResponse.ok) {
+            const userData = await userResponse.json();
+            window.location.href = `/auth/verify-email?userId=${userData.id}&email=${encodeURIComponent(email)}`;
+          } else {
+            setError('Please complete email verification. Check your email for the verification code.');
+          }
+          return;
+        } else if (result.error === 'PARTNER_MOBILE_VERIFICATION_REQUIRED') {
+          // Get userId from the user
+          const userResponse = await fetch(`/api/auth/user-by-email?email=${encodeURIComponent(email)}`);
+          if (userResponse.ok) {
+            const userData = await userResponse.json();
+            window.location.href = `/auth/verify-mobile?userId=${userData.id}&email=${encodeURIComponent(email)}`;
+          } else {
+            setError('Please complete mobile verification.');
+          }
           return;
         } else if (result.error === 'ACCOUNT_UNDER_REVIEW') {
           setError('⏳ ACCOUNT UNDER REVIEW - Your account is under review and will be activated by an administrator. You will be able to sign in once approved.');

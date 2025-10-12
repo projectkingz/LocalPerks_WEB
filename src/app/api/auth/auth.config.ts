@@ -120,7 +120,21 @@ export const authOptions: NextAuthOptions = {
           
           if (isSuspended) {
             console.log('Account is suspended, throwing specific error');
-            if (user.approvalStatus === 'UNDER_REVIEW') {
+            
+            // For partners with pending verifications, redirect to verification flows
+            if (user.role === 'PARTNER') {
+              if (user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
+                console.log('Partner needs email verification, redirecting to verify-email');
+                throw new Error('PARTNER_EMAIL_VERIFICATION_REQUIRED');
+              } else if (user.approvalStatus === 'PENDING_MOBILE_VERIFICATION') {
+                console.log('Partner needs mobile verification, redirecting to verify-mobile');
+                throw new Error('PARTNER_MOBILE_VERIFICATION_REQUIRED');
+              } else if (user.approvalStatus === 'PENDING' || user.approvalStatus === 'UNDER_REVIEW') {
+                throw new Error('PENDING_APPROVAL');
+              } else {
+                throw new Error('ACCOUNT_SUSPENDED');
+              }
+            } else if (user.approvalStatus === 'UNDER_REVIEW') {
               throw new Error('ACCOUNT_UNDER_REVIEW');
             } else if (user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
               throw new Error('EMAIL_VERIFICATION_REQUIRED');

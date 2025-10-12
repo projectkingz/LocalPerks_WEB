@@ -85,7 +85,12 @@ export default function VerifyMobilePage() {
 
       setSuccess(true);
       setTimeout(() => {
-        router.push('/auth/signin?verified=true');
+        // Check if user is a partner (will need admin approval)
+        if (data.user?.role === 'PARTNER' && data.user?.approvalStatus === 'PENDING') {
+          router.push('/auth/signin?message=verification_complete_pending_approval');
+        } else {
+          router.push('/auth/signin?message=verification_complete');
+        }
       }, 2000);
     } catch (err: any) {
       setError(err.message || 'Verification failed');

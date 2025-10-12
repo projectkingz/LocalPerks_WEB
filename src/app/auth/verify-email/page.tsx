@@ -46,7 +46,12 @@ export default function VerifyEmailPage() {
 
       setSuccess(true);
       setTimeout(() => {
-        router.push(`/auth/verify-mobile?userId=${userId}&email=${email}`);
+        // Check if mobile verification is required
+        if (data.requiresMobileVerification) {
+          router.push(`/auth/verify-mobile?userId=${userId}&email=${email}`);
+        } else {
+          router.push('/auth/signin?message=verification_complete');
+        }
       }, 2000);
     } catch (err: any) {
       setError(err.message || 'Verification failed');

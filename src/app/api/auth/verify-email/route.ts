@@ -33,10 +33,17 @@ export async function POST(req: Request) {
       );
     }
 
-    // Update user status to verified
-    const user = await prisma.user.update({
+    // Update user status - for partners, move to mobile verification
+    const user = await prisma.user.findUnique({
       where: { id: userId },
-      data: { approvalStatus: 'ACTIVE' },
+      select: { role: true },
+    });
+
+    const newApprovalStatus = user?.role === 'PARTNER' ? 'PENDING_MOBILE_VERIFICATION' : 'ACTIVE';
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { approvalStatus: newApprovalStatus },
       select: {
         id: true,
         name: true,
@@ -47,11 +54,13 @@ export async function POST(req: Request) {
       },
     });
 
-    console.log(`✅ Email verified successfully for user: ${user.email}`);
+    console.log(`✅ Email verified successfully for user: ${updatedUser.email}`);
+    console.log(`Next step: ${newApprovalStatus}`);
 
     return NextResponse.json({
       message: 'Email verified successfully',
-      user,
+      user: updatedUser,
+      requiresMobileVerification: newApprovalStatus === 'PENDING_MOBILE_VERIFICATION',
     });
   } catch (error) {
     console.error('❌ Email verification error:', error);

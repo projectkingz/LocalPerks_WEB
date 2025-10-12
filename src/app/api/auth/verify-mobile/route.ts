@@ -74,11 +74,13 @@ export async function POST(req: Request) {
       }
 
       // Update user approval status (mobile verification complete)
+      // For partners, set to PENDING for admin approval
       const updatedUser = await prisma.user.update({
         where: { id: userId },
         data: { 
-          // Mark as active since both email and mobile are verified
-          approvalStatus: 'ACTIVE'
+          approvalStatus: user.role === 'PARTNER' ? 'PENDING' : 'ACTIVE',
+          // Keep suspended true for partners (admin must activate)
+          suspended: user.role === 'PARTNER' ? true : false,
         },
         select: {
           id: true,
@@ -87,6 +89,7 @@ export async function POST(req: Request) {
           role: true,
           tenantId: true,
           approvalStatus: true,
+          suspended: true,
         },
       });
 

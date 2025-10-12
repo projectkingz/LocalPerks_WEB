@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { motion } from 'framer-motion';
@@ -16,6 +16,7 @@ function VerifyLogin2FAContent() {
   const [resendSuccess, setResendSuccess] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [mobile, setMobile] = useState<string | null>(null);
+  const codeSentRef = useRef(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get('email');
@@ -28,6 +29,12 @@ function VerifyLogin2FAContent() {
         return;
       }
 
+      // Prevent duplicate sends (React 18 Strict Mode runs useEffect twice)
+      if (codeSentRef.current) {
+        console.log('⏭️  Code already sent, skipping duplicate send');
+        return;
+      }
+
       try {
         const response = await fetch(`/api/auth/user-by-email?email=${encodeURIComponent(email)}`);
         if (response.ok) {
@@ -35,7 +42,8 @@ function VerifyLogin2FAContent() {
           setUserId(userData.id);
           setMobile(userData.mobile || 'your registered mobile');
           
-          // Send initial 2FA code
+          // Send initial 2FA code (mark as sent before calling to prevent race condition)
+          codeSentRef.current = true;
           await sendCode(userData.id, userData.email);
         } else {
           setError('Failed to fetch user data');

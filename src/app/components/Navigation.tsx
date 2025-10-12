@@ -72,10 +72,13 @@ export default function Navigation() {
     await signOut({ callbackUrl: '/' });
   };
 
+  // Check if user is super admin
+  const isSuperAdmin = session?.user?.role === 'SUPER_ADMIN';
+
   // Admin dropdown items
   const adminDropdownItems = [
     { name: 'Dashboard', href: '/admin', icon: BarChart3 },
-    { name: 'System Config', href: '/admin/system-config', icon: Settings },
+    ...(isSuperAdmin ? [{ name: 'System Config', href: '/admin/system-config', icon: Settings }] : []),
   ];
 
   // Other admin navigation items

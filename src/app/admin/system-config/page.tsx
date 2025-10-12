@@ -1,10 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Settings, Save, DollarSign, TrendingUp, Percent } from 'lucide-react';
+import { Settings, Save, DollarSign, TrendingUp, Percent, AlertCircle } from 'lucide-react';
 
 export default function SystemConfigPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [config, setConfig] = useState({
@@ -14,11 +18,27 @@ export default function SystemConfigPage() {
   });
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Check for SUPER_ADMIN access
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/auth/signin?type=admin');
+    } else if (status === 'authenticated') {
+      if (session?.user?.role !== 'SUPER_ADMIN') {
+        console.log('Access denied: User role is', session?.user?.role);
+        router.push('/admin'); // Redirect regular admins to dashboard
+      }
+    }
+  }, [status, session, router]);
+
   // Fetch current configuration
   useEffect(() => {
     const fetchConfig = async () => {
       try {
         const response = await fetch('/api/admin/system-config');
+        if (response.status === 401) {
+          router.push('/admin'); // Unauthorized
+          return;
+        }
         if (response.ok) {
           const data = await response.json();
           setConfig({
@@ -35,8 +55,10 @@ export default function SystemConfigPage() {
       }
     };
 
-    fetchConfig();
-  }, []);
+    if (status === 'authenticated' && session?.user?.role === 'SUPER_ADMIN') {
+      fetchConfig();
+    }
+  }, [status, session, router]);
 
   const handleSave = async () => {
     setIsSaving(true);

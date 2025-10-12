@@ -6,14 +6,14 @@ export async function POST(req: Request) {
   try {
     const { userId, mobile, code, action } = await req.json();
 
-    if (!userId || !mobile) {
+    if (!userId) {
       return NextResponse.json(
-        { message: 'Missing required fields' },
+        { error: 'User ID is required' },
         { status: 400 }
       );
     }
 
-    // Check if user exists and get their tenant
+    // Check if user exists and get their tenant/customer
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { 
@@ -67,50 +67,37 @@ export async function POST(req: Request) {
       }
     }
 
-    if (action === 'send') {
-      // Send WhatsApp verification code
-      const result = await generateAndSend2FACode({
-        userId: user.id,
-        method: 'whatsapp',
-        phone: mobile,
-      });
-
-      if (!result.success) {
-        return NextResponse.json(
-          { message: result.message || 'Failed to send verification code' },
-          { status: 400 }
-        );
-      }
-
-      return NextResponse.json({
-        message: 'Verification code sent to WhatsApp',
-      });
-    } else if (action === 'verify' && code) {
+    // If code is provided, verify it
+    if (code) {
+      console.log('🔐 Verifying mobile code for:', userId);
+      
       // Verify the code
       const isValid = await verify2FACode({ userId, code, purpose: 'registration' });
 
       if (!isValid) {
         return NextResponse.json(
-          { message: 'Invalid or expired verification code' },
+          { error: 'Invalid or expired verification code' },
           { status: 400 }
         );
       }
 
-      // Update mobile number in tenant (for partners) and user status
-      if (tenant) {
+      // Update mobile number in tenant (for partners) if mobile provided
+      if (tenant && mobile) {
         await prisma.tenant.update({
-          where: { id: tenant.id },
+          where: { id: tenant.id},
           data: { mobile: mobile },
         });
       }
 
       // Update user approval status (mobile verification complete)
       // For partners, set to PENDING for admin approval
+      // For customers, set to ACTIVE
       const updatedUser = await prisma.user.update({
         where: { id: userId },
         data: { 
           approvalStatus: user.role === 'PARTNER' ? 'PENDING' : 'ACTIVE',
           // Keep suspended true for partners (admin must activate)
+          // Set suspended false for customers
           suspended: user.role === 'PARTNER' ? true : false,
         },
         select: {
@@ -124,13 +111,46 @@ export async function POST(req: Request) {
         },
       });
 
+      console.log('✅ Mobile verification successful for:', user.role);
+
       return NextResponse.json({
         message: 'Mobile number verified successfully',
         user: updatedUser,
       });
-    } else {
+    } 
+    
+    // If action is 'send', send a new code
+    else if (action === 'send') {
+      if (!mobile) {
+        return NextResponse.json(
+          { error: 'Mobile number is required to send verification code' },
+          { status: 400 }
+        );
+      }
+
+      // Send WhatsApp verification code
+      const result = await generateAndSend2FACode({
+        userId: user.id,
+        method: 'whatsapp',
+        phone: mobile,
+        purpose: 'registration'
+      });
+
+      if (!result.success) {
+        return NextResponse.json(
+          { error: result.message || 'Failed to send verification code' },
+          { status: 400 }
+        );
+      }
+
+      return NextResponse.json({
+        message: 'Verification code sent to WhatsApp',
+      });
+    } 
+    
+    else {
       return NextResponse.json(
-        { message: 'Invalid action' },
+        { error: 'Invalid request. Provide either code for verification or action=send to resend.' },
         { status: 400 }
       );
     }

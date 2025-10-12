@@ -60,8 +60,14 @@ function SignInContent() {
   useEffect(() => {
     // Handle URL error parameter
     if (errorParam) {
-      if (errorParam === 'suspended') {
-        setError('ACCOUNT SUSPENDED - Your account has been suspended. Please contact support for assistance.');
+      if (errorParam === 'account_under_review') {
+        setError('⏳ ACCOUNT UNDER REVIEW - Your account is under review and will be activated by an administrator. You will be able to sign in once approved.');
+      } else if (errorParam === 'email_verification_required') {
+        setError('📧 EMAIL VERIFICATION REQUIRED - Please verify your email address before signing in. Check your inbox for the verification link.');
+      } else if (errorParam === 'pending_approval') {
+        setError('⏳ PENDING APPROVAL - Your account is pending approval. You will be notified once an administrator activates your account.');
+      } else if (errorParam === 'suspended') {
+        setError('🚫 ACCOUNT SUSPENDED - Your account has been suspended. Please contact support for assistance.');
       } else if (errorParam === 'email_password_only') {
         setError('This account was created with email and password. Please sign in using your email and password instead of social login.');
       } else if (errorParam === 'wrong_social_provider') {

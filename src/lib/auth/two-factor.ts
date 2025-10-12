@@ -198,7 +198,7 @@ async function sendCodeViaSMS(phone: string, code: string): Promise<boolean> {
 }
 
 // Normalize phone number to E.164 format
-function normalizePhoneNumber(phone: string): string {
+export function normalizePhoneNumber(phone: string): string {
   // Remove all non-digit characters except +
   let normalized = phone.replace(/[^\d+]/g, '');
   

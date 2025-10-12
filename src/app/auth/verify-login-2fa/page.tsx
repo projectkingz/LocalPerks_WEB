@@ -22,6 +22,12 @@ function VerifyLogin2FAContent() {
   const email = searchParams.get('email');
 
   useEffect(() => {
+    // Prevent duplicate sends (React 18 Strict Mode runs useEffect twice)
+    if (codeSentRef.current) {
+      console.log('⏭️  Code already sent, skipping entire effect');
+      return;
+    }
+
     // Fetch user data to get userId and mobile
     const fetchUserData = async () => {
       if (!email) {
@@ -29,11 +35,9 @@ function VerifyLogin2FAContent() {
         return;
       }
 
-      // Prevent duplicate sends (React 18 Strict Mode runs useEffect twice)
-      if (codeSentRef.current) {
-        console.log('⏭️  Code already sent, skipping duplicate send');
-        return;
-      }
+      // Mark as sent immediately to prevent race conditions
+      codeSentRef.current = true;
+      console.log('🔒 Locked - preventing duplicate sends');
 
       try {
         const response = await fetch(`/api/auth/user-by-email?email=${encodeURIComponent(email)}`);
@@ -42,15 +46,16 @@ function VerifyLogin2FAContent() {
           setUserId(userData.id);
           setMobile(userData.mobile || 'your registered mobile');
           
-          // Send initial 2FA code (mark as sent before calling to prevent race condition)
-          codeSentRef.current = true;
+          // Send initial 2FA code
           await sendCode(userData.id, userData.email);
         } else {
           setError('Failed to fetch user data');
+          codeSentRef.current = false; // Reset on error
         }
       } catch (error) {
         console.error('Error fetching user data:', error);
         setError('Failed to fetch user data');
+        codeSentRef.current = false; // Reset on error
       }
     };
 

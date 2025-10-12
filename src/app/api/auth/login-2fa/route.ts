@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { generateAndSend2FACode } from '@/lib/auth/two-factor';
+import { generateAndSend2FACode, normalizePhoneNumber } from '@/lib/auth/two-factor';
 
 export async function POST(req: Request) {
   try {
@@ -47,7 +47,8 @@ export async function POST(req: Request) {
       );
     }
 
-    const mobile = tenant.mobile;
+    const mobile = normalizePhoneNumber(tenant.mobile);
+    console.log(`📱 Normalized mobile: ${tenant.mobile} → ${mobile}`);
 
     // Send WhatsApp verification code
     let codeSent = false;
@@ -56,7 +57,7 @@ export async function POST(req: Request) {
       const result = await generateAndSend2FACode({
         userId: user.id,
         method: 'whatsapp',
-        mobile: mobile,
+        phone: mobile,
         purpose: 'login' // Add purpose to distinguish from registration 2FA
       });
 

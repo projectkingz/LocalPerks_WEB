@@ -165,8 +165,12 @@ function SignInContent() {
         console.log('SignIn error:', result.error);
         
         if (result.error === '2FA_REQUIRED' || result.error === 'PARTNER_2FA_REQUIRED') {
-          // Redirect to 2FA login verification page
+          // Redirect to partner 2FA login verification page
           window.location.href = `/auth/verify-login-2fa?email=${encodeURIComponent(email)}`;
+          return;
+        } else if (result.error === 'CUSTOMER_2FA_REQUIRED') {
+          // Redirect to customer 2FA login verification page
+          window.location.href = `/auth/verify-login-2fa-customer?email=${encodeURIComponent(email)}`;
           return;
         } else if (result.error === 'PARTNER_EMAIL_VERIFICATION_REQUIRED') {
           // Get userId from the user - we need to fetch it

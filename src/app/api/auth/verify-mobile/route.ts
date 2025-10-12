@@ -36,6 +36,37 @@ export async function POST(req: Request) {
     // For partners, get their tenant
     const tenant = user.role === 'PARTNER' ? user.partnerTenants[0] : null;
 
+    // For partners, validate that the mobile number matches the one from registration
+    if (user.role === 'PARTNER' && tenant) {
+      const registeredMobile = tenant.mobile;
+      
+      // Normalize both numbers for comparison (remove spaces, dashes, etc.)
+      const normalizeMobile = (num: string) => num.replace(/[\s\-\(\)]/g, '');
+      const normalizedInput = normalizeMobile(mobile);
+      const normalizedRegistered = registeredMobile ? normalizeMobile(registeredMobile) : '';
+      
+      if (!registeredMobile) {
+        return NextResponse.json(
+          { message: 'No mobile number found in registration. Please contact support.' },
+          { status: 400 }
+        );
+      }
+      
+      // Check if the numbers match (allowing for different formats of the same number)
+      const inputWithoutCountryCode = normalizedInput.replace(/^\+?44/, '').replace(/^0/, '');
+      const registeredWithoutCountryCode = normalizedRegistered.replace(/^\+?44/, '').replace(/^0/, '');
+      
+      if (inputWithoutCountryCode !== registeredWithoutCountryCode) {
+        return NextResponse.json(
+          { 
+            message: 'Mobile number does not match the number used during registration. Please enter the same mobile number you registered with.',
+            registeredMobile: registeredMobile 
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     if (action === 'send') {
       // Send WhatsApp verification code
       const result = await generateAndSend2FACode({

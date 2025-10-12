@@ -167,17 +167,22 @@ export const authOptions: NextAuthOptions = {
       
       if (isSuspended) {
         console.log('Suspended user attempting to sign in:', user.email);
+        console.log('Approval status for redirect:', user.approvalStatus);
         
         // Determine the specific error message based on approval status
+        let errorUrl = '/auth/signin?error=';
         if (user.approvalStatus === 'UNDER_REVIEW') {
-          return '/auth/signin?error=account_under_review';
+          errorUrl += 'account_under_review';
         } else if (user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
-          return '/auth/signin?error=email_verification_required';
+          errorUrl += 'email_verification_required';
         } else if (user.approvalStatus === 'PENDING') {
-          return '/auth/signin?error=pending_approval';
+          errorUrl += 'pending_approval';
         } else {
-          return '/auth/signin?error=suspended';
+          errorUrl += 'suspended';
         }
+        
+        console.log('Redirecting to:', errorUrl);
+        return errorUrl;
       }
 
       // For social logins, enforce authentication method consistency

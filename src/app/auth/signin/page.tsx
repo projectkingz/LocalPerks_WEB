@@ -59,6 +59,7 @@ function SignInContent() {
 
   useEffect(() => {
     // Handle URL error parameter
+    console.log('Error parameter from URL:', errorParam);
     if (errorParam) {
       if (errorParam === 'account_under_review') {
         setError('⏳ ACCOUNT UNDER REVIEW - Your account is under review and will be activated by an administrator. You will be able to sign in once approved.');

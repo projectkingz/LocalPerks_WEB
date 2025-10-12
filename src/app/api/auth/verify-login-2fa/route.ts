@@ -5,15 +5,17 @@ import { signToken } from '@/lib/auth/jwt';
 
 export async function POST(req: Request) {
   try {
-    const { email, userId, code } = await req.json();
+    const { userId, code } = await req.json();
 
     // Validate input
-    if (!email || !userId || !code) {
+    if (!userId || !code) {
       return NextResponse.json(
-        { message: 'Missing required fields' },
+        { error: 'Missing required fields' },
         { status: 400 }
       );
     }
+
+    console.log('🔐 Verifying login 2FA for user:', userId);
 
     // Verify user exists and is a partner
     const user = await prisma.user.findUnique({
@@ -29,56 +31,51 @@ export async function POST(req: Request) {
 
     if (!user) {
       return NextResponse.json(
-        { message: 'User not found' },
+        { error: 'User not found' },
         { status: 404 }
-      );
-    }
-
-    if (user.email !== email) {
-      return NextResponse.json(
-        { message: 'Email mismatch' },
-        { status: 400 }
       );
     }
 
     if (user.role !== 'PARTNER') {
       return NextResponse.json(
-        { message: '2FA is only available for partner accounts' },
+        { error: '2FA is only available for partner accounts' },
         { status: 403 }
       );
     }
 
     // Check if user is suspended or needs approval
-    if (user.suspended) {
+    const isSuspended = Boolean(user.suspended);
+    if (isSuspended) {
       if (user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
         return NextResponse.json(
-          { message: 'PARTNER_EMAIL_VERIFICATION_REQUIRED' },
+          { error: 'PARTNER_EMAIL_VERIFICATION_REQUIRED' },
           { status: 401 }
         );
       } else if (user.approvalStatus === 'PENDING_MOBILE_VERIFICATION') {
         return NextResponse.json(
-          { message: 'PARTNER_MOBILE_VERIFICATION_REQUIRED' },
+          { error: 'PARTNER_MOBILE_VERIFICATION_REQUIRED' },
           { status: 401 }
         );
       } else if (user.approvalStatus === 'UNDER_REVIEW') {
         return NextResponse.json(
-          { message: 'ACCOUNT_UNDER_REVIEW' },
+          { error: 'ACCOUNT_UNDER_REVIEW' },
           { status: 401 }
         );
       } else if (user.approvalStatus === 'PENDING') {
         return NextResponse.json(
-          { message: 'PENDING_APPROVAL' },
+          { error: 'PENDING_APPROVAL' },
           { status: 401 }
         );
       } else {
         return NextResponse.json(
-          { message: 'ACCOUNT_SUSPENDED' },
+          { error: 'ACCOUNT_SUSPENDED' },
           { status: 401 }
         );
       }
     }
 
     // Verify 2FA code
+    console.log('🔑 Verifying 2FA code...');
     const isValidCode = await verify2FACode({
       userId: user.id,
       code: code,
@@ -86,41 +83,25 @@ export async function POST(req: Request) {
     });
 
     if (!isValidCode) {
+      console.log('❌ Invalid or expired code');
       return NextResponse.json(
-        { message: 'Invalid or expired verification code' },
+        { error: 'Invalid or expired verification code' },
         { status: 400 }
       );
     }
 
-    // Generate session token
-    const sessionToken = signToken({
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-      tenantId: user.tenantId
-    });
+    console.log('✅ 2FA verification successful!');
 
-    // Return user data and token
+    // Return success - the frontend will handle the actual sign-in
     return NextResponse.json({
-      message: 'Login successful',
-      sessionToken,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        tenantId: user.tenantId,
-        points: user.points,
-        tier: user.tier,
-        suspended: user.suspended,
-        approvalStatus: user.approvalStatus
-      }
+      success: true,
+      message: 'Verification successful'
     });
 
   } catch (error) {
     console.error('Verify login 2FA error:', error);
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

@@ -102,14 +102,20 @@ export const authOptions: NextAuthOptions = {
           }
 
           console.log('Verifying password...');
-          const isPasswordValid = await compare(
-            credentials.password as string,
-            user.password
-          );
+          
+          // Check if this is a 2FA bypass (after successful 2FA verification)
+          const is2FABypass = credentials.password === '__2FA_VERIFIED__';
+          
+          if (!is2FABypass) {
+            const isPasswordValid = await compare(
+              credentials.password as string,
+              user.password
+            );
 
-          if (!isPasswordValid) {
-            console.log('Invalid password');
-            return null;
+            if (!isPasswordValid) {
+              console.log('Invalid password');
+              return null;
+            }
           }
 
           console.log('Password verified successfully');
@@ -145,17 +151,22 @@ export const authOptions: NextAuthOptions = {
             }
           }
 
-          // Check if 2FA verification is pending
-          const has2FA = await hasPending2FAVerification(user.id);
-          if (has2FA) {
-            console.log('2FA verification required');
-            throw new Error('2FA_REQUIRED');
-          }
+          // Skip 2FA checks if this is a post-2FA-verification login
+          if (!is2FABypass) {
+            // Check if 2FA verification is pending
+            const has2FA = await hasPending2FAVerification(user.id);
+            if (has2FA) {
+              console.log('2FA verification required');
+              throw new Error('2FA_REQUIRED');
+            }
 
-          // For active partners, require 2FA login
-          if (user.role === 'PARTNER' && !isSuspended && user.approvalStatus === 'ACTIVE') {
-            console.log('Partner login - 2FA required');
-            throw new Error('PARTNER_2FA_REQUIRED');
+            // For active partners, require 2FA login
+            if (user.role === 'PARTNER' && !isSuspended && user.approvalStatus === 'ACTIVE') {
+              console.log('Partner login - 2FA required');
+              throw new Error('PARTNER_2FA_REQUIRED');
+            }
+          } else {
+            console.log('✅ 2FA bypass - already verified');
           }
 
           console.log('Authorization successful');

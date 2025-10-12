@@ -114,6 +114,23 @@ export const authOptions: NextAuthOptions = {
 
           console.log('Password verified successfully');
 
+          // Check if account is suspended (handle MySQL boolean as 1/0)
+          const isSuspended = Boolean(user.suspended);
+          console.log('Suspended check - raw value:', user.suspended, 'converted:', isSuspended, 'approvalStatus:', user.approvalStatus);
+          
+          if (isSuspended) {
+            console.log('Account is suspended, throwing specific error');
+            if (user.approvalStatus === 'UNDER_REVIEW') {
+              throw new Error('ACCOUNT_UNDER_REVIEW');
+            } else if (user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
+              throw new Error('EMAIL_VERIFICATION_REQUIRED');
+            } else if (user.approvalStatus === 'PENDING') {
+              throw new Error('PENDING_APPROVAL');
+            } else {
+              throw new Error('ACCOUNT_SUSPENDED');
+            }
+          }
+
           // Check if 2FA verification is pending
           const has2FA = await hasPending2FAVerification(user.id);
           if (has2FA) {
@@ -122,9 +139,8 @@ export const authOptions: NextAuthOptions = {
           }
 
           console.log('Authorization successful');
-          console.log('User suspended status:', user.suspended, typeof user.suspended);
           
-          // Return user data - suspension will be checked in signIn callback
+          // Return user data
           return {
             id: user.id,
             email: user.email,
@@ -134,8 +150,12 @@ export const authOptions: NextAuthOptions = {
             suspended: Boolean(user.suspended),
             approvalStatus: user.approvalStatus,
           };
-        } catch (error) {
+        } catch (error: any) {
           console.error('Error in authorize:', error);
+          // Re-throw specific errors so they can be caught by the client
+          if (error.message && error.message.startsWith('ACCOUNT_') || error.message.startsWith('EMAIL_') || error.message.startsWith('PENDING_')) {
+            throw error;
+          }
           return null;
         }
       }
@@ -159,31 +179,6 @@ export const authOptions: NextAuthOptions = {
       console.log('SignIn callback - user suspended status:', user.suspended, typeof user.suspended);
       console.log('SignIn callback - account provider:', account?.provider);
       console.log('SignIn callback - user email:', user.email);
-      console.log('SignIn callback - approval status:', user.approvalStatus);
-      
-      // Check if user is suspended - handle both boolean and numeric values
-      const isSuspended = Boolean(user.suspended);
-      console.log('Is suspended (converted):', isSuspended);
-      
-      if (isSuspended) {
-        console.log('Suspended user attempting to sign in:', user.email);
-        console.log('Approval status for redirect:', user.approvalStatus);
-        
-        // Determine the specific error message based on approval status
-        let errorUrl = '/auth/signin?error=';
-        if (user.approvalStatus === 'UNDER_REVIEW') {
-          errorUrl += 'account_under_review';
-        } else if (user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
-          errorUrl += 'email_verification_required';
-        } else if (user.approvalStatus === 'PENDING') {
-          errorUrl += 'pending_approval';
-        } else {
-          errorUrl += 'suspended';
-        }
-        
-        console.log('Redirecting to:', errorUrl);
-        return errorUrl;
-      }
 
       // For social logins, enforce authentication method consistency
       if (account?.provider !== 'credentials') {

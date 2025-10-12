@@ -155,17 +155,23 @@ function SignInContent() {
         redirect: false,
       });
 
+      console.log('SignIn result:', result);
+      
       if (result?.error) {
+        console.log('SignIn error:', result.error);
+        
         if (result.error === '2FA_REQUIRED') {
           // Redirect to 2FA verification page
           window.location.href = `/auth/verify?email=${encodeURIComponent(email)}`;
           return;
         } else if (result.error === 'ACCOUNT_UNDER_REVIEW') {
-          setError('Your account is under review. You will be notified once your account has been activated by an administrator.');
+          setError('⏳ ACCOUNT UNDER REVIEW - Your account is under review and will be activated by an administrator. You will be able to sign in once approved.');
         } else if (result.error === 'EMAIL_VERIFICATION_REQUIRED') {
-          setError('Please verify your email before signing in. Check your email for the verification link.');
+          setError('📧 EMAIL VERIFICATION REQUIRED - Please verify your email address before signing in. Check your inbox for the verification link.');
+        } else if (result.error === 'PENDING_APPROVAL') {
+          setError('⏳ PENDING APPROVAL - Your account is pending approval. You will be notified once an administrator activates your account.');
         } else if (result.error === 'ACCOUNT_SUSPENDED') {
-          setError('Your account has been suspended. Please contact support for assistance.');
+          setError('🚫 ACCOUNT SUSPENDED - Your account has been suspended. Please contact support for assistance.');
         } else if (result.error === 'SOCIAL_LOGIN_ONLY') {
           setError('This account was created with social login. Please sign in using the same social login provider you used when signing up.');
         } else if (result.error === 'CredentialsSignin') {

@@ -4,19 +4,21 @@ import { generateAndSend2FACode } from '@/lib/auth/two-factor';
 
 export async function POST(req: Request) {
   try {
-    const { email, userId, mobile } = await req.json();
+    const { email, userId } = await req.json();
 
     // Validate input
-    if (!email || !userId || !mobile) {
+    if (!email && !userId) {
       return NextResponse.json(
-        { message: 'Missing required fields' },
+        { message: 'Email or userId is required' },
         { status: 400 }
       );
     }
 
+    console.log('🔐 Login 2FA request for:', email || userId);
+
     // Verify user exists and is a partner
     const user = await prisma.user.findUnique({
-      where: { id: userId },
+      where: email ? { email } : { id: userId },
       include: {
         partnerTenants: {
           include: {
@@ -30,13 +32,6 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { message: 'User not found' },
         { status: 404 }
-      );
-    }
-
-    if (user.email !== email) {
-      return NextResponse.json(
-        { message: 'Email mismatch' },
-        { status: 400 }
       );
     }
 
@@ -56,13 +51,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Verify mobile number matches
-    if (tenant.mobile !== mobile) {
-      return NextResponse.json(
-        { message: 'Mobile number mismatch' },
-        { status: 400 }
-      );
-    }
+    const mobile = tenant.mobile;
 
     // Send WhatsApp verification code
     let codeSent = false;

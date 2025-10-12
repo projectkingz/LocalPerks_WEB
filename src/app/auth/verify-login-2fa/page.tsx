@@ -51,6 +51,7 @@ function VerifyLogin2FAContent() {
 
   const sendCode = async (userIdToUse: string, userEmail: string) => {
     try {
+      console.log('📤 Sending 2FA code request...');
       const response = await fetch('/api/auth/login-2fa', {
         method: 'POST',
         headers: {
@@ -65,14 +66,15 @@ function VerifyLogin2FAContent() {
       const data = await response.json();
 
       if (!response.ok) {
-        console.error('Failed to send code:', data.error);
+        console.error('❌ Failed to send code:', data.message || data.error);
         return false;
       }
 
-      console.log('✅ 2FA code sent successfully');
+      console.log('✅ 2FA code sent successfully:', data.message);
+      console.log('📱 Check your WhatsApp or console for the verification code');
       return true;
     } catch (error) {
-      console.error('Error sending code:', error);
+      console.error('❌ Error sending code:', error);
       return false;
     }
   };

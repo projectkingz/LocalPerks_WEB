@@ -13,7 +13,7 @@ import {
   Save,
   X
 } from 'lucide-react';
-import PasswordChangeForm from '@/app/components/PasswordChangeForm';
+import PasswordChangeForm from '@/components/PasswordChangeForm';
 
 export default function AdminProfile() {
   const { data: session } = useSession();

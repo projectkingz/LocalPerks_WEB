@@ -398,26 +398,42 @@ export async function verify2FACode(options: { userId: string; code: string; pur
 // Check if user has pending 2FA verification
 export async function hasPending2FAVerification(userId: string): Promise<boolean> {
   try {
-    const key = `2fa:${userId}`;
+    // Check both registration and login 2FA codes
+    const registrationKey = `2fa:${userId}:registration`;
+    const loginKey = `2fa:${userId}:login`;
     
     if (redis) {
       try {
-        const exists = await redis.exists(key);
-        return exists === 1;
+        const [registrationExists, loginExists] = await Promise.all([
+          redis.exists(registrationKey),
+          redis.exists(loginKey)
+        ]);
+        return registrationExists === 1 || loginExists === 1;
       } catch (error) {
         console.warn('Redis status check failed, checking memory fallback:', error);
       }
     }
     
     // Check memory fallback
-    const memoryEntry = memoryStore.get(key);
-    if (memoryEntry) {
-      // Check if expired
-      if (Date.now() > memoryEntry.expires) {
-        memoryStore.delete(key);
-        return false;
+    const registrationEntry = memoryStore.get(registrationKey);
+    const loginEntry = memoryStore.get(loginKey);
+    
+    // Check registration entry
+    if (registrationEntry) {
+      if (Date.now() > registrationEntry.expires) {
+        memoryStore.delete(registrationKey);
+      } else {
+        return true;
       }
-      return true;
+    }
+    
+    // Check login entry
+    if (loginEntry) {
+      if (Date.now() > loginEntry.expires) {
+        memoryStore.delete(loginKey);
+      } else {
+        return true;
+      }
     }
     
     return false;

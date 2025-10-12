@@ -126,9 +126,15 @@ export default function AdminDashboard() {
         throw new Error('Failed to approve partner');
       }
       
-      // Update local state
+      const updatedUserData = await response.json();
+      
+      // Update local state with both approvalStatus and suspended
       setUsers(users.map(user => 
-        user.id === userId ? { ...user, approvalStatus: 'ACTIVE' } : user
+        user.id === userId ? { 
+          ...user, 
+          approvalStatus: updatedUserData.approvalStatus,
+          suspended: updatedUserData.suspended 
+        } : user
       ));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');

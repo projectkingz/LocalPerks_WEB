@@ -410,7 +410,7 @@ export default function AdminDashboard() {
                         ) : (
                           <button
                             onClick={() => handleSuspendUser(user.id, true)}
-                            className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200"
+                            className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-amber-700 bg-amber-100 hover:bg-amber-200"
                           >
                             <Ban className="h-3 w-3 mr-1" />
                             Suspend

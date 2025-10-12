@@ -114,8 +114,11 @@ export const authOptions: NextAuthOptions = {
 
           console.log('Password verified successfully');
 
-          // Check if account is suspended
-          if (user.suspended) {
+          // Check if account is suspended (handle MySQL boolean as 1/0)
+          const isSuspended = Boolean(user.suspended);
+          console.log('Suspended check - raw value:', user.suspended, 'converted:', isSuspended, 'approvalStatus:', user.approvalStatus);
+          
+          if (isSuspended) {
             console.log('Account is suspended:', user.approvalStatus);
             if (user.approvalStatus === 'UNDER_REVIEW') {
               throw new Error('ACCOUNT_UNDER_REVIEW');
@@ -141,7 +144,7 @@ export const authOptions: NextAuthOptions = {
             name: user.name,
             role: user.role,
             tenantId: user.tenantId,
-            suspended: user.suspended,
+            suspended: Boolean(user.suspended),
             approvalStatus: user.approvalStatus,
           };
         } catch (error) {

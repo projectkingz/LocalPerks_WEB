@@ -87,7 +87,7 @@ export async function POST(req: Request) {
       });
     } else if (action === 'verify' && code) {
       // Verify the code
-      const isValid = await verify2FACode(userId, code);
+      const isValid = await verify2FACode({ userId, code, purpose: 'registration' });
 
       if (!isValid) {
         return NextResponse.json(

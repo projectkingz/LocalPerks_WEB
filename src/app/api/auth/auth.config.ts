@@ -152,6 +152,12 @@ export const authOptions: NextAuthOptions = {
             throw new Error('2FA_REQUIRED');
           }
 
+          // For active partners, require 2FA login
+          if (user.role === 'PARTNER' && !isSuspended && user.approvalStatus === 'ACTIVE') {
+            console.log('Partner login - 2FA required');
+            throw new Error('PARTNER_2FA_REQUIRED');
+          }
+
           console.log('Authorization successful');
           
           // Return user data

@@ -79,6 +79,7 @@ interface TwoFactorOptions {
   method: TwoFactorMethod;
   email?: string;
   phone?: string;
+  purpose?: string; // 'registration' or 'login'
 }
 
 // Generate a random numeric code
@@ -87,8 +88,8 @@ function generateCode(): string {
 }
 
 // Store 2FA code in Redis or memory fallback
-async function storeCode(userId: string, code: string): Promise<void> {
-  const key = `2fa:${userId}`;
+async function storeCode(userId: string, code: string, purpose: string = 'registration'): Promise<void> {
+  const key = `2fa:${userId}:${purpose}`;
   const expires = Date.now() + (CODE_EXPIRY * 1000);
   
   console.log(`\n💾 Storing code for key: ${key}`);
@@ -271,7 +272,7 @@ export async function generateAndSend2FACode(options: TwoFactorOptions): Promise
   message?: string;
 }> {
   try {
-    const { userId, method, email, phone } = options;
+    const { userId, method, email, phone, purpose = 'registration' } = options;
 
     // Get user details
     const user = await prisma.user.findUnique({
@@ -286,7 +287,7 @@ export async function generateAndSend2FACode(options: TwoFactorOptions): Promise
     }
 
     const code = generateCode();
-    await storeCode(userId, code);
+    await storeCode(userId, code, purpose);
 
     console.log(`\n🔐 Generated 2FA code for user ${userId}: ${code}`);
 
@@ -336,9 +337,10 @@ export async function generateAndSend2FACode(options: TwoFactorOptions): Promise
 }
 
 // Verify 2FA code
-export async function verify2FACode(userId: string, code: string): Promise<boolean> {
+export async function verify2FACode(options: { userId: string; code: string; purpose?: string }): Promise<boolean> {
   try {
-    const key = `2fa:${userId}`;
+    const { userId, code, purpose = 'registration' } = options;
+    const key = `2fa:${userId}:${purpose}`;
     let storedCode: string | null = null;
     
     console.log(`\n🔑 Verifying 2FA code for key: ${key}`);

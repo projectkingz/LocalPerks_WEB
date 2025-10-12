@@ -18,7 +18,7 @@ export async function POST(req: Request) {
     // Verify the 2FA code
     let isValid = false;
     try {
-      isValid = await verify2FACode(userId, code);
+      isValid = await verify2FACode({ userId, code, purpose: 'registration' });
       console.log(`✅ Code verification result: ${isValid}`);
     } catch (verifyError) {
       console.error('❌ Error during code verification:', verifyError);

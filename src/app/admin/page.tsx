@@ -397,30 +397,25 @@ export default function AdminDashboard() {
                         </button>
                       )}
                       
-                      {/* Approval Button for Pending/Under Review accounts */}
-                      {(user.approvalStatus === 'PENDING' || user.approvalStatus === 'UNDER_REVIEW' || user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') && canManageUser(user) && (
-                        <button
-                          onClick={() => handleApprovePartner(user.id)}
-                          className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-green-700 bg-green-100 hover:bg-green-200"
-                        >
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Activate
-                        </button>
-                      )}
-                      
-                      {/* Suspend/Activate Button */}
+                      {/* Activate/Suspend Button */}
                       {canManageUser(user) && (
-                        <button
-                          onClick={() => handleSuspendUser(user.id, !user.suspended)}
-                          className={`inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded ${
-                            user.suspended
-                              ? 'text-green-700 bg-green-100 hover:bg-green-200'
-                              : 'text-red-700 bg-red-100 hover:bg-red-200'
-                          }`}
-                        >
-                          {user.suspended ? <CheckCircle className="h-3 w-3 mr-1" /> : <Ban className="h-3 w-3 mr-1" />}
-                          {user.suspended ? 'Activate' : 'Suspend'}
-                        </button>
+                        user.suspended || ['PENDING', 'UNDER_REVIEW', 'PENDING_EMAIL_VERIFICATION', 'PENDING_MOBILE_VERIFICATION'].includes(user.approvalStatus || '') ? (
+                          <button
+                            onClick={() => handleApprovePartner(user.id)}
+                            className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-green-700 bg-green-100 hover:bg-green-200"
+                          >
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Activate
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleSuspendUser(user.id, true)}
+                            className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200"
+                          >
+                            <Ban className="h-3 w-3 mr-1" />
+                            Suspend
+                          </button>
+                        )
                       )}
                       
                       {canDeleteUser(user) ? (

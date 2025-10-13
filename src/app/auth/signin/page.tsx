@@ -192,6 +192,26 @@ function SignInContent() {
             setError('Please complete mobile verification.');
           }
           return;
+        } else if (result.error === 'CUSTOMER_EMAIL_VERIFICATION_REQUIRED') {
+          // Get userId from the user
+          const userResponse = await fetch(`/api/auth/user-by-email?email=${encodeURIComponent(email)}`);
+          if (userResponse.ok) {
+            const userData = await userResponse.json();
+            window.location.href = `/auth/verify-email?userId=${userData.id}&email=${encodeURIComponent(email)}`;
+          } else {
+            setError('Please complete email verification. Check your email for the verification code.');
+          }
+          return;
+        } else if (result.error === 'CUSTOMER_MOBILE_VERIFICATION_REQUIRED') {
+          // Get userId from the user
+          const userResponse = await fetch(`/api/auth/user-by-email?email=${encodeURIComponent(email)}`);
+          if (userResponse.ok) {
+            const userData = await userResponse.json();
+            window.location.href = `/auth/verify-mobile?userId=${userData.id}&email=${encodeURIComponent(email)}`;
+          } else {
+            setError('Please complete mobile verification.');
+          }
+          return;
         } else if (result.error === 'ACCOUNT_UNDER_REVIEW') {
           setError('⏳ ACCOUNT UNDER REVIEW - Your account is under review and will be activated by an administrator. You will be able to sign in once approved.');
         } else if (result.error === 'EMAIL_VERIFICATION_REQUIRED') {

@@ -140,7 +140,21 @@ export const authOptions: NextAuthOptions = {
               } else {
                 throw new Error('ACCOUNT_SUSPENDED');
               }
-            } else if (user.approvalStatus === 'UNDER_REVIEW') {
+            } 
+            // For customers with pending verifications, redirect to verification flows
+            else if (user.role === 'CUSTOMER') {
+              if (user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
+                console.log('Customer needs email verification, redirecting to verify-email');
+                throw new Error('CUSTOMER_EMAIL_VERIFICATION_REQUIRED');
+              } else if (user.approvalStatus === 'PENDING_MOBILE_VERIFICATION') {
+                console.log('Customer needs mobile verification, redirecting to verify-mobile');
+                throw new Error('CUSTOMER_MOBILE_VERIFICATION_REQUIRED');
+              } else {
+                throw new Error('ACCOUNT_SUSPENDED');
+              }
+            }
+            // For other roles (ADMIN, SUPER_ADMIN)
+            else if (user.approvalStatus === 'UNDER_REVIEW') {
               throw new Error('ACCOUNT_UNDER_REVIEW');
             } else if (user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
               throw new Error('EMAIL_VERIFICATION_REQUIRED');

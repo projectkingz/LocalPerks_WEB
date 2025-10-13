@@ -36,7 +36,7 @@ export async function POST(req: Request) {
 
     // Create user and customer in transaction
     const result = await prisma.$transaction(async (tx) => {
-      // Create user with suspended status pending mobile verification
+      // Create user with suspended status pending email verification
       const user = await tx.user.create({
         data: {
           name,
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
           password: hashedPassword,
           role: 'CUSTOMER',
           suspended: true,
-          approvalStatus: 'PENDING_MOBILE_VERIFICATION',
+          approvalStatus: 'PENDING_EMAIL_VERIFICATION',
         },
       });
 
@@ -62,34 +62,35 @@ export async function POST(req: Request) {
       return { user, customer };
     });
 
-    // Send mobile verification code via WhatsApp
-    let verificationSent = false;
+    // Send email verification code
+    let emailVerificationSent = false;
     try {
-      console.log('📤 Sending customer mobile verification code...');
+      console.log('📧 Sending customer email verification code...');
       const sendResult = await generateAndSend2FACode({
         userId: result.user.id,
-        method: 'whatsapp',
-        phone: normalizedMobile,
+        method: 'email',
+        email: result.user.email,
+        name: result.user.name || 'Customer',
         purpose: 'registration'
       });
 
       if (sendResult.success) {
-        verificationSent = true;
-        console.log('✅ Customer verification code sent successfully');
+        emailVerificationSent = true;
+        console.log('✅ Customer email verification code sent successfully');
       } else {
-        console.warn('⚠️  Failed to send customer verification code:', sendResult.message);
+        console.warn('⚠️  Failed to send customer email verification code:', sendResult.message);
       }
     } catch (error) {
-      console.error('❌ Error sending customer verification code:', error);
+      console.error('❌ Error sending customer email verification code:', error);
     }
 
     return NextResponse.json(
       {
-        message: verificationSent 
-          ? 'Registration successful. Please verify your mobile number.'
-          : 'Registration successful but verification code could not be sent. Please try again.',
-        requiresMobileVerification: true,
-        mobileVerificationSent: verificationSent,
+        message: emailVerificationSent 
+          ? 'Registration successful. Please check your email for the verification code.'
+          : 'Registration successful but verification email could not be sent. Please try again.',
+        requiresEmailVerification: true,
+        emailVerificationSent: emailVerificationSent,
         user: {
           id: result.user.id,
           name: result.user.name,

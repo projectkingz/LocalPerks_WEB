@@ -166,11 +166,7 @@ export const authOptions: NextAuthOptions = {
               throw new Error('PARTNER_2FA_REQUIRED');
             }
 
-            // For active customers, require 2FA login
-            if (user.role === 'CUSTOMER' && !isSuspended && user.approvalStatus === 'ACTIVE') {
-              console.log('Customer login - 2FA required');
-              throw new Error('CUSTOMER_2FA_REQUIRED');
-            }
+            // Customers do NOT require login 2FA (only email + mobile verification at registration)
           } else {
             console.log('✅ 2FA bypass - already verified');
           }

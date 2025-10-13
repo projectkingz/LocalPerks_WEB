@@ -69,10 +69,10 @@ export default function CustomerRegistration() {
         throw new Error(data.message || 'Registration failed');
       }
 
-      // Check if mobile verification is required
-      if (data.requiresMobileVerification) {
-        // Redirect to mobile verification page
-        router.push(`/auth/verify-mobile-customer?userId=${data.user.id}&email=${encodeURIComponent(data.user.email)}`);
+      // Check if email verification is required
+      if (data.requiresEmailVerification) {
+        // Redirect to email verification page
+        router.push(`/auth/verify-email?userId=${data.user.id}&email=${encodeURIComponent(data.user.email)}`);
       } else {
         // Redirect to sign in page
         router.push('/auth/signin?registered=true');

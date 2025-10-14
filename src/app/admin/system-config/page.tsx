@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Settings, Save, DollarSign, TrendingUp, Percent, AlertCircle } from 'lucide-react';
+import ScrollControls from '@/components/ScrollControls';
 
 export default function SystemConfigPage() {
   const { data: session, status } = useSession();
@@ -103,8 +104,10 @@ export default function SystemConfigPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      <div className="max-w-4xl mx-auto p-6">
+    <>
+      <ScrollControls />
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+        <div className="max-w-4xl mx-auto p-6">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -265,6 +268,7 @@ export default function SystemConfigPage() {
         </motion.div>
       </div>
     </div>
+    </>
   );
 }
 

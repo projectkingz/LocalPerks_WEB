@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
+import ScrollControls from '@/components/ScrollControls';
 
 interface PointsData {
   points: number;
@@ -311,8 +312,10 @@ export default function RewardsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold mb-8">Rewards</h1>
+    <>
+      <ScrollControls />
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold mb-8">Rewards</h1>
 
       {/* Points Balance */}
       <div className="bg-white shadow rounded-lg p-6">
@@ -623,5 +626,6 @@ export default function RewardsPage() {
         </div>
       )}
     </div>
+    </>
   );
 } 

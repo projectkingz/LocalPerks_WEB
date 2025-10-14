@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { formatDate } from '@/lib/utils/date';
 import SuspendedUserWrapper from '@/components/SuspendedUserWrapper';
+import ScrollControls from '@/components/ScrollControls';
 import {
   Award,
   TrendingUp,
@@ -160,6 +161,7 @@ export default function DashboardPage() {
 
   return (
     <SuspendedUserWrapper>
+      <ScrollControls />
       <div className="space-y-8">
         {/* Header */}
         <div>

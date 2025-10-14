@@ -16,6 +16,8 @@ import {
   Crown
 } from 'lucide-react';
 import EditUserModal from './components/EditUserModal';
+import ScrollControls from '@/components/ScrollControls';
+import TableScrollControls from '@/components/TableScrollControls';
 
 interface User {
   id: string;
@@ -252,9 +254,11 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+    <>
+      <ScrollControls />
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
           <p className="mt-1 text-sm text-gray-500">
@@ -313,7 +317,8 @@ export default function AdminDashboard() {
 
       {/* Users Table */}
       <div className="bg-white rounded-lg shadow">
-        <div className="overflow-x-auto w-full">
+        <TableScrollControls tableContainerId="users-table-container" />
+        <div id="users-table-container" className="overflow-x-auto w-full">
           <table className="min-w-full divide-y divide-gray-200" style={{ minWidth: '1400px' }}>
             <thead className="bg-gray-50">
               <tr>
@@ -491,6 +496,7 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 } 

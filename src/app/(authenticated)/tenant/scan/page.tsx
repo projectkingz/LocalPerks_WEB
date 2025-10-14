@@ -156,7 +156,7 @@ export default function TenantScanPage() {
   return (
     <div className="max-w-2xl mx-auto">
       <h1 className="text-4xl font-extrabold mb-8 text-gray-900">
-        Scan Customer Code
+        Scan Customer Code or Voucher Code
       </h1>
       
       <div className="bg-white shadow-lg rounded-2xl p-8">

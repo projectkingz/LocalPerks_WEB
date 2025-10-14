@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from 'next-auth/react';
 import { Rows3, LayoutGrid } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
+import ScrollControls from '@/components/ScrollControls';
 
 interface Reward {
   id: string;
@@ -96,8 +97,10 @@ export default function RewardsPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto py-8">
-      <div className="flex justify-between items-center mb-6">
+    <>
+      <ScrollControls />
+      <div className="max-w-4xl mx-auto py-8">
+        <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Rewards</h1>
         <div className="flex gap-2 items-center">
           <button
@@ -186,5 +189,6 @@ export default function RewardsPage() {
         </div>
       )}
     </div>
+    </>
   );
 } 

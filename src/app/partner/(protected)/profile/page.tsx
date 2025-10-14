@@ -16,6 +16,7 @@ import {
 import QRScanner from '@/components/QRScanner';
 import TransactionForm from '@/components/TransactionForm';
 import PasswordChangeForm from '@/components/PasswordChangeForm';
+import ScrollControls from '@/components/ScrollControls';
 
 export default function PartnerProfile() {
   const [customerQRCode, setCustomerQRCode] = useState<string | null>(null);
@@ -126,8 +127,10 @@ export default function PartnerProfile() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <>
+      <ScrollControls />
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-8">Business Profile</h1>
 
         <div className="space-y-6">
@@ -265,6 +268,7 @@ export default function PartnerProfile() {
 
         </div>
       </div>
+    </div>
 
       {/* Edit Business Information Modal */}
       {showEditModal && (
@@ -335,6 +339,6 @@ export default function PartnerProfile() {
           </motion.div>
         </div>
       )}
-    </div>
+    </>
   );
 } 

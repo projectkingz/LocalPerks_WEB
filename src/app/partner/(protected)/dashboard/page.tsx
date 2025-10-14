@@ -14,6 +14,7 @@ import {
   Activity
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
+import ScrollControls from '@/components/ScrollControls';
 
 type RecentActivity = {
   id: string;
@@ -140,8 +141,10 @@ export default function PartnerDashboard() {
   }, [session?.user?.email]);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <>
+      <ScrollControls />
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-2xl font-bold text-gray-900">Partner Dashboard</h1>
           {mobile && (
@@ -378,5 +381,6 @@ export default function PartnerDashboard() {
         </div>
       </div>
     </div>
+    </>
   );
 } 

@@ -14,6 +14,7 @@ import {
   X
 } from 'lucide-react';
 import PasswordChangeForm from '@/components/PasswordChangeForm';
+import ScrollControls from '@/components/ScrollControls';
 
 export default function AdminProfile() {
   const { data: session } = useSession();
@@ -100,8 +101,10 @@ export default function AdminProfile() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
+    <>
+      <ScrollControls />
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-8">
+        <div className="max-w-4xl mx-auto px-4">
         <h1 className="text-2xl font-bold text-gray-900 mb-8">Admin Profile</h1>
 
         {message && (
@@ -288,6 +291,7 @@ export default function AdminProfile() {
         </div>
       )}
     </div>
+    </>
   );
 }
 

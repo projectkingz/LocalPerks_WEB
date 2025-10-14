@@ -3,19 +3,47 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/auth.config';
 import { prisma } from '@/lib/prisma';
 import { getSystemConfig, calculatePointsIssueCharge } from '@/lib/systemConfig';
+import * as jwt from 'jsonwebtoken';
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
+  let tenantId = session?.user?.tenantId as string | undefined;
+  let role = session?.user?.role as string | undefined;
+
+  console.log('Partner stats request - Session tenantId:', tenantId, 'Role:', role);
+
+  // Check for mobile JWT token if no session
+  if (!tenantId) {
+    const auth = req.headers.get('authorization') || '';
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : undefined;
+    console.log('Checking mobile JWT token:', token ? 'Token present' : 'No token');
+    if (token) {
+      try {
+        const secret = process.env.NEXTAUTH_SECRET || 'fallback-secret';
+        const payload: any = jwt.verify(token, secret);
+        console.log('JWT payload:', { tenantId: payload.tenantId, role: payload.role, userId: payload.userId });
+        tenantId = payload.tenantId || undefined;
+        role = payload.role;
+      } catch (error) {
+        console.error('JWT verification failed:', error);
+      }
+    }
+  }
   
-  if (!session || !session.user?.tenantId) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+  console.log('Final auth check - tenantId:', tenantId, 'role:', role);
+  
+  if (!tenantId || role !== 'PARTNER') {
+    console.log('Authorization failed - returning 401');
+    return NextResponse.json({ 
+      message: 'Unauthorized', 
+      debug: { tenantId: !!tenantId, role, expected: 'PARTNER' }
+    }, { status: 401 });
   }
 
   const { searchParams } = new URL(req.url);
   const period = searchParams.get('period') || '7'; // days
 
   try {
-    const tenantId = session.user.tenantId;
     const periodDays = parseInt(period);
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - periodDays);
@@ -69,4 +97,5 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
 

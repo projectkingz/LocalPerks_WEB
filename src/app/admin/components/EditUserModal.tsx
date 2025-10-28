@@ -13,6 +13,7 @@ interface User {
   createdAt: string;
   updatedAt: string;
   tenantId: string | null;
+  businessName?: string | null; // Business name for partners
   points: number;
 }
 
@@ -48,7 +49,8 @@ export default function EditUserModal({
         role: user.role,
         points: user.points,
         suspended: user.suspended,
-        tenantId: user.tenantId
+        tenantId: user.tenantId,
+        businessName: user.businessName || ''
       });
       setErrors({});
     }
@@ -147,7 +149,7 @@ export default function EditUserModal({
               {/* Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Name
+                  {user.role === 'PARTNER' ? 'Owner Name' : 'Name'}
                 </label>
                 <input
                   type="text"
@@ -156,12 +158,28 @@ export default function EditUserModal({
                   className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                     errors.name ? 'border-red-300' : 'border-gray-300'
                   }`}
-                  placeholder="Enter name"
+                  placeholder={user.role === 'PARTNER' ? 'Enter owner name' : 'Enter name'}
                 />
                 {errors.name && (
                   <p className="mt-1 text-sm text-red-600">{errors.name}</p>
                 )}
               </div>
+
+              {/* Business Name (for Partners only) */}
+              {user.role === 'PARTNER' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Business Name
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.businessName || ''}
+                    onChange={(e) => handleInputChange('businessName', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter business name"
+                  />
+                </div>
+              )}
 
               {/* Email */}
               <div>

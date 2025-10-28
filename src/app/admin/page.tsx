@@ -29,6 +29,7 @@ interface User {
   createdAt: string;
   updatedAt: string;
   tenantId: string | null;
+  businessName?: string | null; // Business name for partners
   points: number;
 }
 
@@ -42,6 +43,8 @@ export default function AdminDashboard() {
   const [showAddUser, setShowAddUser] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editLoading, setEditLoading] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   const isSuperAdmin = session?.user?.role === 'SUPER_ADMIN';
 
@@ -206,6 +209,134 @@ export default function AdminDashboard() {
     return matchesRole && matchesSearch;
   });
 
+  // Bulk action handlers
+  const handleToggleSelectAll = () => {
+    if (selectedUsers.size === filteredUsers.length) {
+      setSelectedUsers(new Set());
+    } else {
+      setSelectedUsers(new Set(filteredUsers.map(user => user.id)));
+    }
+  };
+
+  const handleToggleSelectUser = (userId: string) => {
+    const newSelected = new Set(selectedUsers);
+    if (newSelected.has(userId)) {
+      newSelected.delete(userId);
+    } else {
+      newSelected.add(userId);
+    }
+    setSelectedUsers(newSelected);
+  };
+
+  const handleBulkApprove = async () => {
+    if (selectedUsers.size === 0) return;
+    
+    if (!confirm(`Are you sure you want to approve ${selectedUsers.size} user(s)?`)) {
+      return;
+    }
+
+    setBulkActionLoading(true);
+    try {
+      const promises = Array.from(selectedUsers).map(userId => 
+        fetch(`/api/admin/users/${userId}/approve`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ approvalStatus: 'APPROVED' }),
+        })
+      );
+
+      const responses = await Promise.all(promises);
+      const allOk = responses.every(r => r.ok);
+
+      if (allOk) {
+        // Refresh the user list
+        await fetchUsers();
+        setSelectedUsers(new Set());
+        setError(null);
+      } else {
+        setError('Failed to approve some users');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred during bulk approval');
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkSuspend = async () => {
+    if (selectedUsers.size === 0) return;
+    
+    if (!confirm(`Are you sure you want to suspend ${selectedUsers.size} user(s)?`)) {
+      return;
+    }
+
+    setBulkActionLoading(true);
+    try {
+      const promises = Array.from(selectedUsers).map(userId => 
+        fetch(`/api/admin/users/${userId}/suspend`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ suspended: true }),
+        })
+      );
+
+      const responses = await Promise.all(promises);
+      const allOk = responses.every(r => r.ok);
+
+      if (allOk) {
+        await fetchUsers();
+        setSelectedUsers(new Set());
+        setError(null);
+      } else {
+        setError('Failed to suspend some users');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred during bulk suspend');
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedUsers.size === 0) return;
+    
+    if (!confirm(`⚠️ WARNING: Are you sure you want to permanently delete ${selectedUsers.size} user(s)? This action cannot be undone.`)) {
+      return;
+    }
+
+    setBulkActionLoading(true);
+    try {
+      const promises = Array.from(selectedUsers).map(userId => 
+        fetch(`/api/admin/users/${userId}?force=true`, {
+          method: 'DELETE',
+        })
+      );
+
+      const responses = await Promise.all(promises);
+      const allOk = responses.every(r => r.ok);
+
+      if (allOk) {
+        await fetchUsers();
+        setSelectedUsers(new Set());
+        setError(null);
+      } else {
+        setError('Failed to delete some users');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred during bulk delete');
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkEdit = () => {
+    const selectedUsersArray = users.filter(u => selectedUsers.has(u.id));
+    if (selectedUsersArray.length > 0) {
+      // Start editing the first selected user
+      setEditingUser(selectedUsersArray[0]);
+    }
+  };
+
   const getRoleIcon = (role: string) => {
     switch (role) {
       case 'SUPER_ADMIN':
@@ -315,29 +446,81 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* Bulk Actions Toolbar */}
+      {selectedUsers.size > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <span className="text-sm font-medium text-blue-900">
+              {selectedUsers.size} user{selectedUsers.size !== 1 ? 's' : ''} selected
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={handleBulkApprove}
+                disabled={bulkActionLoading}
+                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-green-700 bg-green-100 hover:bg-green-200 disabled:opacity-50"
+              >
+                <CheckCircle className="h-3 w-3 mr-1" />
+                Approve All
+              </button>
+              <button
+                onClick={handleBulkSuspend}
+                disabled={bulkActionLoading}
+                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-amber-700 bg-amber-100 hover:bg-amber-200 disabled:opacity-50"
+              >
+                <Ban className="h-3 w-3 mr-1" />
+                Suspend All
+              </button>
+              {isSuperAdmin && (
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={bulkActionLoading}
+                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200 disabled:opacity-50"
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Delete All
+                </button>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={() => setSelectedUsers(new Set())}
+            className="text-sm text-blue-600 hover:text-blue-700"
+          >
+            Clear Selection
+          </button>
+        </div>
+      )}
+
       {/* Users Table */}
       <div className="bg-white rounded-lg shadow">
-        <TableScrollControls tableContainerId="users-table-container" />
-        <div id="users-table-container" className="overflow-x-auto w-full">
-          <table className="min-w-full divide-y divide-gray-200" style={{ minWidth: '1400px' }}>
+        <div className="overflow-x-auto w-full">
+          <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-3 w-12">
+                  <input
+                    type="checkbox"
+                    checked={selectedUsers.size === filteredUsers.length && filteredUsers.length > 0}
+                    onChange={handleToggleSelectAll}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                </th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">
                   User
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
                   Role
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
                   Points
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-40">
                   Actions
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider pr-20" style={{ paddingRight: '80px' }}>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
                   Created
                 </th>
               </tr>
@@ -350,34 +533,58 @@ export default function AdminDashboard() {
                   animate={{ opacity: 1 }}
                   className="hover:bg-gray-50"
                 >
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-3 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedUsers.has(user.id)}
+                      onChange={() => handleToggleSelectUser(user.id)}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                  </td>
+                  <td className="px-3 py-3">
                     <div className="flex items-center">
-                      <div className="flex-shrink-0 h-10 w-10">
-                        <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
-                          <span className="text-sm font-medium text-gray-700">
+                      <div className="flex-shrink-0 h-8 w-8">
+                        <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
+                          <span className="text-xs font-medium text-gray-700">
                             {user.name?.charAt(0) || user.email.charAt(0)}
                           </span>
                         </div>
                       </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {user.name || 'No name'}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {user.email}
-                        </div>
+                      <div className="ml-2 min-w-0 flex-1">
+                        {user.role === 'PARTNER' ? (
+                          <>
+                            <div className="text-sm font-medium text-gray-900 truncate">
+                              {user.businessName || 'No business name'}
+                            </div>
+                            <div className="text-xs text-gray-600 truncate">
+                              {user.name || 'No owner name'}
+                            </div>
+                            <div className="text-xs text-gray-500 truncate">
+                              {user.email}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-sm font-medium text-gray-900 truncate">
+                              {user.name || 'No name'}
+                            </div>
+                            <div className="text-xs text-gray-500 truncate">
+                              {user.email}
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-3 py-3 whitespace-nowrap">
                     <div className="flex items-center">
                       {getRoleIcon(user.role)}
-                      <span className="ml-2 text-sm text-gray-900">
+                      <span className="ml-1 text-xs text-gray-900">
                         {user.role}
                       </span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-3 py-3 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                       user.approvalStatus === 'UNDER_REVIEW'
                         ? 'bg-yellow-100 text-yellow-800'
@@ -387,24 +594,24 @@ export default function AdminDashboard() {
                         ? 'bg-red-100 text-red-800'
                         : 'bg-green-100 text-green-800'
                     }`}>
-                      {user.approvalStatus === 'UNDER_REVIEW' ? 'Under Review' :
-                       user.approvalStatus === 'PENDING' ? 'Pending Approval' : 
-                       user.approvalStatus === 'PENDING_EMAIL_VERIFICATION' ? 'Email Verification Required' :
+                      {user.approvalStatus === 'UNDER_REVIEW' ? 'Review' :
+                       user.approvalStatus === 'PENDING' ? 'Pending' : 
+                       user.approvalStatus === 'PENDING_EMAIL_VERIFICATION' ? 'Email' :
                        user.approvalStatus === 'SUSPENDED' || user.suspended ? 'Suspended' : 'Active'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-900">
                     {user.points.toLocaleString()}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex items-center justify-end space-x-2">
+                  <td className="px-3 py-3 whitespace-nowrap text-right text-xs font-medium">
+                    <div className="flex items-center justify-end space-x-1">
                       {canEditUser(user) && (
                         <button
                           onClick={() => setEditingUser(user)}
-                          className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200"
+                          className="inline-flex items-center px-1.5 py-0.5 border border-transparent text-xs font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200"
+                          title="Edit user"
                         >
-                          <Edit className="h-3 w-3 mr-1" />
-                          Edit
+                          <Edit className="h-3 w-3" />
                         </button>
                       )}
                       
@@ -413,18 +620,18 @@ export default function AdminDashboard() {
                         user.suspended || ['PENDING', 'UNDER_REVIEW', 'PENDING_EMAIL_VERIFICATION', 'PENDING_MOBILE_VERIFICATION'].includes(user.approvalStatus || '') ? (
                           <button
                             onClick={() => handleApprovePartner(user.id)}
-                            className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-green-700 bg-green-100 hover:bg-green-200"
+                            className="inline-flex items-center px-1.5 py-0.5 border border-transparent text-xs font-medium rounded text-green-700 bg-green-100 hover:bg-green-200"
+                            title="Activate user"
                           >
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Activate
+                            <CheckCircle className="h-3 w-3" />
                           </button>
                         ) : (
                           <button
                             onClick={() => handleSuspendUser(user.id, true)}
-                            className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-amber-700 bg-amber-100 hover:bg-amber-200"
+                            className="inline-flex items-center px-1.5 py-0.5 border border-transparent text-xs font-medium rounded text-amber-700 bg-amber-100 hover:bg-amber-200"
+                            title="Suspend user"
                           >
-                            <Ban className="h-3 w-3 mr-1" />
-                            Suspend
+                            <Ban className="h-3 w-3" />
                           </button>
                         )
                       )}
@@ -432,24 +639,23 @@ export default function AdminDashboard() {
                       {canDeleteUser(user) ? (
                         <button
                           onClick={() => handleDeleteUser(user.id)}
-                          className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200"
+                          className="inline-flex items-center px-1.5 py-0.5 border border-transparent text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200"
+                          title="Delete user"
                         >
-                          <Trash2 className="h-3 w-3 mr-1" />
-                          Delete
+                          <Trash2 className="h-3 w-3" />
                         </button>
                       ) : (
                         <button
                           disabled
-                          className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-gray-400 bg-gray-100 cursor-not-allowed"
+                          className="inline-flex items-center px-1.5 py-0.5 border border-transparent text-xs font-medium rounded text-gray-400 bg-gray-100 cursor-not-allowed"
                           title="Only Super Admins can delete users"
                         >
-                          <Trash2 className="h-3 w-3 mr-1" />
-                          Delete
+                          <Trash2 className="h-3 w-3" />
                         </button>
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 pr-20">
+                  <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-500">
                     {new Date(user.createdAt).toLocaleDateString()}
                   </td>
                 </motion.tr>

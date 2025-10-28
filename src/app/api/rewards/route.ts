@@ -50,15 +50,16 @@ export async function GET() {
     let whereClause = {};
     
     if (session.user.role === 'PARTNER' && session.user.tenantId) {
-      // Partners only see their own rewards
+      // Partners only see their own rewards (all statuses)
       whereClause = { tenantId: session.user.tenantId };
       console.log('Rewards API: Filtering for partner tenant:', session.user.tenantId);
     } else if (session.user.role === 'ADMIN' || session.user.role === 'SUPER_ADMIN') {
-      // Admins see all rewards
+      // Admins see all rewards (all statuses)
       console.log('Rewards API: Admin user - showing all rewards');
     } else {
-      // Customers see all rewards from all tenants (no tenant filtering)
-      console.log('Rewards API: Customer user - showing all rewards from all tenants');
+      // Customers only see approved rewards from all tenants
+      whereClause = { approvalStatus: 'APPROVED' };
+      console.log('Rewards API: Customer user - showing only approved rewards from all tenants');
     }
     
     // Fetch rewards from database with tenant filtering and include tenant info
@@ -148,12 +149,21 @@ export async function POST(request: Request) {
       }
     }
     
+    // Set approval status based on user role
+    let approvalStatus = 'PENDING';
+    if (session.user.role === 'ADMIN' || session.user.role === 'SUPER_ADMIN') {
+      approvalStatus = 'APPROVED';
+    }
+
     const reward = await prisma.reward.create({
       data: { 
         name, 
         description, 
         points: Number(points),
-        tenantId: tenantId
+        tenantId: tenantId,
+        approvalStatus: approvalStatus,
+        approvedAt: approvalStatus === 'APPROVED' ? new Date() : null,
+        approvedBy: approvalStatus === 'APPROVED' ? session.user.id : null
       },
     });
     

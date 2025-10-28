@@ -115,6 +115,9 @@ export async function POST(request: NextRequest) {
         points: parseInt(points),
         tenantId: finalTenantId,
         createdAt: createdAt ? new Date(createdAt) : new Date(),
+        approvalStatus: 'APPROVED', // Admin-created rewards are auto-approved
+        approvedAt: new Date(),
+        approvedBy: session.user.id,
       },
       include: {
         redemptions: {
@@ -134,6 +137,80 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(reward);
   } catch (error) {
     console.error('Error creating reward:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check if user is ADMIN or SUPER_ADMIN
+    if (session.user.role !== 'ADMIN' && session.user.role !== 'SUPER_ADMIN') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { rewardId, action, rejectionReason } = body; // action: 'approve' or 'reject'
+
+    if (!rewardId || !action) {
+      return NextResponse.json(
+        { error: 'Reward ID and action are required' },
+        { status: 400 }
+      );
+    }
+
+    if (action !== 'approve' && action !== 'reject') {
+      return NextResponse.json(
+        { error: 'Action must be either "approve" or "reject"' },
+        { status: 400 }
+      );
+    }
+
+    if (action === 'reject' && !rejectionReason) {
+      return NextResponse.json(
+        { error: 'Rejection reason is required when rejecting a reward' },
+        { status: 400 }
+      );
+    }
+
+    // Update the reward
+    const updateData: any = {
+      approvalStatus: action === 'approve' ? 'APPROVED' : 'REJECTED',
+      approvedAt: new Date(),
+      approvedBy: session.user.id,
+    };
+
+    if (action === 'reject') {
+      updateData.rejectionReason = rejectionReason;
+    }
+
+    const reward = await prisma.reward.update({
+      where: { id: rewardId },
+      data: updateData,
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      }
+    });
+
+    return NextResponse.json({ 
+      message: `Reward ${action === 'approve' ? 'approved' : 'rejected'} successfully`,
+      reward 
+    });
+  } catch (error) {
+    console.error('Error updating reward:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

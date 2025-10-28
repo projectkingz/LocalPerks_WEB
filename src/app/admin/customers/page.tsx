@@ -12,6 +12,9 @@ interface Customer {
   points: number;
   tenantId: string;
   createdAt: string;
+  totalAmountSpent: number;
+  totalPointsEarned: number;
+  discountEarned: number;
   transactions: {
     id: string;
     amount: number;
@@ -34,7 +37,7 @@ interface Customer {
   tenant: {
     id: string;
     name: string;
-  };
+  } | null;
 }
 
 export default function AdminCustomersPage() {
@@ -52,11 +55,22 @@ export default function AdminCustomersPage() {
     try {
       setLoading(true);
       setError(null);
+      console.log('🔍 Fetching customers from API...');
       const response = await fetch('/api/admin/customers');
-      if (!response.ok) throw new Error('Failed to fetch customers');
+      console.log('📡 API Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API Error:', response.status, errorText);
+        throw new Error(`Failed to fetch customers: ${response.status} ${errorText}`);
+      }
+      
       const data = await response.json();
+      console.log('📊 API Response data:', data);
+      console.log('👥 Number of customers received:', data.length);
       setCustomers(data);
     } catch (err) {
+      console.error('❌ Fetch error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
@@ -70,7 +84,7 @@ export default function AdminCustomersPage() {
 
   const stats = {
     totalCustomers: customers.length,
-    totalPoints: customers.reduce((sum, c) => sum + c.points, 0),
+    totalPoints: customers.reduce((sum, c) => sum + c.totalPointsEarned, 0),
     totalRedemptions: customers.reduce((sum, c) => sum + c.redemptions.length, 0),
   };
 
@@ -163,11 +177,10 @@ export default function AdminCustomersPage() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Points</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transactions</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Redemptions</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tenant</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Points Earned</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Discount Earned</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount Spent</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Joined</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -177,10 +190,9 @@ export default function AdminCustomersPage() {
                     <div className="text-sm font-medium text-gray-900">{customer.name}</div>
                     <div className="text-sm text-gray-500">{customer.email}</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{customer.points.toLocaleString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{customer.transactions.length}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{customer.redemptions.length}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{customer.tenant?.name || '-'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{customer.totalPointsEarned.toLocaleString()}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">£{customer.discountEarned.toFixed(2)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">£{customer.totalAmountSpent.toFixed(2)}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(customer.createdAt).toLocaleDateString()}</td>
                 </tr>
               ))}

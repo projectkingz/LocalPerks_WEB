@@ -24,8 +24,10 @@ export async function GET(req: NextRequest) {
       u.id, u.name, u.email, u.role, u.suspended, 
       u.approvalStatus, u.createdAt, u.updatedAt, 
       u.tenantId,
+      t.name as businessName,
       COALESCE(CAST(earned_points.total_earned AS SIGNED), 0) - COALESCE(CAST(spent_points.total_spent AS SIGNED), 0) as points
     FROM User u 
+    LEFT JOIN Tenant t ON u.id = t.partnerUserId
     LEFT JOIN (
       SELECT 
         userId,
@@ -44,14 +46,78 @@ export async function GET(req: NextRequest) {
     ) spent_points ON u.email = spent_points.email
     ORDER BY u.createdAt DESC
   `;
+
+  // Get all customers and convert them to user-like format
+  const customers = await prisma.customer.findMany({
+    include: {
+      tenant: {
+        select: {
+          id: true,
+          name: true
+        }
+      },
+      transactions: {
+        where: {
+          status: { in: ['APPROVED', 'VOID'] }
+        }
+      },
+      redemptions: {
+        include: {
+          reward: {
+            select: {
+              points: true
+            }
+          }
+        }
+      }
+    },
+    // Include all customers, but handle invalid tenant IDs gracefully
+    orderBy: {
+      createdAt: 'desc'
+    }
+  });
+
+  // Convert customers to user-like format
+  const customerUsers = customers.map(customer => {
+    const totalAmountSpent = customer.transactions
+      .filter(t => t.type === 'EARNED' && t.status === 'APPROVED')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const totalPointsEarned = customer.transactions
+      .filter(t => t.type === 'EARNED' && t.status === 'APPROVED')
+      .reduce((sum, t) => sum + t.points, 0);
+
+    const totalPointsSpent = customer.redemptions
+      .reduce((sum, r) => sum + r.reward.points, 0);
+
+    return {
+      id: customer.id,
+      name: customer.name,
+      email: customer.email,
+      role: 'CUSTOMER',
+      suspended: false,
+      approvalStatus: 'ACTIVE',
+      createdAt: customer.createdAt,
+      updatedAt: customer.updatedAt,
+      tenantId: customer.tenantId,
+      businessName: customer.tenant?.name || 'Multi-Tenant Customer',
+      points: customer.points,
+      totalAmountSpent,
+      totalPointsEarned,
+      totalPointsSpent
+    };
+  });
   
-  // Convert BigInt values to numbers for JSON serialization
+  // Convert BigInt values to numbers for JSON serialization and combine users and customers
   const serializedUsers = (users as any[]).map(user => ({
     ...user,
     points: Number(user.points),
   }));
+
+  // Combine users and customers, with customers first
+  const allUsers = [...customerUsers, ...serializedUsers];
   
-  return NextResponse.json(serializedUsers);
+  return NextResponse.json(allUsers);
 }
 
 export async function POST(req: NextRequest) {

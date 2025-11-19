@@ -196,12 +196,13 @@ export const pointsUtil = {
     purchaseDate: Date = new Date()
   ): Promise<{ success: boolean; data?: any; error?: string; message?: string }> {
     try {
-      // First, get customer by QR code
-      const customerResponse = await fetch(`/api/customers/qr/${qrCode}`);
+      // First, get customer by QR code using lookup endpoint
+      const customerResponse = await fetch(`/api/customers/qr/lookup?qrCode=${encodeURIComponent(qrCode)}`);
       if (!customerResponse.ok) {
         throw new Error('Customer not found');
       }
-      const customer: Customer = await customerResponse.json();
+      const responseData = await customerResponse.json();
+      const customer: Customer = responseData.customer;
 
       // Get tenant's points configuration
       const configResponse = await fetch(`/api/tenants/${tenantId}/points-config`);
@@ -268,12 +269,13 @@ export const pointsUtil = {
     tenantId: string
   ): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
-      // Get customer by QR code
-      const customerResponse = await fetch(`/api/customers/qr/${customerQrCode}`);
+      // Get customer by QR code using lookup endpoint
+      const customerResponse = await fetch(`/api/customers/qr/lookup?qrCode=${encodeURIComponent(customerQrCode)}`);
       if (!customerResponse.ok) {
         throw new Error('Customer not found');
       }
-      const customer: Customer = await customerResponse.json();
+      const responseData = await customerResponse.json();
+      const customer: Customer = responseData.customer;
 
       // Get reward by QR code
       const rewardResponse = await fetch(`/api/rewards/qr/${rewardQrCode}`);
@@ -319,12 +321,13 @@ export const pointsUtil = {
     tenantId: string
   ): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
-      // Get customer by QR code
-      const customerResponse = await fetch(`/api/customers/qr/${qrCode}`);
+      // Get customer by QR code using lookup endpoint
+      const customerResponse = await fetch(`/api/customers/qr/lookup?qrCode=${encodeURIComponent(qrCode)}`);
       if (!customerResponse.ok) {
         throw new Error('Customer not found');
       }
-      const customer: Customer = await customerResponse.json();
+      const responseData = await customerResponse.json();
+      const customer: Customer = responseData.customer;
 
       // Get transaction history
       const historyResponse = await fetch(

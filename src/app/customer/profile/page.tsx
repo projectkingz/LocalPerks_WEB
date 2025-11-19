@@ -17,6 +17,7 @@ export default function ProfilePage() {
   const [pointsData, setPointsData] = useState<PointsData>({ points: 0, tier: 'Standard' });
   const [loading, setLoading] = useState(true);
   const [qrCode, setQrCode] = useState('');
+  const [customerId, setCustomerId] = useState('');
   const [showPasswordForm, setShowPasswordForm] = useState(false);
 
   useEffect(() => {
@@ -31,6 +32,7 @@ export default function ProfilePage() {
         const qrResponse = await fetch('/api/customer/qr');
         const qrData = await qrResponse.json();
         setQrCode(qrData.qrCode);
+        setCustomerId(qrData.customerId || '');
       } catch (error) {
         console.error('Error fetching profile data:', error);
       } finally {
@@ -106,31 +108,90 @@ export default function ProfilePage() {
         )}
       </div>
 
-      {/* QR Code */}
+      {/* QR Code Digital Card */}
       <div className="bg-white shadow-lg rounded-2xl p-8">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Your QR Code</h2>
-          <p className="text-sm text-gray-600 mb-4">Scan this code to earn points</p>
+          <h2 className="text-heading font-bold text-gray-900 mb-6">Your Digital Card</h2>
+          
           {loading ? (
             <div className="animate-pulse flex justify-center">
-              <div className="h-80 w-80 bg-gray-200 rounded"></div>
+              <div className="aspect-[85.6/53.98] w-full max-w-md bg-gray-200 rounded-2xl"></div>
             </div>
           ) : (
             <div className="flex justify-center">
-              <div className="p-6 bg-white rounded-lg shadow-inner">
-                <QRCodeSVG value={qrCode} size={300} level="H" />
+              {/* Digital Card - Bank Card Style */}
+              <div className="relative w-full max-w-md bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl shadow-2xl overflow-hidden" style={{ minHeight: '500px' }}>
+                {/* Decorative elements */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-32 -mt-32"></div>
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-10 rounded-full -ml-24 -mb-24"></div>
+                
+                {/* Card Content */}
+                <div className="relative h-full p-6 flex flex-col justify-between" style={{ minHeight: '500px' }}>
+                  {/* Top Section */}
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <h3 className="text-subheading font-bold text-white mb-1">LocalPerks</h3>
+                      <p className="text-blue-200 text-caption">Loyalty Card</p>
+                    </div>
+                    {/* Chip */}
+                    <div className="w-10 h-8 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-md shadow-lg"></div>
+                  </div>
+                  
+                  {/* Middle Section - QR Code */}
+                  <div className="flex justify-center my-2 flex-shrink-0">
+                    <div className="bg-white rounded-xl p-4 shadow-xl">
+                      <QRCodeSVG 
+                        value={qrCode} 
+                        size={200} 
+                        level="H"
+                        className="rounded-lg"
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Bottom Section */}
+                  <div className="space-y-2 mt-2">
+                    {/* Customer Name */}
+                    <div>
+                      <p className="text-white text-label font-semibold uppercase tracking-wider">
+                        {session?.user?.name?.toUpperCase() || 'MEMBER'}
+                      </p>
+                    </div>
+                    
+                    {/* Customer ID */}
+                    {customerId && (
+                      <div className="flex items-center space-x-2">
+                        <p className="text-blue-200 text-caption font-semibold">ID:</p>
+                        <p className="text-white text-caption font-mono font-semibold break-all">{customerId}</p>
+                      </div>
+                    )}
+                    
+                    {/* Points and Tier */}
+                    <div className="flex items-center justify-between pt-2 border-t border-blue-500 border-opacity-30">
+                      <div>
+                        <p className="text-blue-200 text-caption uppercase tracking-wide">Points</p>
+                        <p className="text-white text-body font-bold">{pointsData.points.toLocaleString()}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-blue-200 text-caption uppercase tracking-wide">Tier</p>
+                        <p className="text-white text-body font-bold">{pointsData.tier}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
-          <p className="mt-4 text-sm text-gray-600">
-            Show this code to earn points at participating retailers & businesses
+          
+          <p className="mt-6 text-sm text-gray-600">
+            Show this digital card to earn points at participating retailers & businesses
           </p>
         </div>
       </div>
 
       {/* Rewards Status */}
       <div className="bg-white shadow-lg rounded-2xl p-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Rewards Status</h2>
+        <h2 className="text-heading font-bold text-gray-900 mb-6">Rewards Status</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl border-2 border-blue-200">
             <div className="flex items-center space-x-4">
@@ -140,8 +201,8 @@ export default function ProfilePage() {
                 </svg>
               </div>
               <div>
-                <p className="text-sm font-bold text-blue-600 uppercase tracking-wide">Current Tier</p>
-                <p className="text-2xl font-bold text-gray-900">{pointsData.tier}</p>
+                <p className="text-label font-bold text-blue-600 uppercase tracking-wide">Current Tier</p>
+                <p className="text-heading font-bold text-gray-900">{pointsData.tier}</p>
               </div>
             </div>
           </div>
@@ -154,8 +215,8 @@ export default function ProfilePage() {
                 </svg>
               </div>
               <div>
-                <p className="text-sm font-bold text-blue-600 uppercase tracking-wide">Total Points</p>
-                <p className="text-2xl font-bold text-gray-900">{pointsData.points}</p>
+                <p className="text-label font-bold text-blue-600 uppercase tracking-wide">Total Points</p>
+                <p className="text-heading font-bold text-gray-900">{pointsData.points}</p>
               </div>
             </div>
           </div>

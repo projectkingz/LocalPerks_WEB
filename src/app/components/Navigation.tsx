@@ -78,7 +78,6 @@ export default function Navigation() {
   // Admin dropdown items
   const adminDropdownItems = [
     { name: 'Dashboard', href: '/admin', icon: BarChart3 },
-    { name: 'Subscriptions', href: '/admin/subscriptions', icon: CreditCard },
     ...(isSuperAdmin ? [{ name: 'System Config', href: '/admin/system-config', icon: Settings }] : []),
   ];
 
@@ -91,7 +90,7 @@ export default function Navigation() {
     { name: 'Pending Transactions', href: '/admin/pending-transactions', icon: Clock },
   ];
   
-  const isAdminActive = pathname === '/admin' || pathname === '/admin/subscriptions' || pathname === '/admin/system-config';
+  const isAdminActive = pathname === '/admin' || pathname === '/admin/system-config';
 
   return (
     <nav className="bg-white shadow mb-8">

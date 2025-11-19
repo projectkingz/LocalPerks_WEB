@@ -79,12 +79,14 @@ model Customer {
   email        String        @unique
   name         String
   mobile       String
+  qrCode       String?       @unique // Persistent unique QR code identifier
   tenant       Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   redemptions  Redemption[]
   transactions Transaction[]
   vouchers     Voucher[]
 
   @@index([tenantId])
+  @@index([qrCode])
 }
 
 model Tenant {

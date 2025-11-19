@@ -1,29 +1,29 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/api/auth/auth.config';
 import { prisma } from '@/lib/prisma';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
- * GET /api/customers/qr/[id]
- * Returns the persistent QR code for a customer by email
+ * GET /api/customer/qr
+ * Returns the persistent QR code for the authenticated customer
  * If no QR code exists, generates and stores one
  */
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request) {
   try {
-    const email = params.id;
-    if (!email) {
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user?.email) {
       return NextResponse.json(
-        { error: 'Email is required' },
-        { status: 400 }
+        { error: 'Unauthorized' },
+        { status: 401 }
       );
     }
 
     // Find customer by email
     let customer = await prisma.customer.findUnique({
-      where: { email },
-      select: { id: true, qrCode: true, email: true, name: true }
+      where: { email: session.user.email },
+      select: { id: true, qrCode: true, email: true }
     });
 
     if (!customer) {
@@ -37,21 +37,21 @@ export async function GET(
     if (customer.qrCode) {
       return NextResponse.json({ 
         qrCode: customer.qrCode,
-        customerId: customer.id,
-        email: customer.email,
-        name: customer.name
+        customerId: customer.id
       });
     }
 
     // Generate a unique QR code identifier
+    // Format: customer-{customerId}-{shortUuid}
+    // This ensures uniqueness and makes it easy to identify the customer
     let qrCode: string;
     let isUnique = false;
     let attempts = 0;
     const maxAttempts = 10;
 
-    // Ensure QR code is unique
+    // Ensure QR code is unique (handle edge case of collision)
     while (!isUnique && attempts < maxAttempts) {
-      const shortUuid = uuidv4().split('-')[0];
+      const shortUuid = uuidv4().split('-')[0]; // Use first part of UUID for shorter code
       qrCode = `customer-${customer.id}-${shortUuid}`;
       
       // Check if this QR code already exists
@@ -80,9 +80,7 @@ export async function GET(
 
     return NextResponse.json({ 
       qrCode,
-      customerId: customer.id,
-      email: customer.email,
-      name: customer.name
+      customerId: customer.id
     });
   } catch (error) {
     console.error('Error generating QR code:', error);
@@ -91,4 +89,7 @@ export async function GET(
       { status: 500 }
     );
   }
-} 
+}
+
+
+

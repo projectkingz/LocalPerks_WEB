@@ -1,8 +1,18 @@
-import { Inter } from 'next/font/google';
+import { Roboto, Roboto_Mono } from 'next/font/google';
 import './globals.css';
 import Providers from './providers';
 
-const inter = Inter({ subsets: ['latin'] });
+const roboto = Roboto({ 
+  subsets: ['latin'],
+  variable: '--font-roboto',
+  weight: ['300', '400', '500', '700', '900']
+});
+
+const robotoMono = Roboto_Mono({ 
+  subsets: ['latin'],
+  variable: '--font-roboto-mono',
+  weight: ['300', '400', '500', '600', '700']
+});
 
 export const metadata = {
   title: 'LocalPerks - Community Rewards Program',
@@ -15,8 +25,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="en" className={`${roboto.variable} ${robotoMono.variable}`}>
+      <body className={roboto.className}>
         <Providers>
           {children}
         </Providers>

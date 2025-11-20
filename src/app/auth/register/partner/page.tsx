@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { Star, CreditCard, Check } from 'lucide-react';
 import Link from 'next/link';
 
-export default function PartnerRegistration() {
+function PartnerRegistrationContent() {
   const [logoError, setLogoError] = useState(false);
   const [formData, setFormData] = useState({
     businessName: '',
@@ -726,4 +726,19 @@ export default function PartnerRegistration() {
       </motion.div>
     </div>
   );
-} 
+}
+
+export default function PartnerRegistration() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-blue-50/30">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <PartnerRegistrationContent />
+    </Suspense>
+  );
+}

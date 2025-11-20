@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { QRCodeSVG } from 'qrcode.react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Lock, Settings } from 'lucide-react';
 import PasswordChangeForm from '@/components/PasswordChangeForm';
 
@@ -19,6 +19,7 @@ export default function ProfilePage() {
   const [qrCode, setQrCode] = useState('');
   const [customerId, setCustomerId] = useState('');
   const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [showCardModal, setShowCardModal] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -120,7 +121,11 @@ export default function ProfilePage() {
           ) : (
             <div className="flex justify-center">
               {/* Digital Card - Bank Card Style */}
-              <div className="relative w-full max-w-md bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl shadow-2xl overflow-hidden" style={{ minHeight: '500px' }}>
+              <div 
+                onClick={() => setShowCardModal(true)}
+                className="relative w-full max-w-md bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl shadow-2xl overflow-hidden cursor-pointer hover:scale-105 transition-transform duration-200" 
+                style={{ minHeight: '500px' }}
+              >
                 {/* Decorative elements */}
                 <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-32 -mt-32"></div>
                 <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-10 rounded-full -ml-24 -mb-24"></div>
@@ -130,8 +135,8 @@ export default function ProfilePage() {
                   {/* Top Section */}
                   <div className="flex items-start justify-between mb-2">
                     <div>
-                      <h3 className="text-subheading font-bold text-white mb-1">LocalPerks</h3>
-                      <p className="text-blue-200 text-caption">Loyalty Card</p>
+                      <h3 className="text-[18px] font-medium text-white mb-1" style={{ fontFamily: 'var(--font-roboto)' }}>LocalPerks</h3>
+                      <p className="text-blue-200 text-[18px] font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Loyalty Card</p>
                     </div>
                     {/* Chip */}
                     <div className="w-10 h-8 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-md shadow-lg"></div>
@@ -139,9 +144,9 @@ export default function ProfilePage() {
                   
                   {/* Middle Section - QR Code */}
                   <div className="flex justify-center my-2 flex-shrink-0">
-                    <div className="bg-white rounded-xl p-4 shadow-xl">
+                    <div className="bg-white rounded-xl p-4 shadow-xl w-[232px] h-[232px] flex items-center justify-center">
                       <QRCodeSVG 
-                        value={qrCode} 
+                        value={qrCode || `rewards-${session?.user?.email || 'guest'}-app`} 
                         size={200} 
                         level="H"
                         className="rounded-lg"
@@ -153,28 +158,28 @@ export default function ProfilePage() {
                   <div className="space-y-2 mt-2">
                     {/* Customer Name */}
                     <div>
-                      <p className="text-white text-label font-semibold uppercase tracking-wider">
-                        {session?.user?.name?.toUpperCase() || 'MEMBER'}
+                      <p className="text-white text-[18px] font-medium tracking-wider" style={{ fontFamily: 'var(--font-roboto)' }}>
+                        {session?.user?.name || 'Member'}
                       </p>
                     </div>
                     
                     {/* Customer ID */}
                     {customerId && (
                       <div className="flex items-center space-x-2">
-                        <p className="text-blue-200 text-caption font-semibold">ID:</p>
-                        <p className="text-white text-caption font-mono font-semibold break-all">{customerId}</p>
+                        <p className="text-blue-200 text-[18px] font-medium uppercase" style={{ fontFamily: 'var(--font-roboto)' }}>ID:</p>
+                        <p className="text-white text-[18px] font-medium break-all uppercase" style={{ fontFamily: 'var(--font-roboto)' }}>{customerId}</p>
                       </div>
                     )}
                     
                     {/* Points and Tier */}
                     <div className="flex items-center justify-between pt-2 border-t border-blue-500 border-opacity-30">
                       <div>
-                        <p className="text-blue-200 text-caption uppercase tracking-wide">Points</p>
-                        <p className="text-white text-body font-bold">{pointsData.points.toLocaleString()}</p>
+                        <p className="text-blue-200 text-[18px] tracking-wide font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Points</p>
+                        <p className="text-white text-[18px] font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>{pointsData.points.toLocaleString()}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-blue-200 text-caption uppercase tracking-wide">Tier</p>
-                        <p className="text-white text-body font-bold">{pointsData.tier}</p>
+                        <p className="text-blue-200 text-[18px] tracking-wide font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Tier</p>
+                        <p className="text-white text-[18px] font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>{pointsData.tier}</p>
                       </div>
                     </div>
                   </div>
@@ -188,6 +193,94 @@ export default function ProfilePage() {
           </p>
         </div>
       </div>
+
+      {/* Digital Card Modal */}
+      <AnimatePresence>
+        {showCardModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowCardModal(false)}
+            className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4 overflow-y-auto"
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-xl my-8"
+            >
+              {/* Enlarged Digital Card */}
+              <div className="relative w-full bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-3xl shadow-2xl overflow-hidden" style={{ minHeight: '450px', maxHeight: '85vh' }}>
+                {/* Decorative elements */}
+                <div className="absolute top-0 right-0 w-72 h-72 bg-white opacity-10 rounded-full -mr-36 -mt-36"></div>
+                <div className="absolute bottom-0 left-0 w-56 h-56 bg-white opacity-10 rounded-full -ml-28 -mb-28"></div>
+                
+                {/* Card Content */}
+                <div className="relative h-full p-5 md:p-6 lg:p-7 flex flex-col justify-between" style={{ minHeight: '450px' }}>
+                  {/* Top Section */}
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <h3 className="text-2xl md:text-3xl lg:text-4xl font-medium text-white mb-1" style={{ fontFamily: 'var(--font-roboto)' }}>LocalPerks</h3>
+                      <p className="text-blue-200 text-sm md:text-base font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Loyalty Card</p>
+                    </div>
+                    {/* Chip */}
+                    <div className="w-11 h-8 md:w-12 md:h-9 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-lg shadow-lg"></div>
+                  </div>
+                  
+                  {/* Middle Section - QR Code */}
+                  <div className="flex justify-center my-2 flex-shrink-0">
+                    <div className="bg-white rounded-xl p-3 md:p-4 shadow-xl">
+                      <QRCodeSVG 
+                        value={qrCode || `rewards-${session?.user?.email || 'guest'}-app`} 
+                        size={210}
+                        level="H"
+                        className="rounded-lg"
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Bottom Section */}
+                  <div className="space-y-2 mt-2">
+                    {/* Customer Name */}
+                    <div>
+                      <p className="text-white text-sm md:text-base lg:text-lg font-medium tracking-wider" style={{ fontFamily: 'var(--font-roboto)' }}>
+                        {session?.user?.name || 'Member'}
+                      </p>
+                    </div>
+                    
+                    {/* Customer ID */}
+                    {customerId && (
+                      <div className="flex items-center space-x-2">
+                        <p className="text-blue-200 text-sm md:text-base font-medium uppercase" style={{ fontFamily: 'var(--font-roboto)' }}>ID:</p>
+                        <p className="text-white text-sm md:text-base font-medium break-all uppercase" style={{ fontFamily: 'var(--font-roboto)' }}>{customerId}</p>
+                      </div>
+                    )}
+                    
+                    {/* Points and Tier */}
+                    <div className="flex items-center justify-between pt-2 border-t border-blue-500 border-opacity-30">
+                      <div>
+                        <p className="text-blue-200 text-xs md:text-sm tracking-wide font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Points</p>
+                        <p className="text-white text-xl md:text-2xl lg:text-3xl font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>{pointsData.points.toLocaleString()}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-blue-200 text-xs md:text-sm tracking-wide font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Tier</p>
+                        <p className="text-white text-lg md:text-xl lg:text-2xl font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>{pointsData.tier}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Close hint */}
+              <p className="text-white text-sm text-center mt-4 opacity-75">
+                Click outside to close
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Rewards Status */}
       <div className="bg-white shadow-lg rounded-2xl p-8">

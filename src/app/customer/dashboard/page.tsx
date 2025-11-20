@@ -291,8 +291,8 @@ export default function DashboardPage() {
                   {/* Top Section */}
                   <div className="flex items-start justify-between mb-2">
                     <div>
-                      <h3 className="text-subheading font-bold text-white mb-1">LocalPerks</h3>
-                      <p className="text-blue-200 text-caption">Loyalty Card</p>
+                      <h3 className="text-[18px] font-medium text-white mb-1" style={{ fontFamily: 'var(--font-roboto)' }}>LocalPerks</h3>
+                      <p className="text-blue-200 text-[18px] font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Loyalty Card</p>
                     </div>
                     {/* Chip */}
                     <div className="w-10 h-8 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-md shadow-lg"></div>
@@ -312,30 +312,34 @@ export default function DashboardPage() {
                   
                   {/* Bottom Section */}
                   <div className="space-y-2 mt-2">
-                    {/* Customer Name */}
-                    <div>
-                      <p className="text-white text-label font-semibold uppercase tracking-wider">
-                        {session?.user?.name?.toUpperCase() || 'MEMBER'}
+                    {/* Customer Name - Aligned */}
+                    <div className="min-h-[28px] flex items-center">
+                      <p className="text-white text-[18px] font-medium tracking-wider" style={{ fontFamily: 'var(--font-roboto)' }}>
+                        {session?.user?.name || 'Member'}
                       </p>
                     </div>
                     
-                    {/* Customer ID */}
-                    {customerId && (
-                      <div className="flex items-center space-x-2">
-                        <p className="text-blue-200 text-caption font-semibold">ID:</p>
-                        <p className="text-white text-caption font-mono font-semibold break-all">{customerId}</p>
-                      </div>
-                    )}
+                    {/* Customer ID - Aligned */}
+                    <div className="min-h-[28px] flex items-center">
+                      {customerId ? (
+                        <div className="flex items-center space-x-2">
+                          <p className="text-blue-200 text-[18px] font-medium uppercase" style={{ fontFamily: 'var(--font-roboto)' }}>ID:</p>
+                          <p className="text-white text-[18px] font-medium break-all uppercase" style={{ fontFamily: 'var(--font-roboto)' }}>{customerId}</p>
+                        </div>
+                      ) : (
+                        <div className="h-[28px]"></div>
+                      )}
+                    </div>
                     
-                    {/* Points and Tier */}
-                    <div className="flex items-center justify-between pt-2 border-t border-blue-500 border-opacity-30">
+                    {/* Points and Tier - Aligned */}
+                    <div className="flex items-center justify-between pt-2 border-t border-blue-500 border-opacity-30 min-h-[60px]">
                       <div>
-                        <p className="text-blue-200 text-caption uppercase tracking-wide">Points</p>
-                        <p className="text-white text-body font-bold">{pointsData.points.toLocaleString()}</p>
+                        <p className="text-blue-200 text-[18px] tracking-wide font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Points</p>
+                        <p className="text-white text-[18px] font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>{pointsData.points.toLocaleString()}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-blue-200 text-caption uppercase tracking-wide">Tier</p>
-                        <p className="text-white text-body font-bold">{pointsData.tier}</p>
+                        <p className="text-blue-200 text-[18px] tracking-wide font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Tier</p>
+                        <p className="text-white text-[18px] font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>{pointsData.tier}</p>
                       </div>
                     </div>
                   </div>
@@ -362,8 +366,8 @@ export default function DashboardPage() {
                 {/* Top Section */}
                 <div className="flex items-start justify-between mb-2">
                   <div>
-                    <h3 className="text-subheading font-bold text-white mb-1">LocalPerks</h3>
-                    <p className="text-green-100 text-caption">Discount Card</p>
+                    <h3 className="text-[18px] font-medium text-white mb-1" style={{ fontFamily: 'var(--font-roboto)' }}>LocalPerks</h3>
+                    <p className="text-green-100 text-[18px] font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Discount Card</p>
                   </div>
                   {/* Chip */}
                   <div className="w-10 h-8 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-md shadow-lg"></div>
@@ -372,36 +376,32 @@ export default function DashboardPage() {
                 {/* Middle Section - Discount Amount */}
                 <div className="flex flex-col items-center justify-center my-2 flex-shrink-0">
                   <div className="bg-white bg-opacity-20 rounded-xl p-4 shadow-xl w-[232px] h-[232px] flex flex-col items-center justify-center backdrop-blur-sm">
-                    <p className="text-green-100 text-sm md:text-base uppercase tracking-widest mb-3 font-semibold">Available</p>
-                    <p className="text-white text-4xl md:text-5xl font-extrabold tracking-tight">£{Math.floor(availableDiscount)}</p>
-                    <p className="text-green-100 text-base md:text-lg mt-3 font-semibold">Redeemable Value</p>
+                    <p className="text-green-100 text-[18px] tracking-widest mb-3 font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Available</p>
+                    <p className="text-white text-[18px] font-medium tracking-tight" style={{ fontFamily: 'var(--font-roboto)' }}>£{Math.floor(availableDiscount)}</p>
+                    <p className="text-green-100 text-[18px] mt-3 font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Redeemable Value</p>
                   </div>
                 </div>
                 
                 {/* Bottom Section */}
                 <div className="space-y-2 mt-2">
-                  {/* Cardholder Name */}
-                  <div>
-                    <p className="text-white text-label font-semibold uppercase tracking-wider">
-                      {session?.user?.name?.toUpperCase() || 'MEMBER'}
+                  {/* Cardholder Name - Aligned */}
+                  <div className="min-h-[28px] flex items-center">
+                    <p className="text-white text-[18px] font-medium tracking-wider" style={{ fontFamily: 'var(--font-roboto)' }}>
+                      {session?.user?.name || 'Member'}
                     </p>
                   </div>
                   
-                  {/* Points Value */}
-                  <div className="flex items-center space-x-2">
-                    <p className="text-green-100 text-caption font-semibold">Points:</p>
-                    <p className="text-white text-caption font-semibold">{pointsData.points.toLocaleString()}</p>
+                  {/* Spacer to match Customer ID row on left card */}
+                  <div className="min-h-[28px] flex items-center">
+                    <div className="h-[28px]"></div>
                   </div>
                   
-                  {/* Action Link */}
-                  <div className="pt-2 border-t border-green-400 border-opacity-30">
-                    <Link
-                      href="/customer/rewards"
-                      className="inline-flex items-center text-xs font-medium text-white hover:text-green-100 transition-colors"
-                    >
-                      Redeem Discounts
-                      <ArrowRight className="ml-1 h-3 w-3" />
-                    </Link>
+                  {/* Discount Value - Aligned */}
+                  <div className="flex items-center justify-between pt-2 border-t border-green-400 border-opacity-30 min-h-[60px]">
+                    <div className="text-right w-full">
+                      <p className="text-green-100 text-[18px] tracking-wide font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Value</p>
+                      <p className="text-white text-[18px] font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>£{Math.floor(availableDiscount)}</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -427,32 +427,32 @@ export default function DashboardPage() {
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.8, opacity: 0 }}
                 onClick={(e) => e.stopPropagation()}
-                className="relative w-full max-w-2xl my-8"
+                className="relative w-full max-w-xl my-8"
               >
                 {/* Enlarged Digital Card */}
-                <div className="relative w-full bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-3xl shadow-2xl overflow-hidden" style={{ minHeight: '600px', maxHeight: '90vh' }}>
+                <div className="relative w-full bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-3xl shadow-2xl overflow-hidden" style={{ minHeight: '450px', maxHeight: '85vh' }}>
                   {/* Decorative elements */}
-                  <div className="absolute top-0 right-0 w-96 h-96 bg-white opacity-10 rounded-full -mr-48 -mt-48"></div>
-                  <div className="absolute bottom-0 left-0 w-72 h-72 bg-white opacity-10 rounded-full -ml-36 -mb-36"></div>
+                  <div className="absolute top-0 right-0 w-72 h-72 bg-white opacity-10 rounded-full -mr-36 -mt-36"></div>
+                  <div className="absolute bottom-0 left-0 w-56 h-56 bg-white opacity-10 rounded-full -ml-28 -mb-28"></div>
                   
                   {/* Card Content */}
-                  <div className="relative h-full p-6 md:p-8 lg:p-10 flex flex-col justify-between" style={{ minHeight: '600px' }}>
+                  <div className="relative h-full p-5 md:p-6 lg:p-7 flex flex-col justify-between" style={{ minHeight: '450px' }}>
                     {/* Top Section */}
-                    <div className="flex items-start justify-between mb-2 md:mb-3">
+                    <div className="flex items-start justify-between mb-2">
                       <div>
-                        <h3 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-1 md:mb-2">LocalPerks</h3>
-                        <p className="text-blue-200 text-sm md:text-base lg:text-lg">Loyalty Card</p>
+                        <h3 className="text-2xl md:text-3xl lg:text-4xl font-medium text-white mb-1" style={{ fontFamily: 'var(--font-roboto)' }}>LocalPerks</h3>
+                        <p className="text-blue-200 text-sm md:text-base font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Loyalty Card</p>
                       </div>
                       {/* Chip */}
-                      <div className="w-14 h-10 md:w-16 md:h-12 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-lg shadow-lg"></div>
+                      <div className="w-11 h-8 md:w-12 md:h-9 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-lg shadow-lg"></div>
                     </div>
                     
                     {/* Middle Section - QR Code */}
-                    <div className="flex justify-center my-2 md:my-3 flex-shrink-0">
-                      <div className="bg-white rounded-xl md:rounded-2xl p-4 md:p-5 lg:p-6 shadow-xl">
+                    <div className="flex justify-center my-2 flex-shrink-0">
+                      <div className="bg-white rounded-xl p-3 md:p-4 shadow-xl">
                         <QRCodeSVG 
                           value={qrCode || `rewards-${session?.user?.email || 'guest'}-app`} 
-                          size={280}
+                          size={210}
                           level="H"
                           className="rounded-lg"
                         />
@@ -460,31 +460,31 @@ export default function DashboardPage() {
                     </div>
                     
                     {/* Bottom Section */}
-                    <div className="space-y-2 md:space-y-3 mt-2 md:mt-3">
+                    <div className="space-y-2 mt-2">
                       {/* Customer Name */}
                       <div>
-                        <p className="text-white text-base md:text-lg lg:text-xl font-semibold uppercase tracking-wider">
-                          {session?.user?.name?.toUpperCase() || 'MEMBER'}
+                        <p className="text-white text-sm md:text-base lg:text-lg font-medium tracking-wider" style={{ fontFamily: 'var(--font-roboto)' }}>
+                          {session?.user?.name || 'Member'}
                         </p>
                       </div>
                       
                       {/* Customer ID */}
                       {customerId && (
                         <div className="flex items-center space-x-2">
-                          <p className="text-blue-200 text-sm md:text-base">ID:</p>
-                          <p className="text-white text-sm md:text-base font-mono font-semibold break-all">{customerId}</p>
+                          <p className="text-blue-200 text-sm md:text-base font-medium uppercase" style={{ fontFamily: 'var(--font-roboto)' }}>ID:</p>
+                          <p className="text-white text-sm md:text-base font-medium break-all uppercase" style={{ fontFamily: 'var(--font-roboto)' }}>{customerId}</p>
                         </div>
                       )}
                       
                       {/* Points and Tier */}
-                      <div className="flex items-center justify-between pt-2 md:pt-3 border-t border-blue-500 border-opacity-30">
+                      <div className="flex items-center justify-between pt-2 border-t border-blue-500 border-opacity-30">
                         <div>
-                          <p className="text-blue-200 text-sm md:text-base uppercase tracking-wide">Points</p>
-                          <p className="text-white text-2xl md:text-3xl lg:text-4xl font-bold">{pointsData.points.toLocaleString()}</p>
+                          <p className="text-blue-200 text-xs md:text-sm tracking-wide font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Points</p>
+                          <p className="text-white text-xl md:text-2xl lg:text-3xl font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>{pointsData.points.toLocaleString()}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-blue-200 text-sm md:text-base uppercase tracking-wide">Tier</p>
-                          <p className="text-white text-xl md:text-2xl lg:text-3xl font-bold">{pointsData.tier}</p>
+                          <p className="text-blue-200 text-xs md:text-sm tracking-wide font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Tier</p>
+                          <p className="text-white text-lg md:text-xl lg:text-2xl font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>{pointsData.tier}</p>
                         </div>
                       </div>
                     </div>

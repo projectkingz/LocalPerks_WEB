@@ -25,7 +25,8 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(new URL("/", req.url));
     }
   }
-  if (pathname.startsWith("/partner")) {
+  // Only protect partner dashboard routes, not the public partner landing page
+  if (pathname.startsWith("/partner/dashboard") || pathname.startsWith("/partner/pending-approvals") || pathname.startsWith("/partner/profile") || pathname.startsWith("/partner/rewards") || pathname.startsWith("/partner/transactions")) {
     if (token.role !== "PARTNER")
       return NextResponse.redirect(new URL("/", req.url));
   }
@@ -42,5 +43,13 @@ export async function middleware(req: NextRequest) {
 // };
 
 export const config = {
-  matcher: ["/admin/:path*", "/partner/:path*", "/customer/:path*"],
+  matcher: [
+    "/admin/:path*", 
+    "/partner/dashboard/:path*", 
+    "/partner/pending-approvals/:path*", 
+    "/partner/profile/:path*", 
+    "/partner/rewards/:path*", 
+    "/partner/transactions/:path*",
+    "/customer/:path*"
+  ],
 };

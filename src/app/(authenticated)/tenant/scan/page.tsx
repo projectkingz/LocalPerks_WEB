@@ -76,7 +76,7 @@ export default function TenantScanPage() {
 
       if (customerResponse.ok) {
         const data = await customerResponse.json();
-        setScanResult({ ...data, type: 'customer' });
+        setScanResult({ ...data.customer, type: 'customer' });
         return;
       }
 

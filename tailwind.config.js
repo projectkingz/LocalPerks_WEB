@@ -6,7 +6,14 @@ module.exports = {
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        'sans': ['var(--font-roboto)', 'sans-serif'],
+        'roboto': ['var(--font-roboto)', 'sans-serif'],
+        'roboto-mono': ['var(--font-roboto-mono)', 'monospace'],
+        'mono': ['var(--font-roboto-mono)', 'monospace'],
+      },
+    },
   },
   plugins: [],
 } 

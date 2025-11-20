@@ -1,73 +1,75 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { verify2FACode } from '@/lib/auth/two-factor';
+import { getVerificationCode } from '../resend-verification/route';
 
 export async function POST(req: Request) {
   try {
     const { userId, code } = await req.json();
 
-    console.log(`\n🔍 Verifying email for user: ${userId} with code: ${code}`);
-
     if (!userId || !code) {
       return NextResponse.json(
-        { message: 'Missing required fields' },
+        { error: 'Missing userId or code' },
         { status: 400 }
       );
     }
 
-    // Verify the 2FA code
-    let isValid = false;
-    try {
-      isValid = await verify2FACode({ userId, code, purpose: 'registration' });
-      console.log(`✅ Code verification result: ${isValid}`);
-    } catch (verifyError) {
-      console.error('❌ Error during code verification:', verifyError);
-      // Continue with isValid = false
-    }
+    // Get stored code
+    const storedCode = getVerificationCode(userId);
 
-    if (!isValid) {
-      console.warn('⚠️  Invalid or expired verification code');
+    if (!storedCode) {
       return NextResponse.json(
-        { message: 'Invalid or expired verification code' },
+        { error: 'No verification code found or code expired. Please request a new code.' },
         { status: 400 }
       );
     }
 
-    // Update user status - both partners and customers move to mobile verification
+    // Verify code
+    if (storedCode !== code) {
+      return NextResponse.json(
+        { error: 'Invalid verification code' },
+        { status: 400 }
+      );
+    }
+
+    // Update user email verification status
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { role: true },
     });
 
-    // Both partners and customers require mobile verification after email
-    const newApprovalStatus = 'PENDING_MOBILE_VERIFICATION';
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
 
-    const updatedUser = await prisma.user.update({
+    // Update user to pending mobile verification
+    await prisma.user.update({
       where: { id: userId },
-      data: { approvalStatus: newApprovalStatus },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        tenantId: true,
-        approvalStatus: true,
+      data: {
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
+        approvalStatus: 'PENDING_MOBILE_VERIFICATION',
       },
     });
 
-    console.log(`✅ Email verified successfully for user: ${updatedUser.email} (${user?.role})`);
-    console.log(`Next step: ${newApprovalStatus}`);
+    console.log(`✅ Email verified for user: ${user.email}`);
 
     return NextResponse.json({
+      success: true,
       message: 'Email verified successfully',
-      user: updatedUser,
-      requiresMobileVerification: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      },
     });
   } catch (error) {
-    console.error('❌ Email verification error:', error);
+    console.error('Error verifying email:', error);
     return NextResponse.json(
-      { message: 'Error during email verification' },
+      { error: 'Failed to verify email' },
       { status: 500 }
     );
   }
 }
+

@@ -129,10 +129,10 @@ export const authOptions: NextAuthOptions = {
             
             // For partners with pending verifications, redirect to verification flows
             if (user.role === 'PARTNER') {
-              if (user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
+              if (false && user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
                 console.log('Partner needs email verification, redirecting to verify-email');
                 throw new Error('PARTNER_EMAIL_VERIFICATION_REQUIRED');
-              } else if (user.approvalStatus === 'PENDING_MOBILE_VERIFICATION') {
+              } else if (false && user.approvalStatus === 'PENDING_MOBILE_VERIFICATION') {
                 console.log('Partner needs mobile verification, redirecting to verify-mobile');
                 throw new Error('PARTNER_MOBILE_VERIFICATION_REQUIRED');
               } else if (user.approvalStatus === 'PENDING' || user.approvalStatus === 'UNDER_REVIEW') {
@@ -143,10 +143,10 @@ export const authOptions: NextAuthOptions = {
             } 
             // For customers with pending verifications, redirect to verification flows
             else if (user.role === 'CUSTOMER') {
-              if (user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
+              if (false && user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
                 console.log('Customer needs email verification, redirecting to verify-email');
                 throw new Error('CUSTOMER_EMAIL_VERIFICATION_REQUIRED');
-              } else if (user.approvalStatus === 'PENDING_MOBILE_VERIFICATION') {
+              } else if (false && user.approvalStatus === 'PENDING_MOBILE_VERIFICATION') {
                 console.log('Customer needs mobile verification, redirecting to verify-mobile');
                 throw new Error('CUSTOMER_MOBILE_VERIFICATION_REQUIRED');
               } else {
@@ -156,7 +156,7 @@ export const authOptions: NextAuthOptions = {
             // For other roles (ADMIN, SUPER_ADMIN)
             else if (user.approvalStatus === 'UNDER_REVIEW') {
               throw new Error('ACCOUNT_UNDER_REVIEW');
-            } else if (user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
+            } else if (false && user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
               throw new Error('EMAIL_VERIFICATION_REQUIRED');
             } else if (user.approvalStatus === 'PENDING') {
               throw new Error('PENDING_APPROVAL');
@@ -301,46 +301,28 @@ export const authOptions: NextAuthOptions = {
                 }
               });
 
-              // Ensure customer record exists for this user
-              const existingCustomer = await prisma.customer.findUnique({
-                where: { email: existingUser.email }
-              });
-
-              if (!existingCustomer) {
-                console.log('Creating customer record for existing user');
-                // Create a default tenant if none exists
-                let defaultTenant = await prisma.tenant.findFirst({
-                  where: { name: 'System Default Tenant' }
+              // Ensure customer record exists for this user (only for CUSTOMER role)
+              if (existingUser.role === 'CUSTOMER') {
+                const existingCustomer = await prisma.customer.findUnique({
+                  where: { email: existingUser.email }
                 });
 
-                if (!defaultTenant) {
-                  // Create a system user first for the tenant
-                  const systemUser = await prisma.user.create({
+                if (!existingCustomer) {
+                  console.log('Creating customer record for existing CUSTOMER user');
+                  
+                  // Create customer record without specific tenant assignment
+                  // Customers can transact with any tenant
+                  await prisma.customer.create({
                     data: {
-                      email: 'system@default.com',
-                      name: 'System User',
-                      role: 'ADMIN',
-                      suspended: false,
-                    }
-                  });
-
-                  defaultTenant = await prisma.tenant.create({
-                    data: {
-                      name: 'System Default Tenant',
-                      partnerUserId: systemUser.id,
+                      email: existingUser.email,
+                      name: existingUser.name || '',
+                      mobile: '000-000-0000', // Default mobile for social login users
+                      tenantId: null, // No specific tenant - can transact with any
                     }
                   });
                 }
-
-                // Create customer record
-                await prisma.customer.create({
-                  data: {
-                    email: existingUser.email,
-                    name: existingUser.name || '',
-                    mobile: '000-000-0000', // Default mobile for social login users
-                    tenantId: defaultTenant.id,
-                  }
-                });
+              } else {
+                console.log(`Skipping customer record creation for existing ${existingUser.role} user:`, existingUser.email);
               }
             }
           } else if (user.email) {
@@ -376,47 +358,30 @@ export const authOptions: NextAuthOptions = {
         session.user.suspended = token.suspended;
         session.user.approvalStatus = token.approvalStatus;
         
-        // Ensure customer record exists for this user
+        // Ensure customer record exists for this user (only for CUSTOMER role)
         try {
-          const existingCustomer = await prisma.customer.findUnique({
-            where: { email: session.user.email! }
-          });
-
-          if (!existingCustomer) {
-            console.log('Creating customer record for user in session callback');
-            // Create a default tenant if none exists
-            let defaultTenant = await prisma.tenant.findFirst({
-              where: { name: 'System Default Tenant' }
+          // Only create Customer records for users with CUSTOMER role
+          if (session.user.role === 'CUSTOMER') {
+            const existingCustomer = await prisma.customer.findUnique({
+              where: { email: session.user.email! }
             });
 
-            if (!defaultTenant) {
-              // Create a system user first for the tenant
-              const systemUser = await prisma.user.create({
+            if (!existingCustomer) {
+              console.log('Creating customer record for CUSTOMER user in session callback');
+              
+              // Create customer record without specific tenant assignment
+              // Customers can transact with any tenant
+              await prisma.customer.create({
                 data: {
-                  email: 'system@default.com',
-                  name: 'System User',
-                  role: 'ADMIN',
-                  suspended: false,
-                }
-              });
-
-              defaultTenant = await prisma.tenant.create({
-                data: {
-                  name: 'System Default Tenant',
-                  partnerUserId: systemUser.id,
+                  email: session.user.email!,
+                  name: session.user.name || '',
+                  mobile: '000-000-0000', // Default mobile for social login users
+                  tenantId: null, // No specific tenant - can transact with any
                 }
               });
             }
-
-            // Create customer record
-            await prisma.customer.create({
-              data: {
-                email: session.user.email!,
-                name: session.user.name || '',
-                mobile: '000-000-0000', // Default mobile for social login users
-                tenantId: defaultTenant.id,
-              }
-            });
+          } else {
+            console.log(`Skipping customer record creation for ${session.user.role} user:`, session.user.email);
           }
         } catch (error) {
           console.error('Error ensuring customer record in session callback:', error);

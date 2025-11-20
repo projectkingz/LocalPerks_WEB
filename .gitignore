@@ -4,6 +4,8 @@
 /node_modules
 /.pnp
 .pnp.js
+/backend/node_modules
+/backend/.next
 
 # testing
 /coverage
@@ -11,6 +13,10 @@
 # next.js
 /.next/
 /out/
+
+# Exclude backend and docs from Next.js processing
+/backend/
+/docs/
 
 # production
 /build

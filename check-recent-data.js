@@ -1,4 +1,4 @@
-/auth/verify-mobile?userId=cmh6xd7ww00004al4ft0jgzul&email=sambaba%40business.com&mobile=undefinedconst { PrismaClient } = require('@prisma/client');
+const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 

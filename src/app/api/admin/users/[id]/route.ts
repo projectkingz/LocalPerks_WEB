@@ -67,10 +67,19 @@ export async function PATCH(
       updateData.password = await hash(data.password, 12);
     }
 
+    // Update user
     const updatedUser = await prisma.user.update({
       where: { id: params.id },
       data: updateData,
     });
+
+    // If businessName is provided and user is a partner, update the tenant record
+    if (data.businessName && targetUser.role === 'PARTNER') {
+      await prisma.tenant.updateMany({
+        where: { partnerUserId: params.id },
+        data: { name: data.businessName }
+      });
+    }
 
     // Return user info except password
     const { password, ...userInfo } = updatedUser;

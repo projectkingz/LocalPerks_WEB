@@ -75,31 +75,41 @@ model Customer {
   points       Int           @default(0)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
-  tenantId     String
+  tenantId     String?       // Optional - customers can transact with any tenant
   email        String        @unique
   name         String
   mobile       String
-  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  qrCode       String?       @unique // Persistent unique QR code identifier
+  tenant       Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   redemptions  Redemption[]
   transactions Transaction[]
   vouchers     Voucher[]
 
   @@index([tenantId])
+  @@index([qrCode])
 }
 
 model Tenant {
-  id            String              @id @default(cuid())
-  name          String
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-  partnerUserId String
-  mobile        String?
-  customers     Customer[]
-  rewards       Reward[]
-  partnerUser   User                @relation("PartnerUser", fields: [partnerUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  pointsConfig  TenantPointsConfig?
-  transactions  Transaction[]
-  users         User[]
+  id                 String              @id @default(cuid())
+  name               String
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  partnerUserId      String
+  mobile             String?
+  nextBillingDate    DateTime?
+  stripeCustomerId   String?
+  subscriptionStatus String              @default("ACTIVE")
+  subscriptionTier   String              @default("BASIC")
+  customers          Customer[]
+  rewards            Reward[]
+  partnerUser        User                @relation("PartnerUser", fields: [partnerUserId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  pointsConfig       TenantPointsConfig?
+  transactions       Transaction[]
+  users              User[]
+  subscriptions      Subscription[]
+
+  @@index([subscriptionTier])
+  @@index([subscriptionStatus])
 }
 
 model Transaction {
@@ -113,8 +123,8 @@ model Transaction {
   status     String   @default("pending")
   type       String
   userId     String
-  customer   Customer @relation(fields: [customerId], references: [id])
-  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user       User     @relation(fields: [userId], references: [id])
 
   @@index([userId])
@@ -123,17 +133,22 @@ model Transaction {
 }
 
 model Reward {
-  id          String       @id @default(cuid())
-  name        String
-  description String
-  points      Int
-  createdAt   DateTime     @default(now())
-  tenantId    String
-  redemptions Redemption[]
-  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  vouchers    Voucher[]
+  id              String       @id @default(cuid())
+  name            String
+  description     String
+  points          Int
+  createdAt       DateTime     @default(now())
+  tenantId        String
+  approvalStatus  String       @default("PENDING") // PENDING, APPROVED, REJECTED
+  approvedAt      DateTime?
+  approvedBy      String?
+  rejectionReason String?
+  redemptions     Redemption[]
+  tenant          Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vouchers        Voucher[]
 
   @@index([tenantId])
+  @@index([approvalStatus])
 }
 
 model Redemption {
@@ -195,24 +210,75 @@ model Activity {
 }
 
 model SystemConfig {
-  id                      String   @id @default(cuid())
-  pointFaceValue          Float    @default(0.01) // £0.01 per point
-  systemFixedCharge       Float    @default(0.001) // £0.001 per point
-  systemVariableCharge    Float    @default(0.06) // 6% issuance margin
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
-  
+  id                   String   @id @default(cuid())
+  pointFaceValue       Float    @default(0.01)
+  systemFixedCharge    Float    @default(0.001)
+  systemVariableCharge Float    @default(0.06)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
   @@map("system_config")
 }
 
+model SubscriptionTier {
+  id            String         @id @default(cuid())
+  name          String         @unique
+  displayName   String
+  price         Float
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  subscriptions Subscription[]
+
+  @@map("subscription_tiers")
+}
+
+model Subscription {
+  id                   String                @id @default(cuid())
+  tenantId             String
+  tierId               String
+  status               String                @default("ACTIVE")
+  stripeSubscriptionId String?
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  nextBillingDate      DateTime
+  amount               Float
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  tenant               Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tier                 SubscriptionTier      @relation(fields: [tierId], references: [id])
+  payments             SubscriptionPayment[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([nextBillingDate])
+}
+
+model SubscriptionPayment {
+  id                    String       @id @default(cuid())
+  subscriptionId        String
+  amount                Float
+  status                String
+  stripePaymentIntentId String?
+  stripeInvoiceId       String?
+  paidAt                DateTime?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  subscription          Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@index([status])
+  @@index([paidAt])
+}
+
 model Admin {
-  id            String   @id @default(cuid())
-  name          String
-  mobile        String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  adminUserId   String   @unique
-  adminUser     User     @relation("AdminUser", fields: [adminUserId], references: [id], onDelete: Cascade)
-  
+  id          String   @id @default(cuid())
+  name        String
+  mobile      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  adminUserId String   @unique
+  adminUser   User     @relation("AdminUser", fields: [adminUserId], references: [id], onDelete: Cascade)
+
   @@index([adminUserId])
 }

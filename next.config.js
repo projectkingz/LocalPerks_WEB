@@ -12,10 +12,30 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true, // ⚠️ Temporarily disable TypeScript for deployment
   },
+  // Optimize build performance
+  swcMinify: true,
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production' ? {
+      exclude: ['error', 'warn'],
+    } : false,
+  },
+  // Reduce bundle size
+  modularizeImports: {
+    'lucide-react': {
+      transform: 'lucide-react/dist/esm/icons/{{member}}',
+      skipDefaultConversion: true,
+    },
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: '2mb'
-    }
+    },
+    // Optimize memory usage
+    optimizePackageImports: [
+      'lucide-react',
+      '@heroicons/react',
+      'framer-motion',
+    ],
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {
@@ -33,6 +53,18 @@ const nextConfig = {
       test: /prisma\/seed.*\.ts$/,
       use: 'ignore-loader'
     });
+    
+    // Exclude backend directory from webpack processing
+    config.watchOptions = {
+      ...config.watchOptions,
+      ignored: [
+        '**/node_modules/**',
+        '**/.next/**',
+        '**/backend/**',
+        '**/docs/**',
+        '**/.git/**'
+      ]
+    };
     
     return config;
   },

@@ -27,6 +27,14 @@ interface Reward {
   description: string;
   points: number;
   createdAt: string;
+  approvalStatus: string;
+  approvedAt?: string;
+  approvedBy?: string;
+  rejectionReason?: string;
+  tenant?: {
+    id: string;
+    name: string;
+  };
   redemptions: Redemption[];
 }
 
@@ -101,8 +109,9 @@ export default function AdminRewardsDashboard() {
   const canDeleteReward = (reward: Reward) => {
     // Only SUPER_ADMIN can delete rewards
     if (!isSuperAdmin) return false;
-    // Cannot delete rewards with existing redemptions
-    if (reward.redemptions && reward.redemptions.length > 0) return false;
+    // Cannot delete rewards with existing redemptions (check if redemptions array exists and has length > 0)
+    const redemptionCount = Array.isArray(reward.redemptions) ? reward.redemptions.length : 0;
+    if (redemptionCount > 0) return false;
     return true;
   };
 
@@ -215,6 +224,72 @@ export default function AdminRewardsDashboard() {
       }
 
       setRewards(rewards.filter(r => r.id !== rewardId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    }
+  };
+
+  const handleApproveReward = async (rewardId: string) => {
+    try {
+      const response = await fetch('/api/admin/rewards', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          rewardId,
+          action: 'approve'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to approve reward');
+      }
+
+      const result = await response.json();
+      
+      // Update the reward in the local state
+      setRewards(rewards.map(r => 
+        r.id === rewardId 
+          ? { ...r, approvalStatus: 'APPROVED', approvedAt: new Date().toISOString(), approvedBy: result.approvedBy }
+          : r
+      ));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    }
+  };
+
+  const handleRejectReward = async (rewardId: string) => {
+    const rejectionReason = prompt('Please provide a reason for rejecting this reward:');
+    if (!rejectionReason) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/admin/rewards', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          rewardId,
+          action: 'reject',
+          rejectionReason
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to reject reward');
+      }
+
+      const result = await response.json();
+      
+      // Update the reward in the local state
+      setRewards(rewards.map(r => 
+        r.id === rewardId 
+          ? { ...r, approvalStatus: 'REJECTED', rejectionReason, approvedAt: new Date().toISOString(), approvedBy: result.approvedBy }
+          : r
+      ));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     }
@@ -503,6 +578,9 @@ export default function AdminRewardsDashboard() {
                     Created
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -525,8 +603,42 @@ export default function AdminRewardsDashboard() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(reward.createdAt).toLocaleDateString()}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        reward.approvalStatus === 'APPROVED' 
+                          ? 'bg-green-100 text-green-800' 
+                          : reward.approvalStatus === 'REJECTED'
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {reward.approvalStatus}
+                      </span>
+                      {reward.rejectionReason && (
+                        <div className="text-xs text-red-600 mt-1">
+                          {reward.rejectionReason}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
+                        {reward.approvalStatus === 'PENDING' && (
+                          <>
+                            <button
+                              onClick={() => handleApproveReward(reward.id)}
+                              className="text-green-600 hover:text-green-900"
+                              title="Approve reward"
+                            >
+                              <Award className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleRejectReward(reward.id)}
+                              className="text-red-600 hover:text-red-900"
+                              title="Reject reward"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
                         <button
                           onClick={() => handleEditReward(reward)}
                           className="text-blue-600 hover:text-blue-900"

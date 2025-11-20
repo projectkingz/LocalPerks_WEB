@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { hash } from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
-import { generateAndSend2FACode } from '@/lib/auth/two-factor';
 
 export async function POST(req: Request) {
   try {
@@ -39,8 +38,8 @@ export async function POST(req: Request) {
           email,
           password: hashedPassword,
           role: 'PARTNER',
-          suspended: true, // Account suspended until admin approval
-          approvalStatus: 'PENDING_EMAIL_VERIFICATION', // Mark as pending email verification
+          suspended: false, // Account active immediately (authentication disabled)
+          approvalStatus: 'PENDING_PAYMENT', // Mark as pending payment
         },
       });
 
@@ -62,36 +61,15 @@ export async function POST(req: Request) {
       return { tenant, user: updatedUser };
     });
 
-    // Send email verification code
-    let emailVerificationSent = false;
-    try {
-      console.log(`\n📤 Attempting to send verification email to: ${email}`);
-      const emailResult = await generateAndSend2FACode({
-        userId: result.user.id,
-        method: 'email',
-        email: email,
-      });
-
-      console.log(`\n📬 Email result:`, emailResult);
-
-      if (emailResult.success) {
-        emailVerificationSent = true;
-        console.log('✅ Email verification sent successfully');
-      } else {
-        console.warn('⚠️  Failed to send email verification:', emailResult.message);
-        console.warn('💡 Check the console above for the verification code');
-      }
-    } catch (error) {
-      console.error('❌ Error sending email verification:', error);
-    }
+    // Note: Email verification will be sent after payment completion in Step 2
+    console.log(`\n Partner registration completed for: ${email}`);
+    console.log(' Email verification will be sent after payment completion');
 
     return NextResponse.json(
       {
-        message: emailVerificationSent 
-          ? 'Registration successful. Please check your email for verification code.'
-          : 'Registration successful. Please contact support for account activation.',
-        requiresEmailVerification: emailVerificationSent,
-        emailVerificationSent,
+        message: 'Registration successful. Please proceed to payment to complete your account setup.',
+        requiresEmailVerification: false,
+        emailVerificationSent: false,
         user: {
           id: result.user.id,
           name: result.user.name,
@@ -114,4 +92,4 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
-} 
+}

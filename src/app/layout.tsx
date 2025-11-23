@@ -1,4 +1,4 @@
-import { Roboto, Roboto_Mono } from 'next/font/google';
+import { Roboto, Roboto_Mono, Fira_Sans } from 'next/font/google';
 import './globals.css';
 import Providers from './providers';
 
@@ -14,6 +14,12 @@ const robotoMono = Roboto_Mono({
   weight: ['300', '400', '500', '600', '700']
 });
 
+const firaSans = Fira_Sans({ 
+  subsets: ['latin'],
+  variable: '--font-fira-sans',
+  weight: ['300', '400', '500', '600', '700']
+});
+
 export const metadata = {
   title: 'LocalPerks - Community Rewards Program',
   description: 'Earn points and rewards when you spend in your community',
@@ -25,7 +31,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${roboto.variable} ${robotoMono.variable}`}>
+    <html lang="en" className={`${roboto.variable} ${robotoMono.variable} ${firaSans.variable}`}>
       <body className={roboto.className}>
         <Providers>
           {children}

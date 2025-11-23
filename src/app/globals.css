@@ -5,11 +5,12 @@
 :root {
   --font-roboto: 'Roboto', sans-serif;
   --font-roboto-mono: 'Roboto Mono', monospace;
+  --font-fira-sans: var(--font-fira-sans), 'Fira Sans', sans-serif;
   --font-size-display: clamp(2.25rem, 4vw, 3rem);
   --font-size-heading: 1.5rem;
   --font-size-subheading: 1.125rem;
   --font-size-body: 1rem;
-  --font-size-label: 0.875rem;
+  --font-size-label: 1.3125rem; /* 21px */
   --font-size-caption: 0.75rem;
 }
 

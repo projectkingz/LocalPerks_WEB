@@ -168,6 +168,23 @@ export default function DashboardPage() {
 
   const progress = getProgressToNextTier();
 
+  const getAllTiersInfo = () => {
+    const tiers = [
+      { name: 'Standard', points: 0, color: 'from-blue-500 to-blue-600' },
+      { name: 'Silver', points: 100, color: 'from-gray-400 to-gray-600' },
+      { name: 'Gold', points: 500, color: 'from-yellow-400 to-orange-500' },
+      { name: 'Platinum', points: 1000, color: 'from-purple-500 to-pink-500' }
+    ];
+    
+    const maxPoints = 1000; // Use 1000 as max for visualization since Platinum is unlimited
+    const currentPoints = pointsData.points;
+    const overallProgress = Math.min((currentPoints / maxPoints) * 100, 100);
+    
+    return { tiers, maxPoints, currentPoints, overallProgress };
+  };
+
+  const tierInfo = getAllTiersInfo();
+
   const getTierColor = (tier: string) => {
     switch (tier) {
       case 'Platinum': return 'bg-gradient-to-r from-purple-500 to-pink-500';
@@ -500,28 +517,99 @@ export default function DashboardPage() {
           )}
         </AnimatePresence>
 
-        {/* Progress Bar */}
+        {/* Progress Bar - All Tiers */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
           className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100"
         >
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Progress to Next Tier</h2>
-          <div className="space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="font-medium">{pointsData.tier}</span>
-              <span className="text-gray-500">Next Tier</span>
+          <h2 className="font-semibold text-gray-900 mb-6" style={{ fontSize: '18px' }}>Tier Progress</h2>
+          <div className="space-y-4" style={{ padding: '10px' }}>
+            {/* Progress Bar Container */}
+            <div className="relative pb-14">
+              {/* Background Bar */}
+              <div className="w-full bg-gray-200 rounded-full h-4 relative">
+                {/* Gradient Progress Fill - Full gradient across all tiers */}
+                <div
+                  className="h-4 rounded-full transition-all duration-500 relative z-0"
+                  style={{ 
+                    width: `${tierInfo.overallProgress}%`,
+                    background: 'linear-gradient(to right, #3b82f6 0%, #60a5fa 10%, #9ca3af 25%, #6b7280 35%, #facc15 50%, #fb923c 65%, #a855f7 85%, #ec4899 100%)'
+                  }}
+                ></div>
+                
+                {/* Tier Marker Lines - positioned on the progress bar */}
+                {tierInfo.tiers.map((tier, index) => {
+                  const position = (tier.points / tierInfo.maxPoints) * 100;
+                  const isCurrentTier = pointsData.tier === tier.name;
+                  
+                  return (
+                    <div
+                      key={`marker-${tier.name}`}
+                      className="absolute top-0 z-10"
+                      style={{ left: `${position}%`, transform: 'translateX(-50%)' }}
+                    >
+                      {/* Vertical Line Marker */}
+                      <div 
+                        className={`w-0.5 transition-all duration-300 ${
+                          isCurrentTier ? 'h-5 bg-black' : 'h-4 bg-gray-600'
+                        }`}
+                      ></div>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              {/* Tier Labels - below the progress bar */}
+              <div className="relative mt-6">
+                {tierInfo.tiers.map((tier, index) => {
+                  const position = (tier.points / tierInfo.maxPoints) * 100;
+                  const isCurrentTier = pointsData.tier === tier.name;
+                  const isFirst = index === 0;
+                  const isLast = index === tierInfo.tiers.length - 1;
+                  
+                  // Adjust transform for edge labels to prevent overflow
+                  let transformValue = 'translateX(-50%)';
+                  if (isFirst) transformValue = 'translateX(0)';
+                  if (isLast) transformValue = 'translateX(-100%)';
+                  
+                  return (
+                    <div
+                      key={`label-${tier.name}`}
+                      className="absolute flex flex-col items-center"
+                      style={{ 
+                        left: `${position}%`, 
+                        transform: transformValue,
+                        maxWidth: '80px',
+                        textAlign: 'center'
+                      }}
+                    >
+                      {/* Tier Name */}
+                      <div className={`font-semibold text-black whitespace-nowrap ${
+                        isCurrentTier ? 'font-bold' : ''
+                      }`} style={{ fontSize: '18px' }}>
+                        {tier.name}
+                      </div>
+                      {/* Tier Points */}
+                      <div className="text-black mt-1 font-medium whitespace-nowrap" style={{ fontSize: '18px' }}>
+                        {tier.points === 0 ? '0' : tier.points.toLocaleString()} pts
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-3">
-              <div
-                className={`h-3 rounded-full transition-all duration-500 ${getTierColor(pointsData.tier)}`}
-                style={{ width: `${progress.percentage}%` }}
-              ></div>
-            </div>
-            <div className="flex justify-between text-sm text-gray-600">
-              <span>{progress.current} points earned</span>
-              <span>{progress.target} points needed</span>
+            
+            {/* Current Status */}
+            <div className="flex justify-between items-center pt-3 border-t border-gray-100">
+              <div>
+                <span className="text-black" style={{ fontSize: '18px' }}>Current Tier: </span>
+                <span className="font-semibold text-black" style={{ fontSize: '18px' }}>{pointsData.tier}</span>
+              </div>
+              <div className="text-right">
+                <span className="text-black" style={{ fontSize: '18px' }}>{tierInfo.currentPoints.toLocaleString()} pts</span>
+              </div>
             </div>
           </div>
         </motion.div>

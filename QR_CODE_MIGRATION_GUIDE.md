@@ -168,3 +168,9 @@ npx prisma migrate dev --name remove_qr_code_from_customer
 
 
 
+
+
+
+
+
+

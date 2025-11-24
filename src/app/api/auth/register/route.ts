@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { hash } from 'bcryptjs';
+import { generateUniqueDisplayId } from '@/lib/customerId';
 
 export async function POST(request: Request) {
   try {
@@ -57,12 +58,16 @@ export async function POST(request: Request) {
       });
     }
 
+    // Generate unique display ID
+    const displayId = await generateUniqueDisplayId(prisma);
+    
     const customer = await prisma.customer.create({
       data: {
         name,
         email,
         mobile: phone || '',
         tenantId: defaultTenant.id,
+        displayId: displayId,
       },
     });
 

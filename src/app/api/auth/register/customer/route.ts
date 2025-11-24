@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { hash } from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { generateAndSend2FACode, normalizePhoneNumber } from '@/lib/auth/two-factor';
+import { generateUniqueDisplayId } from '@/lib/customerId';
 
 export async function POST(req: Request) {
   try {
@@ -48,7 +49,10 @@ export async function POST(req: Request) {
         },
       });
 
-      // Create customer with mobile number
+      // Generate unique display ID
+      const displayId = await generateUniqueDisplayId(tx as any);
+      
+      // Create customer with mobile number and display ID
       const customer = await tx.customer.create({
         data: {
           name: user.name || '',
@@ -56,6 +60,7 @@ export async function POST(req: Request) {
           points: 0,
           tenantId: 'default', // You might want to make this configurable
           mobile: normalizedMobile,
+          displayId: displayId,
         } as any,
       });
 

@@ -23,7 +23,7 @@ export async function GET(
     // Find customer by email
     let customer = await prisma.customer.findUnique({
       where: { email },
-      select: { id: true, qrCode: true, email: true, name: true }
+      select: { id: true, displayId: true, qrCode: true, email: true, name: true }
     });
 
     if (!customer) {
@@ -37,7 +37,7 @@ export async function GET(
     if (customer.qrCode) {
       return NextResponse.json({ 
         qrCode: customer.qrCode,
-        customerId: customer.id,
+        customerId: customer.displayId || customer.id, // Use displayId if available, fallback to id
         email: customer.email,
         name: customer.name
       });
@@ -80,7 +80,7 @@ export async function GET(
 
     return NextResponse.json({ 
       qrCode,
-      customerId: customer.id,
+      customerId: customer.displayId || customer.id, // Use displayId if available, fallback to id
       email: customer.email,
       name: customer.name
     });

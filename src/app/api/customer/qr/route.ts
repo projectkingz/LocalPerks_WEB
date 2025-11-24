@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     // Find customer by email
     let customer = await prisma.customer.findUnique({
       where: { email: session.user.email },
-      select: { id: true, qrCode: true, email: true }
+      select: { id: true, displayId: true, qrCode: true, email: true }
     });
 
     if (!customer) {
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
     if (customer.qrCode) {
       return NextResponse.json({ 
         qrCode: customer.qrCode,
-        customerId: customer.id
+        customerId: customer.displayId || customer.id // Use displayId if available, fallback to id
       });
     }
 
@@ -80,7 +80,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ 
       qrCode,
-      customerId: customer.id
+      customerId: customer.displayId || customer.id // Use displayId if available, fallback to id
     });
   } catch (error) {
     console.error('Error generating QR code:', error);
@@ -90,6 +90,8 @@ export async function GET(request: Request) {
     );
   }
 }
+
+
 
 
 

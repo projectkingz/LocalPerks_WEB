@@ -310,6 +310,10 @@ export const authOptions: NextAuthOptions = {
                 if (!existingCustomer) {
                   console.log('Creating customer record for existing CUSTOMER user');
                   
+                  // Generate unique display ID
+                  const { generateUniqueDisplayId } = await import('@/lib/customerId');
+                  const displayId = await generateUniqueDisplayId(prisma);
+                  
                   // Create customer record without specific tenant assignment
                   // Customers can transact with any tenant
                   await prisma.customer.create({
@@ -318,6 +322,7 @@ export const authOptions: NextAuthOptions = {
                       name: existingUser.name || '',
                       mobile: '000-000-0000', // Default mobile for social login users
                       tenantId: null, // No specific tenant - can transact with any
+                      displayId: displayId,
                     }
                   });
                 }
@@ -369,6 +374,10 @@ export const authOptions: NextAuthOptions = {
             if (!existingCustomer) {
               console.log('Creating customer record for CUSTOMER user in session callback');
               
+              // Generate unique display ID
+              const { generateUniqueDisplayId } = await import('@/lib/customerId');
+              const displayId = await generateUniqueDisplayId(prisma);
+              
               // Create customer record without specific tenant assignment
               // Customers can transact with any tenant
               await prisma.customer.create({
@@ -377,6 +386,7 @@ export const authOptions: NextAuthOptions = {
                   name: session.user.name || '',
                   mobile: '000-000-0000', // Default mobile for social login users
                   tenantId: null, // No specific tenant - can transact with any
+                  displayId: displayId,
                 }
               });
             }

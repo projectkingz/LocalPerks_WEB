@@ -48,6 +48,7 @@ export async function GET(req: Request) {
       where: { email: session.user.email },
       select: {
         id: true,
+        displayId: true,
         name: true,
         email: true,
         mobile: true,
@@ -67,6 +68,7 @@ export async function GET(req: Request) {
     // Return combined profile data
     return NextResponse.json({
       id: user.id,
+      customerId: customer.displayId || customer.id, // Use displayId if available, fallback to id
       name: customer.name,
       email: customer.email,
       mobile: customer.mobile,

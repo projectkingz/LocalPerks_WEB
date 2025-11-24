@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { hash } from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
+import { generateUniqueDisplayId } from '@/lib/customerId';
 
 export async function POST(req: Request) {
   try {
@@ -53,6 +54,9 @@ export async function POST(req: Request) {
         }
       });
 
+      // Generate unique display ID
+      const displayId = await generateUniqueDisplayId(tx as any);
+      
       // Create customer record (using correct schema fields)
       const customer = await tx.customer.create({
         data: {
@@ -60,7 +64,8 @@ export async function POST(req: Request) {
           email: user.email,
           mobile: '000-000-0000', // Default mobile for new users
           points: 0,
-          tenantId: user.tenantId || tenantId
+          tenantId: user.tenantId || tenantId,
+          displayId: displayId,
         }
       });
 

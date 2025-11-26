@@ -115,7 +115,7 @@ export async function GET(request: Request) {
       date: t.createdAt.toISOString(),
       amount: t.amount,
       points: t.points,
-      description: t.type === 'EARNED' ? 'Points earned' : 'Points spent',
+      description: t.type === 'EARNED' ? 'Points earned' : t.type === 'REFUND' ? 'Refund processed' : 'Points spent',
       type: t.type,
       status: t.status,
       customer: t.customer ? {
@@ -192,8 +192,39 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
       }
 
-      // Use provided points or calculate them using tenant-specific config
-      const calculatedPoints = points || await calculatePointsForTransaction(amount, userTenantId);
+      // Determine if this is a refund (negative amount)
+      const isRefund = amount < 0;
+      const absoluteAmount = Math.abs(amount);
+      
+      // Calculate points based on absolute amount using tenant-specific config
+      // For refunds, we'll negate the points
+      let calculatedPoints = points || await calculatePointsForTransaction(absoluteAmount, userTenantId);
+      if (isRefund) {
+        calculatedPoints = -calculatedPoints; // Make points negative for refunds
+      }
+
+      // Determine transaction type
+      const transactionType = type || (isRefund ? 'REFUND' : 'EARNED');
+
+      // For refunds, verify customer has enough points
+      if (isRefund) {
+        const currentPoints = await prisma.transaction.aggregate({
+          where: {
+            customerId: customer.id,
+            status: { in: ['APPROVED', 'VOID'] }
+          },
+          _sum: {
+            points: true
+          }
+        });
+        
+        const customerPoints = currentPoints._sum.points || 0;
+        if (customerPoints + calculatedPoints < 0) {
+          return NextResponse.json({ 
+            error: `Insufficient points. Customer has ${customerPoints} points, but refund requires ${Math.abs(calculatedPoints)} points.` 
+          }, { status: 400 });
+        }
+      }
 
       // Get or create user record for the customer
       let user = await prisma.user.findUnique({
@@ -216,7 +247,7 @@ export async function POST(request: Request) {
         data: {
           amount: amount,
           points: calculatedPoints,
-          type: type || 'EARNED',
+          type: transactionType,
           status: 'APPROVED',
           userId: user.id,
           customerId: customer.id,
@@ -247,9 +278,13 @@ export async function POST(request: Request) {
         }
       });
     } else {
-      // Original web request format
-      if (!amount || !customerId || !tenantId) {
-        return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      // Original web request format - use tenantId from body or session for partners
+      const finalTenantId = tenantId || (userRole === 'PARTNER' ? userTenantId : undefined);
+      
+      if (!amount || !customerId || !finalTenantId) {
+        return NextResponse.json({ 
+          error: 'Missing required fields: amount, customerId, or tenantId' 
+        }, { status: 400 });
       }
 
     // Verify customer exists
@@ -263,7 +298,7 @@ export async function POST(request: Request) {
 
     // Verify tenant exists
     const tenant = await prisma.tenant.findUnique({
-      where: { id: tenantId }
+      where: { id: finalTenantId }
     });
 
     if (!tenant) {
@@ -286,20 +321,51 @@ export async function POST(request: Request) {
       });
     }
 
-    // Calculate points based on amount using tenant-specific config
-    const points = await calculatePointsForTransaction(amount, tenantId);
+    // Determine if this is a refund (negative amount)
+    const isRefund = amount < 0;
+    const absoluteAmount = Math.abs(amount);
+    
+    // Calculate points based on absolute amount using tenant-specific config
+    // For refunds, we'll negate the points
+    let points = await calculatePointsForTransaction(absoluteAmount, finalTenantId);
+    if (isRefund) {
+      points = -points; // Make points negative for refunds
+    }
+
+    // Determine transaction type
+    const transactionType = isRefund ? 'REFUND' : 'EARNED';
+
+    // For refunds, verify customer has enough points
+    if (isRefund) {
+      const currentPoints = await prisma.transaction.aggregate({
+        where: {
+          customerId: customerId,
+          status: { in: ['APPROVED', 'VOID'] }
+        },
+        _sum: {
+          points: true
+        }
+      });
+      
+      const customerPoints = currentPoints._sum.points || 0;
+      if (customerPoints + points < 0) {
+        return NextResponse.json({ 
+          error: `Insufficient points. Customer has ${customerPoints} points, but refund requires ${Math.abs(points)} points.` 
+        }, { status: 400 });
+      }
+    }
 
     // Create transaction
     const transaction = await prisma.transaction.create({
-      data: {
-        amount: amount,
-        points: points,
-        type: 'EARNED',
-        status: 'APPROVED',
-        userId: user.id,
-        customerId: customerId,
-        tenantId: tenantId
-      },
+        data: {
+          amount: amount,
+          points: points,
+          type: transactionType,
+          status: 'APPROVED',
+          userId: user.id,
+          customerId: customerId,
+          tenantId: finalTenantId
+        },
       include: {
         customer: {
           select: {

@@ -21,6 +21,8 @@ type RecentActivity = {
   description: string | null;
   points: number;
   createdAt: string;
+  type?: string;
+  amount?: number;
   user?: { name?: string | null; email?: string | null };
 };
 
@@ -51,6 +53,7 @@ export default function PartnerDashboard() {
   });
   const [recentPointsIssued, setRecentPointsIssued] = useState<RecentActivity[]>([]);
   const [recentPointsRedeemed, setRecentPointsRedeemed] = useState<RecentActivity[]>([]);
+  const [recentTransactions, setRecentTransactions] = useState<RecentActivity[]>([]);
   const [popularRewards, setPopularRewards] = useState<PopularReward[]>([]);
   const [popularLoading, setPopularLoading] = useState(false);
   const [popularError, setPopularError] = useState<string | null>(null);
@@ -97,6 +100,17 @@ export default function PartnerDashboard() {
         if (data) {
           setRecentPointsIssued(data.recentPointsIssued || []);
           setRecentPointsRedeemed(data.recentPointsRedeemed || []);
+          // Use unified recent transactions if available, otherwise combine issued and redeemed
+          if (data.recentTransactions && data.recentTransactions.length > 0) {
+            setRecentTransactions(data.recentTransactions || []);
+          } else {
+            // Fallback: combine and sort by date
+            const combined = [
+              ...(data.recentPointsIssued || []).map((t: any) => ({ ...t, type: 'EARNED' })),
+              ...(data.recentPointsRedeemed || []).map((t: any) => ({ ...t, type: t.type || 'SPENT' }))
+            ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 15);
+            setRecentTransactions(combined);
+          }
         }
       })
       .catch((err) => {
@@ -283,50 +297,52 @@ export default function PartnerDashboard() {
           >
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h2>
             <div className="space-y-4">
-              {recentPointsIssued.length === 0 && recentPointsRedeemed.length === 0 ? (
+              {recentTransactions.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <p>No recent activity</p>
                 </div>
               ) : (
                 <>
-                  {recentPointsIssued.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">Points Issued</p>
-                          <p className="text-sm text-gray-500">
-                            {item.description || (item.user?.name || item.user?.email || 'Unknown user')}
+                  {recentTransactions.map((item) => {
+                    const isEarned = item.type === 'EARNED';
+                    const isRefund = item.type === 'REFUND';
+                    const isSpent = item.type === 'SPENT';
+                    
+                    return (
+                      <div key={item.id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0">
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-2 h-2 rounded-full ${
+                            isEarned ? 'bg-green-500' : 
+                            isRefund ? 'bg-orange-500' : 
+                            'bg-red-500'
+                          }`}></div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">
+                              {isEarned ? 'Purchase' : 
+                               isRefund ? 'Refund Issued' : 
+                               'Reward Redeemed'}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              {item.user?.name || item.user?.email || 'Unknown user'}
+                              {item.amount && ` - £${Math.abs(item.amount).toFixed(2)}`}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className={`text-sm font-medium ${
+                            isEarned ? 'text-green-600' : 
+                            isRefund ? 'text-orange-600' : 
+                            'text-red-600'
+                          }`}>
+                            {item.points >= 0 ? '+' : ''}{item.points.toLocaleString()} points
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {formatDate(item.createdAt)}
                           </p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-green-600">+{item.points.toLocaleString()} points</p>
-                        <p className="text-xs text-gray-500">
-                          {formatDate(item.createdAt)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                  {recentPointsRedeemed.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">Reward Redeemed</p>
-                          <p className="text-sm text-gray-500">
-                            {item.description || (item.user?.name || item.user?.email || 'Unknown user')}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-red-600">-{item.points.toLocaleString()} points</p>
-                        <p className="text-xs text-gray-500">
-                          {formatDate(item.createdAt)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </>
               )}
             </div>

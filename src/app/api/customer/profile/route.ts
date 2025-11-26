@@ -24,7 +24,6 @@ export async function GET(req: Request) {
         email: true,
         role: true,
         points: true,
-        tier: true,
         createdAt: true,
       },
     });
@@ -73,7 +72,6 @@ export async function GET(req: Request) {
       email: customer.email,
       mobile: customer.mobile,
       points: customer.points,
-      tier: user.tier,
       createdAt: customer.createdAt,
       updatedAt: customer.updatedAt,
     });

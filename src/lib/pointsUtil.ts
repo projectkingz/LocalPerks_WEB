@@ -392,10 +392,10 @@ export const pointsUtil = {
         }
       });
 
-      // Match web /api/points logic: include EARNED and any VOID (any type), and SPENT (negative)
+      // Match web /api/points logic: include EARNED and any VOID (any type), and SPENT/REFUND (negative)
       const calculatedPoints = transactions.reduce((total, t) => {
         if (t.type === 'EARNED' || t.status === 'VOID') return total + t.points;
-        if (t.type === 'SPENT') return total + t.points; // SPENT already negative
+        if (t.type === 'SPENT' || t.type === 'REFUND') return total + t.points; // SPENT/REFUND already negative
         return total;
       }, 0);
 
@@ -436,7 +436,7 @@ export const pointsUtil = {
       // Match web calculation rules
       const calculatedPoints = transactions.reduce((total, t) => {
         if (t.type === 'EARNED' || t.status === 'VOID') return total + t.points;
-        if (t.type === 'SPENT') return total + t.points;
+        if (t.type === 'SPENT' || t.type === 'REFUND') return total + t.points;
         return total;
       }, 0);
 

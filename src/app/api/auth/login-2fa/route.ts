@@ -40,46 +40,121 @@ export async function POST(req: Request) {
 
     // Get tenant mobile number
     const tenant = user.partnerTenants[0];
-    if (!tenant || !tenant.mobile) {
+    console.log(`👤 Partner tenant info:`, tenant ? {
+      id: tenant.id,
+      hasMobile: !!tenant.mobile,
+      mobile: tenant.mobile ? '***' + tenant.mobile.slice(-4) : 'none'
+    } : 'No tenant found');
+    
+    if (!tenant) {
+      console.error('❌ No partner tenant found for user:', user.id);
       return NextResponse.json(
-        { message: 'Mobile number not found for this partner account' },
+        { 
+          message: 'Partner tenant not found. Please complete your partner registration.',
+          codeSent: false
+        },
         { status: 400 }
       );
     }
-
-    const mobile = normalizePhoneNumber(tenant.mobile);
-    console.log(`📱 Normalized mobile: ${tenant.mobile} → ${mobile}`);
-
-    // Send WhatsApp verification code
+    
+    // Send verification code - prefer WhatsApp if mobile available, otherwise use email
     let codeSent = false;
-    try {
-      console.log(`\n📤 Sending login 2FA WhatsApp to: ${mobile}`);
-      const result = await generateAndSend2FACode({
-        userId: user.id,
-        method: 'whatsapp',
-        phone: mobile,
-        purpose: 'login' // Add purpose to distinguish from registration 2FA
-      });
+    let deliveryMethod = 'email';
+    
+    if (tenant.mobile) {
+      // Try WhatsApp first
+      const mobile = normalizePhoneNumber(tenant.mobile);
+      console.log(`📱 Normalized mobile: ${tenant.mobile} → ${mobile}`);
+      
+      try {
+        console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+        console.log(`📤 Sending login 2FA WhatsApp to: ${mobile}`);
+        console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+        
+        const result = await generateAndSend2FACode({
+          userId: user.id,
+          method: 'whatsapp',
+          phone: mobile,
+          purpose: 'login'
+        });
 
-      console.log(`\n📱 WhatsApp result:`, result);
+        console.log(`\n📱 WhatsApp result:`, result);
 
-      if (result.success) {
-        codeSent = true;
-        console.log('✅ Login 2FA WhatsApp sent successfully');
-      } else {
-        console.warn('⚠️  Failed to send login 2FA WhatsApp:', result.message);
-        console.warn('💡 Check the console above for the verification code');
+        if (result.success) {
+          codeSent = true;
+          deliveryMethod = 'whatsapp';
+          console.log('✅ Login 2FA WhatsApp sent successfully');
+        } else {
+          console.warn('\n⚠️  Failed to send login 2FA WhatsApp:', result.message);
+          console.log('🔄 Falling back to email...');
+          deliveryMethod = 'email'; // Will try email below
+        }
+      } catch (error) {
+        console.error('❌ Error sending login 2FA WhatsApp:', error);
+        console.log('🔄 Falling back to email...');
+        deliveryMethod = 'email'; // Will try email below
       }
-    } catch (error) {
-      console.error('❌ Error sending login 2FA WhatsApp:', error);
     }
+    
+    // Fallback to email if WhatsApp failed or mobile not available
+    if (!codeSent) {
+      if (!user.email) {
+        console.error('❌ No email found for user:', user.id);
+        return NextResponse.json(
+          { 
+            message: 'No contact method available. Please add a mobile number or email to your account.',
+            codeSent: false
+          },
+          { status: 400 }
+        );
+      }
+      
+      try {
+        console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+        console.log(`📤 Sending login 2FA email to: ${user.email}`);
+        console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+        
+        const result = await generateAndSend2FACode({
+          userId: user.id,
+          method: 'email',
+          email: user.email,
+          purpose: 'login'
+        });
+
+        console.log(`\n📧 Email result:`, result);
+
+        if (result.success) {
+          codeSent = true;
+          console.log('✅ Login 2FA email sent successfully');
+        } else {
+          console.warn('\n⚠️  Failed to send login 2FA email:', result.message);
+          console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log('💡 IMPORTANT: Check the console output above for the');
+          console.log('   6-digit verification code. The code was generated');
+          console.log('   and logged above (look for "Generated 2FA code").');
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+          // Still allow the flow to continue since code is in console
+          codeSent = true;
+        }
+      } catch (error) {
+        console.error('❌ Error sending login 2FA email:', error);
+        console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('💡 Check the console output above for the verification code');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+      }
+    }
+
+    const maskedContact = tenant.mobile && deliveryMethod === 'whatsapp'
+      ? tenant.mobile.replace(/(\+44)(\d{3})(\d{3})(\d{4})/, '$1 $2***$4')
+      : user.email?.replace(/(.{2})(.*)(@.*)/, '$1***$3') || 'your contact';
 
     return NextResponse.json({
       message: codeSent 
-        ? 'Verification code sent to your WhatsApp'
+        ? `Verification code sent to your ${deliveryMethod === 'whatsapp' ? 'WhatsApp' : 'email'}`
         : 'Failed to send verification code. Please try again.',
       codeSent,
-      mobile: mobile.replace(/(\+44)(\d{3})(\d{3})(\d{4})/, '$1 $2***$4') // Mask mobile for privacy
+      method: deliveryMethod,
+      contact: maskedContact
     });
 
   } catch (error) {

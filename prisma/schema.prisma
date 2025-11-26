@@ -97,7 +97,7 @@ model Tenant {
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   partnerUserId      String
-  mobile             String?
+  mobile             String
   nextBillingDate    DateTime?
   stripeCustomerId   String?
   subscriptionStatus String              @default("ACTIVE")
@@ -276,7 +276,7 @@ model SubscriptionPayment {
 model Admin {
   id          String   @id @default(cuid())
   name        String
-  mobile      String?
+  mobile      String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   adminUserId String   @unique

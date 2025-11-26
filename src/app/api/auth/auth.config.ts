@@ -198,8 +198,8 @@ export const authOptions: NextAuthOptions = {
             approvalStatus: user.approvalStatus,
           };
         } catch (error: any) {
-          console.error('Error in authorize:', error);
           // Re-throw specific errors so they can be caught by the client
+          // These are expected errors that trigger redirects, not actual failures
           if (error.message && (
             error.message.startsWith('ACCOUNT_') || 
             error.message.startsWith('EMAIL_') || 
@@ -207,8 +207,11 @@ export const authOptions: NextAuthOptions = {
             error.message.startsWith('PARTNER_') ||
             error.message === '2FA_REQUIRED'
           )) {
+            // Don't log these as errors - they're expected flow control
             throw error;
           }
+          // Only log unexpected errors
+          console.error('Error in authorize:', error);
           return null;
         }
       }

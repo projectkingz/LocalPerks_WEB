@@ -37,6 +37,8 @@ const nextConfig = {
       'framer-motion',
     ],
   },
+  // Font optimization
+  optimizeFonts: true,
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {

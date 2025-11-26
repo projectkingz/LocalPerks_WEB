@@ -5,15 +5,23 @@ import { prisma } from '@/lib/prisma';
 
 // Initialize Redis with error handling
 let redis: Redis | null = null;
+let redisConnectionFailed = false;
 try {
   if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
     redis = new Redis({
       url: process.env.UPSTASH_REDIS_REST_URL,
       token: process.env.UPSTASH_REDIS_REST_TOKEN,
     });
+    // Test connection asynchronously (don't block initialization)
+    redis.ping().catch((error) => {
+      console.warn('Redis connection test failed, will use memory fallback:', error.message || error);
+      redisConnectionFailed = true;
+      redis = null;
+    });
   }
 } catch (error) {
   console.warn('Redis initialization failed:', error);
+  redisConnectionFailed = true;
   redis = null;
 }
 
@@ -97,7 +105,7 @@ async function storeCode(userId: string, code: string, purpose: string = 'regist
   console.log(`⏰ Expires: ${new Date(expires)}`);
   
   try {
-    if (redis) {
+    if (redis && !redisConnectionFailed) {
       console.log('🔄 Attempting to store in Redis...');
       await redis.set(key, code, { ex: CODE_EXPIRY });
       console.log('✅ Code stored in Redis');
@@ -108,7 +116,9 @@ async function storeCode(userId: string, code: string, purpose: string = 'regist
       console.log(`📊 Memory store now has ${memoryStore.size} entries`);
     }
   } catch (error) {
-    console.warn('⚠️  Failed to store code in Redis, using memory fallback:', error);
+    console.warn('⚠️  Failed to store code in Redis, using memory fallback');
+    redisConnectionFailed = true;
+    redis = null;
     memoryStore.set(key, { code, expires });
     console.log('✅ Code stored in memory fallback');
     console.log(`📊 Memory store now has ${memoryStore.size} entries`);
@@ -228,9 +238,14 @@ export function normalizePhoneNumber(phone: string): string {
 async function sendCodeViaWhatsApp(phone: string, code: string): Promise<boolean> {
   try {
     if (!twilio) {
-      console.error('⚠️  Twilio not configured. Please set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in your .env file.');
-      console.log(`📱 WhatsApp code for ${phone}: ${code}`);
-      return false;
+      console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('⚠️  Twilio not configured - WhatsApp code NOT sent');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log(`📱 WhatsApp would be sent to: ${phone}`);
+      console.log(`🔑 VERIFICATION CODE: ${code}`);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+      // Return true to allow flow to continue - code is in console
+      return true;
     }
     
     // Normalize phone number
@@ -289,7 +304,13 @@ export async function generateAndSend2FACode(options: TwoFactorOptions): Promise
     const code = generateCode();
     await storeCode(userId, code, purpose);
 
-    console.log(`\n🔐 Generated 2FA code for user ${userId}: ${code}`);
+    console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    console.log(`🔐 GENERATED 2FA CODE`);
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    console.log(`User ID: ${userId}`);
+    console.log(`Purpose: ${purpose}`);
+    console.log(`Code: ${code}`);
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
 
     if (method === 'email' && email) {
       const sent = await sendCodeViaEmail(email, code, user.name || 'User');
@@ -348,7 +369,7 @@ export async function verify2FACode(options: { userId: string; code: string; pur
     console.log(`💾 Redis available: ${redis ? 'Yes' : 'No'}`);
     console.log(`💾 Memory store size: ${memoryStore.size}`);
     
-    if (redis) {
+    if (redis && !redisConnectionFailed) {
       try {
         console.log('🔄 Attempting Redis lookup...');
         storedCode = await redis.get<string>(key);
@@ -360,6 +381,8 @@ export async function verify2FACode(options: { userId: string; code: string; pur
         }
       } catch (error) {
         console.warn('⚠️  Redis verification failed, trying memory fallback');
+        redisConnectionFailed = true;
+        redis = null;
         // Don't log the full error, just continue to fallback
       }
     }
@@ -402,7 +425,7 @@ export async function hasPending2FAVerification(userId: string): Promise<boolean
     const registrationKey = `2fa:${userId}:registration`;
     const loginKey = `2fa:${userId}:login`;
     
-    if (redis) {
+    if (redis && !redisConnectionFailed) {
       try {
         const [registrationExists, loginExists] = await Promise.all([
           redis.exists(registrationKey),
@@ -410,7 +433,12 @@ export async function hasPending2FAVerification(userId: string): Promise<boolean
         ]);
         return registrationExists === 1 || loginExists === 1;
       } catch (error) {
-        console.warn('Redis status check failed, checking memory fallback:', error);
+        // Only log once to avoid spam
+        if (!redisConnectionFailed) {
+          console.warn('Redis status check failed, checking memory fallback');
+        }
+        redisConnectionFailed = true;
+        redis = null;
       }
     }
     

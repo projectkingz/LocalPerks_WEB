@@ -5,19 +5,25 @@ import Providers from './providers';
 const roboto = Roboto({ 
   subsets: ['latin'],
   variable: '--font-roboto',
-  weight: ['300', '400', '500', '700', '900']
+  weight: ['300', '400', '500', '700', '900'],
+  display: 'swap',
+  fallback: ['system-ui', 'arial']
 });
 
 const robotoMono = Roboto_Mono({ 
   subsets: ['latin'],
   variable: '--font-roboto-mono',
-  weight: ['300', '400', '500', '600', '700']
+  weight: ['300', '400', '500', '600', '700'],
+  display: 'swap',
+  fallback: ['Courier New', 'monospace']
 });
 
 const firaSans = Fira_Sans({ 
   subsets: ['latin'],
   variable: '--font-fira-sans',
-  weight: ['300', '400', '500', '600', '700']
+  weight: ['300', '400', '500', '600', '700'],
+  display: 'swap',
+  fallback: ['system-ui', 'arial']
 });
 
 export const metadata = {

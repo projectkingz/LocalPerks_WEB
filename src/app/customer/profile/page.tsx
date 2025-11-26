@@ -156,23 +156,27 @@ export default function ProfilePage() {
                   
                   {/* Bottom Section */}
                   <div className="space-y-2 mt-2">
-                    {/* Customer Name */}
-                    <div>
+                    {/* Customer Name - Aligned */}
+                    <div className="min-h-[28px] flex items-center">
                       <p className="text-white text-[18px] font-medium tracking-wider" style={{ fontFamily: 'var(--font-roboto)' }}>
                         {session?.user?.name || 'Member'}
                       </p>
                     </div>
                     
-                    {/* Customer ID */}
-                    {customerId && (
-                      <div className="flex items-center space-x-2">
-                        <p className="text-blue-200 text-[18px] font-medium uppercase" style={{ fontFamily: 'var(--font-roboto)' }}>ID:</p>
-                        <p className="text-white text-[18px] font-medium break-all uppercase" style={{ fontFamily: 'var(--font-roboto)' }}>{customerId}</p>
-                      </div>
-                    )}
+                    {/* Customer ID - Aligned */}
+                    <div className="min-h-[28px] flex items-center">
+                      {customerId ? (
+                        <div className="flex items-center space-x-2">
+                          <p className="text-blue-200 text-[18px] font-medium uppercase" style={{ fontFamily: 'var(--font-roboto)' }}>ID:</p>
+                          <p className="text-white text-[18px] font-medium break-all uppercase" style={{ fontFamily: 'var(--font-roboto)' }}>{customerId}</p>
+                        </div>
+                      ) : (
+                        <div className="h-[28px]"></div>
+                      )}
+                    </div>
                     
-                    {/* Points and Tier */}
-                    <div className="flex items-center justify-between pt-2 border-t border-blue-500 border-opacity-30">
+                    {/* Points and Tier - Aligned */}
+                    <div className="flex items-center justify-between pt-2 border-t border-blue-500 border-opacity-30 min-h-[60px]">
                       <div>
                         <p className="text-blue-200 text-[18px] tracking-wide font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Points</p>
                         <p className="text-white text-[18px] font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>{pointsData.points.toLocaleString()}</p>
@@ -243,23 +247,27 @@ export default function ProfilePage() {
                   
                   {/* Bottom Section */}
                   <div className="space-y-2 mt-2">
-                    {/* Customer Name */}
-                    <div>
+                    {/* Customer Name - Aligned */}
+                    <div className="min-h-[28px] flex items-center">
                       <p className="text-white text-sm md:text-base lg:text-lg font-medium tracking-wider" style={{ fontFamily: 'var(--font-roboto)' }}>
                         {session?.user?.name || 'Member'}
                       </p>
                     </div>
                     
-                    {/* Customer ID */}
-                    {customerId && (
-                      <div className="flex items-center space-x-2">
-                        <p className="text-blue-200 text-sm md:text-base font-medium uppercase" style={{ fontFamily: 'var(--font-roboto)' }}>ID:</p>
-                        <p className="text-white text-sm md:text-base font-medium break-all uppercase" style={{ fontFamily: 'var(--font-roboto)' }}>{customerId}</p>
-                      </div>
-                    )}
+                    {/* Customer ID - Aligned */}
+                    <div className="min-h-[28px] flex items-center">
+                      {customerId ? (
+                        <div className="flex items-center space-x-2">
+                          <p className="text-blue-200 text-sm md:text-base font-medium uppercase" style={{ fontFamily: 'var(--font-roboto)' }}>ID:</p>
+                          <p className="text-white text-sm md:text-base font-medium break-all uppercase" style={{ fontFamily: 'var(--font-roboto)' }}>{customerId}</p>
+                        </div>
+                      ) : (
+                        <div className="h-[28px]"></div>
+                      )}
+                    </div>
                     
-                    {/* Points and Tier */}
-                    <div className="flex items-center justify-between pt-2 border-t border-blue-500 border-opacity-30">
+                    {/* Points and Tier - Aligned */}
+                    <div className="flex items-center justify-between pt-2 border-t border-blue-500 border-opacity-30 min-h-[60px]">
                       <div>
                         <p className="text-blue-200 text-xs md:text-sm tracking-wide font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Points</p>
                         <p className="text-white text-xl md:text-2xl lg:text-3xl font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>{pointsData.points.toLocaleString()}</p>

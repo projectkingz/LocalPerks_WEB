@@ -142,6 +142,12 @@ function getTransactionDescription(transaction: any): string {
     } else {
       return 'Points earned';
     }
+  } else if (type === 'REFUND') {
+    if (amount < 0) {
+      return `Refund - £${Math.abs(amount).toFixed(2)}`;
+    } else {
+      return 'Refund processed';
+    }
   } else if (type === 'SPENT') {
     if (amount > 0) {
       return `Redemption - £${amount.toFixed(2)}`;

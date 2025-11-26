@@ -42,8 +42,10 @@ export async function GET() {
       id: transaction.id,
       date: transaction.createdAt.toISOString(),
       points: transaction.points,
-      description: `Transaction - £${transaction.amount.toFixed(2)}`,
-      type: transaction.type === 'EARNED' ? 'EARNED' : 'SPENT',
+      description: transaction.type === 'REFUND' 
+        ? `Refund - £${Math.abs(transaction.amount).toFixed(2)}`
+        : `Transaction - £${transaction.amount.toFixed(2)}`,
+      type: transaction.type === 'EARNED' ? 'EARNED' : transaction.type === 'REFUND' ? 'REFUND' : 'SPENT',
       status: transaction.status as 'PENDING' | 'APPROVED' | 'REJECTED',
       amount: transaction.amount
     }));
@@ -52,7 +54,9 @@ export async function GET() {
       id: transaction.id,
       date: transaction.createdAt.toISOString(),
       points: transaction.points,
-      description: `Transaction - £${transaction.amount.toFixed(2)}`,
+      description: transaction.type === 'REFUND' 
+        ? `Refund - £${Math.abs(transaction.amount).toFixed(2)}`
+        : `Transaction - £${transaction.amount.toFixed(2)}`,
       amount: transaction.amount,
       status: transaction.status as 'PENDING' | 'APPROVED' | 'REJECTED'
     }));

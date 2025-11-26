@@ -123,10 +123,10 @@ export async function GET(request: Request) {
       take: 10
     });
 
-    // Get recent points redeemed transactions
+    // Get recent points redeemed transactions (SPENT) and refunds (REFUND)
     const recentPointsRedeemed = await prisma.transaction.findMany({
       where: {
-        type: 'SPENT',
+        type: { in: ['SPENT', 'REFUND'] },
         status: 'APPROVED',
         createdAt: {
           gte: startDate
@@ -145,6 +145,29 @@ export async function GET(request: Request) {
         createdAt: 'desc'
       },
       take: 10
+    });
+
+    // Get all recent transactions (unified list for recent activity)
+    const recentTransactions = await prisma.transaction.findMany({
+      where: {
+        status: 'APPROVED',
+        createdAt: {
+          gte: startDate
+        },
+        ...tenantFilter
+      },
+      include: {
+        customer: {
+          select: {
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: 15
     });
 
     // Get popular rewards (rewards with most redemptions)
@@ -287,8 +310,26 @@ export async function GET(request: Request) {
       })),
       recentPointsRedeemed: recentPointsRedeemed.map(t => ({
         id: t.id,
-        description: 'Points spent',
-        points: -Math.abs(t.points), // Make negative for display
+        description: t.type === 'REFUND' ? 'Refund processed' : 'Points spent',
+        points: t.points, // Points are already negative for REFUND and SPENT
+        type: t.type,
+        amount: t.amount,
+        createdAt: t.createdAt,
+        user: {
+          name: t.customer?.name,
+          email: t.customer?.email
+        }
+      })),
+      recentTransactions: recentTransactions.map(t => ({
+        id: t.id,
+        description: t.type === 'EARNED' 
+          ? 'Purchase' 
+          : t.type === 'REFUND' 
+          ? 'Refund processed'
+          : 'Reward redeemed',
+        points: t.points,
+        type: t.type,
+        amount: t.amount,
         createdAt: t.createdAt,
         user: {
           name: t.customer?.name,

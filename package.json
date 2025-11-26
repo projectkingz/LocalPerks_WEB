@@ -53,6 +53,7 @@
     "@types/qrcode.react": "^1.0.5",
     "@types/react": "^18.3.23",
     "@types/uuid": "^10.0.0",
+    "baseline-browser-mapping": "^2.8.31",
     "eslint": "^8.57.1",
     "eslint-config-next": "15.3.4",
     "ignore-loader": "^0.1.2",

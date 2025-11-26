@@ -5,10 +5,34 @@ import { prisma } from '@/lib/prisma';
 import { hash } from 'bcryptjs';
 import { validatePassword } from '../utils/password';
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL || '',
-  token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
-});
+// Initialize Redis with error handling and fallback
+let redis: Redis | null = null;
+try {
+  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    redis = new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    });
+    // Test connection
+    redis.ping().catch(() => {
+      console.warn('Redis connection test failed, will use memory fallback');
+      redis = null;
+    });
+  }
+} catch (error) {
+  console.warn('Redis initialization failed, using memory fallback:', error);
+  redis = null;
+}
+
+// In-memory fallback for password reset tokens
+declare global {
+  var __password_reset_memory_store__: Map<string, { token: string; expires: number }> | undefined;
+}
+
+const memoryStore = global.__password_reset_memory_store__ ?? new Map<string, { token: string; expires: number }>();
+if (!global.__password_reset_memory_store__) {
+  global.__password_reset_memory_store__ = memoryStore;
+}
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
@@ -33,9 +57,20 @@ export async function sendPasswordResetEmail(email: string) {
     // Generate reset token
     const token = crypto.randomBytes(32).toString('hex');
     const key = `reset:${email}`;
+    const expires = Date.now() + (RESET_TOKEN_EXPIRY * 1000);
 
     // Store token with expiry
-    await redis.set(key, token, { ex: RESET_TOKEN_EXPIRY });
+    try {
+      if (redis) {
+        await redis.set(key, token, { ex: RESET_TOKEN_EXPIRY });
+      } else {
+        // Fallback to in-memory storage
+        memoryStore.set(key, { token, expires });
+      }
+    } catch (error) {
+      console.warn('Failed to store reset token in Redis, using memory fallback:', error);
+      memoryStore.set(key, { token, expires });
+    }
 
     // Create reset URL
     const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL}/auth/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
@@ -81,7 +116,28 @@ export async function sendPasswordResetEmail(email: string) {
 export async function validateResetToken(email: string, token: string): Promise<boolean> {
   try {
     const key = `reset:${email}`;
-    const storedToken = await redis.get<string>(key);
+    let storedToken: string | null = null;
+
+    if (redis) {
+      try {
+        storedToken = await redis.get<string>(key);
+      } catch (error) {
+        console.warn('Redis validation failed, checking memory fallback:', error);
+      }
+    }
+
+    // Check memory fallback
+    if (!storedToken) {
+      const memoryEntry = memoryStore.get(key);
+      if (memoryEntry) {
+        // Check if expired
+        if (Date.now() > memoryEntry.expires) {
+          memoryStore.delete(key);
+          return false;
+        }
+        storedToken = memoryEntry.token;
+      }
+    }
 
     return storedToken === token;
   } catch (error) {
@@ -124,7 +180,15 @@ export async function resetPassword(email: string, token: string, newPassword: s
 
     // Delete reset token
     const key = `reset:${email}`;
-    await redis.del(key);
+    try {
+      if (redis) {
+        await redis.del(key);
+      }
+    } catch (error) {
+      console.warn('Failed to delete reset token from Redis:', error);
+    }
+    // Always delete from memory fallback
+    memoryStore.delete(key);
 
     return {
       success: true,

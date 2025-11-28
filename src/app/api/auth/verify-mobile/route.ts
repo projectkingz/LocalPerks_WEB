@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getWhatsAppVerificationCode } from '../resend-verification-whatsapp/route';
+import { verify2FACode } from '@/lib/auth/two-factor';
 
 export async function POST(req: Request) {
   try {
@@ -9,24 +9,6 @@ export async function POST(req: Request) {
     if (!userId || !code) {
       return NextResponse.json(
         { error: 'Missing userId or code' },
-        { status: 400 }
-      );
-    }
-
-    // Get stored code
-    const storedCode = getWhatsAppVerificationCode(userId);
-
-    if (!storedCode) {
-      return NextResponse.json(
-        { error: 'No verification code found or code expired. Please request a new code.' },
-        { status: 400 }
-      );
-    }
-
-    // Verify code
-    if (storedCode !== code) {
-      return NextResponse.json(
-        { error: 'Invalid verification code' },
         { status: 400 }
       );
     }
@@ -44,20 +26,50 @@ export async function POST(req: Request) {
       );
     }
 
-    // Update user to pending admin approval
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: {
-        approvalStatus: 'PENDING', // Partner accounts need admin approval
-      },
+    // Verify 2FA code for registration
+    const isValidCode = await verify2FACode({
+      userId: user.id,
+      code: code,
+      purpose: 'registration'
     });
 
-    console.log(`✅ Mobile verified for user: ${user.email}`);
-    console.log(`   Status: PENDING (awaiting admin approval)`);
+    if (!isValidCode) {
+      return NextResponse.json(
+        { error: 'Invalid or expired verification code' },
+        { status: 400 }
+      );
+    }
+
+    // Update user based on role
+    let updatedUser;
+    if (user.role === 'CUSTOMER') {
+      // For customers, activate account immediately after mobile verification
+      updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: {
+          suspended: false,
+          approvalStatus: 'ACTIVE',
+        },
+      });
+      console.log(`✅ Mobile verified for customer: ${user.email}`);
+      console.log(`   Status: ACTIVE (account activated)`);
+    } else {
+      // For partners, set to pending admin approval
+      updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: {
+          approvalStatus: 'PENDING', // Partner accounts need admin approval
+        },
+      });
+      console.log(`✅ Mobile verified for user: ${user.email}`);
+      console.log(`   Status: PENDING (awaiting admin approval)`);
+    }
 
     return NextResponse.json({
       success: true,
-      message: 'Mobile verified successfully. Your account is pending admin approval.',
+      message: user.role === 'CUSTOMER' 
+        ? 'Mobile verified successfully. Your account is now active!'
+        : 'Mobile verified successfully. Your account is pending admin approval.',
       user: {
         id: updatedUser.id,
         email: updatedUser.email,

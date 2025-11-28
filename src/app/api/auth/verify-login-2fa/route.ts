@@ -17,7 +17,7 @@ export async function POST(req: Request) {
 
     console.log('🔐 Verifying login 2FA for user:', userId);
 
-    // Verify user exists and is a partner
+    // Verify user exists
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -32,9 +32,9 @@ export async function POST(req: Request) {
       );
     }
 
-    if (user.role !== 'PARTNER') {
+    if (user.role !== 'PARTNER' && user.role !== 'CUSTOMER') {
       return NextResponse.json(
-        { error: '2FA is only available for partner accounts' },
+        { error: '2FA is only available for partner and customer accounts' },
         { status: 403 }
       );
     }

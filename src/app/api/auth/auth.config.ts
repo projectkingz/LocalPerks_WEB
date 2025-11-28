@@ -129,10 +129,10 @@ export const authOptions: NextAuthOptions = {
             
             // For partners with pending verifications, redirect to verification flows
             if (user.role === 'PARTNER') {
-              if (false && user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
+              if (user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
                 console.log('Partner needs email verification, redirecting to verify-email');
                 throw new Error('PARTNER_EMAIL_VERIFICATION_REQUIRED');
-              } else if (false && user.approvalStatus === 'PENDING_MOBILE_VERIFICATION') {
+              } else if (user.approvalStatus === 'PENDING_MOBILE_VERIFICATION') {
                 console.log('Partner needs mobile verification, redirecting to verify-mobile');
                 throw new Error('PARTNER_MOBILE_VERIFICATION_REQUIRED');
               } else if (user.approvalStatus === 'PENDING' || user.approvalStatus === 'UNDER_REVIEW') {
@@ -143,10 +143,10 @@ export const authOptions: NextAuthOptions = {
             } 
             // For customers with pending verifications, redirect to verification flows
             else if (user.role === 'CUSTOMER') {
-              if (false && user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
+              if (user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
                 console.log('Customer needs email verification, redirecting to verify-email');
                 throw new Error('CUSTOMER_EMAIL_VERIFICATION_REQUIRED');
-              } else if (false && user.approvalStatus === 'PENDING_MOBILE_VERIFICATION') {
+              } else if (user.approvalStatus === 'PENDING_MOBILE_VERIFICATION') {
                 console.log('Customer needs mobile verification, redirecting to verify-mobile');
                 throw new Error('CUSTOMER_MOBILE_VERIFICATION_REQUIRED');
               } else {
@@ -156,7 +156,7 @@ export const authOptions: NextAuthOptions = {
             // For other roles (ADMIN, SUPER_ADMIN)
             else if (user.approvalStatus === 'UNDER_REVIEW') {
               throw new Error('ACCOUNT_UNDER_REVIEW');
-            } else if (false && user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
+            } else if (user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
               throw new Error('EMAIL_VERIFICATION_REQUIRED');
             } else if (user.approvalStatus === 'PENDING') {
               throw new Error('PENDING_APPROVAL');
@@ -404,3 +404,4 @@ export const authOptions: NextAuthOptions = {
     },
   }
 }; 
+

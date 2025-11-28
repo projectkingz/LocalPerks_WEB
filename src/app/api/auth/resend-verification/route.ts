@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { generateAndSend2FACode } from '@/lib/auth/two-factor';
 
 // In-memory store for verification codes (in production, use Redis)
 interface VerificationCode {
@@ -33,38 +34,48 @@ export async function POST(req: Request) {
       );
     }
 
-    // Generate 6-digit code
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
-
-    // Store code
-    codeStore.set(userId, { code, expiresAt });
-
-    // Send email with code (using your existing email service)
-    const emailSubject = 'LocalPerks Email Verification';
-    const emailBody = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #2563eb;">Email Verification</h2>
-        <p>Your verification code is:</p>
-        <div style="font-size: 32px; font-weight: bold; color: #2563eb; text-align: center; padding: 20px; background-color: #eff6ff; border-radius: 8px; margin: 20px 0;">
-          ${code}
-        </div>
-        <p style="color: #6b7280; font-size: 14px;">
-          This code will expire in 10 minutes.
-        </p>
-        <p style="color: #6b7280; font-size: 14px;">
-          If you didn't request this code, please ignore this email.
-        </p>
-      </div>
-    `;
-
-    // TODO: Implement actual email sending service
-    console.log(`\n📧 Verification Email to ${email}:`);
-    console.log(`   Code: ${code}`);
-    console.log(`   Expires: ${new Date(expiresAt).toLocaleString()}`);
-
-    // Simulate email sending (in production, use SendGrid, AWS SES, etc.)
-    // await sendEmail(email, emailSubject, emailBody);
+    // Use 2FA system for customers and partners
+    let codeSent = false;
+    try {
+      if (user.role === 'CUSTOMER') {
+        // Check if a code already exists for this user
+        const { hasPending2FAVerification } = await import('@/lib/auth/two-factor');
+        const hasPendingCode = await hasPending2FAVerification(user.id);
+        
+        if (hasPendingCode) {
+          console.log('📧 Code already exists for customer, not sending duplicate');
+          // Code already exists, don't send a new one
+          return NextResponse.json({
+            success: true,
+            message: 'A verification code was already sent. Please check your email or wait before requesting a new one.',
+            expiresIn: 600,
+            codeAlreadyExists: true
+          });
+        }
+        
+        // For customers, use 2FA system
+        const result = await generateAndSend2FACode({
+          userId: user.id,
+          method: 'email',
+          email: user.email,
+          name: user.name || 'Customer',
+          purpose: 'registration'
+        });
+        codeSent = result.success;
+      } else {
+        // For partners, use legacy system (for backward compatibility)
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+        codeStore.set(userId, { code, expiresAt });
+        
+        console.log(`\n📧 Verification Email to ${email}:`);
+        console.log(`   Code: ${code}`);
+        console.log(`   Expires: ${new Date(expiresAt).toLocaleString()}`);
+        codeSent = true;
+      }
+    } catch (error) {
+      console.error('Error sending verification code:', error);
+    }
 
     return NextResponse.json({
       success: true,

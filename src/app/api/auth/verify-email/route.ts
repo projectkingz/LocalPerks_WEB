@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getVerificationCode } from '../resend-verification/route';
+import { verify2FACode } from '@/lib/auth/two-factor';
 
 export async function POST(req: Request) {
   try {
@@ -13,25 +13,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Get stored code
-    const storedCode = getVerificationCode(userId);
-
-    if (!storedCode) {
-      return NextResponse.json(
-        { error: 'No verification code found or code expired. Please request a new code.' },
-        { status: 400 }
-      );
-    }
-
-    // Verify code
-    if (storedCode !== code) {
-      return NextResponse.json(
-        { error: 'Invalid verification code' },
-        { status: 400 }
-      );
-    }
-
-    // Update user email verification status
+    // Get user to check role
     const user = await prisma.user.findUnique({
       where: { id: userId },
     });
@@ -43,15 +25,41 @@ export async function POST(req: Request) {
       );
     }
 
-    // Update user to pending mobile verification
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        emailVerified: true,
-        emailVerifiedAt: new Date(),
-        approvalStatus: 'PENDING_MOBILE_VERIFICATION',
-      },
+    // Verify 2FA code for registration
+    const isValidCode = await verify2FACode({
+      userId: user.id,
+      code: code,
+      purpose: 'registration'
     });
+
+    if (!isValidCode) {
+      return NextResponse.json(
+        { error: 'Invalid or expired verification code' },
+        { status: 400 }
+      );
+    }
+
+    // Update user based on role
+    if (user.role === 'CUSTOMER') {
+      // For customers, after email verification, move to mobile verification
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          emailVerified: new Date(),
+          approvalStatus: 'PENDING_MOBILE_VERIFICATION',
+          // Keep suspended until mobile is verified
+        },
+      });
+    } else {
+      // For partners, update to pending mobile verification
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          emailVerified: new Date(),
+          approvalStatus: 'PENDING_MOBILE_VERIFICATION',
+        },
+      });
+    }
 
     console.log(`✅ Email verified for user: ${user.email}`);
 

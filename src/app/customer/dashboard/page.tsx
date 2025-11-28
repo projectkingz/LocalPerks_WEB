@@ -306,13 +306,13 @@ export default function DashboardPage() {
                 {/* Card Content */}
                 <div className="relative h-full p-6 flex flex-col justify-between">
                   {/* Top Section */}
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
+                  <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
+                    <div className="min-w-0">
                       <h3 className="text-[18px] font-medium text-white mb-1" style={{ fontFamily: 'var(--font-roboto)' }}>LocalPerks</h3>
                       <p className="text-blue-200 text-[18px] font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Loyalty Card</p>
                     </div>
                     {/* Chip */}
-                    <div className="w-10 h-8 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-md shadow-lg"></div>
+                    <div className="w-10 h-8 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-md shadow-lg flex-shrink-0"></div>
                   </div>
                   
                   {/* Middle Section - QR Code */}
@@ -349,12 +349,12 @@ export default function DashboardPage() {
                     </div>
                     
                     {/* Points and Tier - Aligned */}
-                    <div className="flex items-center justify-between pt-2 border-t border-blue-500 border-opacity-30 min-h-[60px]">
-                      <div>
+                    <div className="flex flex-wrap items-start justify-between gap-4 pt-2 border-t border-blue-500 border-opacity-30 min-h-[60px]">
+                      <div className="min-w-[140px]">
                         <p className="text-blue-200 text-[18px] tracking-wide font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Points</p>
                         <p className="text-white text-[18px] font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>{pointsData.points.toLocaleString()}</p>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right min-w-[140px]">
                         <p className="text-blue-200 text-[18px] tracking-wide font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Tier</p>
                         <p className="text-white text-[18px] font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>{pointsData.tier}</p>
                       </div>
@@ -381,13 +381,13 @@ export default function DashboardPage() {
               {/* Card Content */}
               <div className="relative h-full p-6 flex flex-col justify-between" style={{ minHeight: '500px' }}>
                 {/* Top Section */}
-                <div className="flex items-start justify-between mb-2">
-                  <div>
+                <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
+                  <div className="min-w-0">
                     <h3 className="text-[18px] font-medium text-white mb-1" style={{ fontFamily: 'var(--font-roboto)' }}>LocalPerks</h3>
                     <p className="text-green-100 text-[18px] font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Discount Card</p>
                   </div>
                   {/* Chip */}
-                  <div className="w-10 h-8 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-md shadow-lg"></div>
+                  <div className="w-10 h-8 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-md shadow-lg flex-shrink-0"></div>
                 </div>
                 
                 {/* Middle Section - Discount Amount */}
@@ -455,8 +455,8 @@ export default function DashboardPage() {
                   {/* Card Content */}
                   <div className="relative h-full p-5 md:p-6 lg:p-7 flex flex-col justify-between" style={{ minHeight: '450px' }}>
                     {/* Top Section */}
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
+                    <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
+                      <div className="min-w-0">
                         <h3 className="text-2xl md:text-3xl lg:text-4xl font-medium text-white mb-1" style={{ fontFamily: 'var(--font-roboto)' }}>LocalPerks</h3>
                         <p className="text-blue-200 text-sm md:text-base font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Loyalty Card</p>
                       </div>
@@ -494,12 +494,12 @@ export default function DashboardPage() {
                       )}
                       
                       {/* Points and Tier */}
-                      <div className="flex items-center justify-between pt-2 border-t border-blue-500 border-opacity-30">
-                        <div>
+                      <div className="flex flex-wrap items-start justify-between gap-4 pt-2 border-t border-blue-500 border-opacity-30">
+                        <div className="min-w-[140px]">
                           <p className="text-blue-200 text-xs md:text-sm tracking-wide font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Points</p>
                           <p className="text-white text-xl md:text-2xl lg:text-3xl font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>{pointsData.points.toLocaleString()}</p>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right min-w-[140px]">
                           <p className="text-blue-200 text-xs md:text-sm tracking-wide font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Tier</p>
                           <p className="text-white text-lg md:text-xl lg:text-2xl font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>{pointsData.tier}</p>
                         </div>

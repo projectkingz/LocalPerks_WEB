@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { generateAndSend2FACode, normalizePhoneNumber } from '@/lib/auth/two-factor';
 
 // In-memory store for WhatsApp codes
 interface WhatsAppCode {
@@ -33,32 +34,64 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!user.tenant?.mobile) {
+    let mobileNumber: string | null = null;
+    
+    if (user.role === 'CUSTOMER') {
+      // Get customer mobile number
+      const customer = await prisma.customer.findUnique({
+        where: { email: user.email }
+      });
+      
+      if (!customer || !customer.mobile) {
+        return NextResponse.json(
+          { error: 'Mobile number not found for customer' },
+          { status: 400 }
+        );
+      }
+      mobileNumber = customer.mobile;
+    } else if (user.role === 'PARTNER') {
+      // Get partner tenant mobile number
+      if (!user.tenant?.mobile) {
+        return NextResponse.json(
+          { error: 'Mobile number not found for partner' },
+          { status: 400 }
+        );
+      }
+      mobileNumber = user.tenant.mobile;
+    } else {
       return NextResponse.json(
-        { error: 'Mobile number not found' },
-        { status: 400 }
+        { error: 'Mobile verification is only available for customers and partners' },
+        { status: 403 }
       );
     }
 
-    // Generate 6-digit code
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
-
-    // Store code
-    whatsappCodeStore.set(userId, { code, expiresAt });
-
-    // Send WhatsApp message with code
-    const whatsappMessage = `*LocalPerks Mobile Verification*\n\nYour verification code is: *${code}*\n\nThis code will expire in 10 minutes.\n\nIf you didn't request this code, please ignore this message.`;
-    const mobileNumber = user.tenant.mobile;
-
-    // TODO: Implement actual WhatsApp sending service
-    console.log(`\n📱 WhatsApp Message to ${mobileNumber}:`);
-    console.log(`   Code: ${code}`);
-    console.log(`   Expires: ${new Date(expiresAt).toLocaleString()}`);
-    console.log(`   Message: ${whatsappMessage}`);
-
-    // Simulate WhatsApp sending (in production, use Twilio, WhatsApp Business API, etc.)
-    // await sendWhatsAppMessage(mobileNumber, whatsappMessage);
+    // Use 2FA system for customers, legacy system for partners
+    if (user.role === 'CUSTOMER') {
+      // For customers, use 2FA system
+      const normalizedMobile = normalizePhoneNumber(mobileNumber);
+      const result = await generateAndSend2FACode({
+        userId: user.id,
+        method: 'whatsapp',
+        phone: normalizedMobile,
+        purpose: 'registration'
+      });
+      
+      if (!result.success) {
+        return NextResponse.json(
+          { error: result.message || 'Failed to send verification code' },
+          { status: 500 }
+        );
+      }
+    } else {
+      // For partners, use legacy system (for backward compatibility)
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+      whatsappCodeStore.set(userId, { code, expiresAt });
+      
+      console.log(`\n📱 WhatsApp Message to ${mobileNumber}:`);
+      console.log(`   Code: ${code}`);
+      console.log(`   Expires: ${new Date(expiresAt).toLocaleString()}`);
+    }
 
     return NextResponse.json({
       success: true,

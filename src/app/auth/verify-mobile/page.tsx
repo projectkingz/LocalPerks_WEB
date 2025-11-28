@@ -108,7 +108,14 @@ function VerifyMobileContent() {
       const data = await response.json();
 
       if (response.ok) {
-        router.push(`/partner/signup-success?verified=true`);
+        // Redirect based on user role
+        if (data.user?.role === 'CUSTOMER') {
+          // Customers are activated immediately, redirect to signin
+          router.push(`/auth/signin?verified=true&message=verification_complete`);
+        } else {
+          // Partners need admin approval, redirect to signup success
+          router.push(`/partner/signup-success?verified=true`);
+        }
       } else {
         setError(data.error || 'Invalid verification code');
       }

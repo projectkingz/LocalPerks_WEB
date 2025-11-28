@@ -301,6 +301,38 @@ export async function generateAndSend2FACode(options: TwoFactorOptions): Promise
       };
     }
 
+    // Check if a code already exists for this purpose (prevent duplicate sends)
+    const key = `2fa:${userId}:${purpose}`;
+    let existingCode = null;
+    
+    if (redis && !redisConnectionFailed) {
+      try {
+        existingCode = await redis.get<string>(key);
+      } catch (error) {
+        // Ignore Redis errors, check memory fallback
+      }
+    }
+    
+    // Check memory fallback
+    if (!existingCode) {
+      const memoryEntry = memoryStore.get(key);
+      if (memoryEntry && Date.now() < memoryEntry.expires) {
+        existingCode = memoryEntry.code;
+        console.log('⚠️  Code already exists for this user and purpose, not generating duplicate');
+        // Still return success since code exists, but don't send another email
+        return {
+          success: true,
+          message: 'A verification code was already sent. Please check your email.',
+        };
+      }
+    } else {
+      console.log('⚠️  Code already exists in Redis, not generating duplicate');
+      return {
+        success: true,
+        message: 'A verification code was already sent. Please check your email.',
+      };
+    }
+
     const code = generateCode();
     await storeCode(userId, code, purpose);
 

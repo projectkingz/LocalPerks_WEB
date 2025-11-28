@@ -14,16 +14,22 @@ function VerifyEmailContent() {
   const [error, setError] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
   const [codeSent, setCodeSent] = useState(false);
+  const [hasInitialized, setHasInitialized] = useState(false);
 
   useEffect(() => {
     if (!userId || !email) {
       router.push('/partner/signup-success');
       return;
     }
-    if (!codeSent) {
-      handleResend();
-    }
-  }, []);
+    
+    // Only initialize once (prevent React Strict Mode double execution)
+    if (hasInitialized) return;
+    setHasInitialized(true);
+    
+    // Don't auto-resend - code was already sent during registration
+    // User can manually click "Resend Code" if needed
+    setCodeSent(true); // Mark as sent so UI shows the code was sent
+  }, [userId, email, router, hasInitialized]);
 
   const handleResend = async () => {
     try {

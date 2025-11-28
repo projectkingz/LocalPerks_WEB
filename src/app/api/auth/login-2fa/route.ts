@@ -16,7 +16,7 @@ export async function POST(req: Request) {
 
     console.log('🔐 Login 2FA request for:', email || userId);
 
-    // Verify user exists and is a partner
+    // Verify user exists
     const user = await prisma.user.findUnique({
       where: email ? { email } : { id: userId },
       include: {
@@ -31,50 +31,74 @@ export async function POST(req: Request) {
       );
     }
 
-    if (user.role !== 'PARTNER') {
+    if (user.role !== 'PARTNER' && user.role !== 'CUSTOMER') {
       return NextResponse.json(
-        { message: '2FA is only available for partner accounts' },
+        { message: '2FA is only available for partner and customer accounts' },
         { status: 403 }
       );
     }
 
-    // Get tenant mobile number
-    const tenant = user.partnerTenants[0];
-    console.log(`👤 Partner tenant info:`, tenant ? {
-      id: tenant.id,
-      hasMobile: !!tenant.mobile,
-      mobile: tenant.mobile ? '***' + tenant.mobile.slice(-4) : 'none'
-    } : 'No tenant found');
+    // Get contact information based on user role
+    let mobile: string | null = null;
+    let contactName = user.name || 'User';
     
-    if (!tenant) {
-      console.error('❌ No partner tenant found for user:', user.id);
-      return NextResponse.json(
-        { 
-          message: 'Partner tenant not found. Please complete your partner registration.',
-          codeSent: false
-        },
-        { status: 400 }
-      );
+    if (user.role === 'PARTNER') {
+      // Get tenant mobile number for partners
+      const tenant = user.partnerTenants[0];
+      console.log(`👤 Partner tenant info:`, tenant ? {
+        id: tenant.id,
+        hasMobile: !!tenant.mobile,
+        mobile: tenant.mobile ? '***' + tenant.mobile.slice(-4) : 'none'
+      } : 'No tenant found');
+      
+      if (!tenant) {
+        console.error('❌ No partner tenant found for user:', user.id);
+        return NextResponse.json(
+          { 
+            message: 'Partner tenant not found. Please complete your partner registration.',
+            codeSent: false
+          },
+          { status: 400 }
+        );
+      }
+      mobile = tenant.mobile;
+    } else if (user.role === 'CUSTOMER') {
+      // Get customer mobile number
+      const customer = await prisma.customer.findUnique({
+        where: { email: user.email }
+      });
+      
+      if (customer) {
+        mobile = customer.mobile;
+        contactName = customer.name || contactName;
+        console.log(`👤 Customer info:`, {
+          id: customer.id,
+          hasMobile: !!customer.mobile,
+          mobile: customer.mobile ? '***' + customer.mobile.slice(-4) : 'none'
+        });
+      } else {
+        console.warn('⚠️  Customer record not found for user:', user.id);
+      }
     }
     
     // Send verification code - prefer WhatsApp if mobile available, otherwise use email
     let codeSent = false;
     let deliveryMethod = 'email';
     
-    if (tenant.mobile) {
+    if (mobile) {
       // Try WhatsApp first
-      const mobile = normalizePhoneNumber(tenant.mobile);
-      console.log(`📱 Normalized mobile: ${tenant.mobile} → ${mobile}`);
+      const normalizedMobile = normalizePhoneNumber(mobile);
+      console.log(`📱 Normalized mobile: ${mobile} → ${normalizedMobile}`);
       
       try {
         console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-        console.log(`📤 Sending login 2FA WhatsApp to: ${mobile}`);
+        console.log(`📤 Sending login 2FA WhatsApp to: ${normalizedMobile}`);
         console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
         
         const result = await generateAndSend2FACode({
           userId: user.id,
           method: 'whatsapp',
-          phone: mobile,
+          phone: normalizedMobile,
           purpose: 'login'
         });
 
@@ -144,8 +168,8 @@ export async function POST(req: Request) {
       }
     }
 
-    const maskedContact = tenant.mobile && deliveryMethod === 'whatsapp'
-      ? tenant.mobile.replace(/(\+44)(\d{3})(\d{3})(\d{4})/, '$1 $2***$4')
+    const maskedContact = mobile && deliveryMethod === 'whatsapp'
+      ? mobile.replace(/(\+44)(\d{3})(\d{3})(\d{4})/, '$1 $2***$4')
       : user.email?.replace(/(.{2})(.*)(@.*)/, '$1***$3') || 'your contact';
 
     return NextResponse.json({

@@ -80,7 +80,7 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
         subscriptionTier: tierName,
         subscriptionStatus: 'ACTIVE',
         stripeCustomerId: subscription.customer as string,
-        nextBillingDate: new Date(subscription.current_period_end * 1000),
+        nextBillingDate: new Date((subscription as any).current_period_end * 1000),
       },
     });
 
@@ -91,9 +91,9 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
         tierId: tier.id,
         status: 'ACTIVE',
         stripeSubscriptionId: subscription.id,
-        currentPeriodStart: new Date(subscription.current_period_start * 1000),
-        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-        nextBillingDate: new Date(subscription.current_period_end * 1000),
+        currentPeriodStart: new Date((subscription as any).current_period_start * 1000),
+        currentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
+        nextBillingDate: new Date((subscription as any).current_period_end * 1000),
         amount: tier.price,
       },
     });
@@ -122,9 +122,9 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
       where: { stripeSubscriptionId: subscription.id },
       data: {
         status: status,
-        currentPeriodStart: new Date(subscription.current_period_start * 1000),
-        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-        nextBillingDate: new Date(subscription.current_period_end * 1000),
+        currentPeriodStart: new Date((subscription as any).current_period_start * 1000),
+        currentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
+        nextBillingDate: new Date((subscription as any).current_period_end * 1000),
       },
     });
 
@@ -133,7 +133,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
       where: { id: tenantId },
       data: {
         subscriptionStatus: status,
-        nextBillingDate: new Date(subscription.current_period_end * 1000),
+        nextBillingDate: new Date((subscription as any).current_period_end * 1000),
       },
     });
 
@@ -175,7 +175,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 }
 
 async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
-  const subscriptionId = invoice.subscription as string;
+  const subscriptionId = (invoice as any).subscription as string;
 
   if (!subscriptionId) {
     console.error('No subscription ID in invoice:', invoice.id);
@@ -199,7 +199,7 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
         subscriptionId: subscription.id,
         amount: invoice.amount_paid / 100, // Convert from pence
         status: 'COMPLETED',
-        stripePaymentIntentId: invoice.payment_intent as string,
+        stripePaymentIntentId: (invoice as any).payment_intent as string,
         stripeInvoiceId: invoice.id,
         paidAt: new Date(),
       },
@@ -212,7 +212,7 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
 }
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
-  const subscriptionId = invoice.subscription as string;
+  const subscriptionId = (invoice as any).subscription as string;
 
   if (!subscriptionId) {
     console.error('No subscription ID in invoice:', invoice.id);

@@ -36,7 +36,7 @@ export async function GET() {
     });
 
     return NextResponse.json(
-      history.map(item => ({
+      history.map((item: any) => ({
         ...item,
         date: item.createdAt
       }))

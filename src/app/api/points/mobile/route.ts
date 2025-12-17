@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const calculatedPoints = transactions.reduce((total, t) => {
+    const calculatedPoints = transactions.reduce((total: number, t: any) => {
       if (t.type === "EARNED" || t.status === "VOID") return total + t.points;
       if (t.type === "SPENT" || t.type === "REFUND") return total + t.points; // SPENT/REFUND already negative
       return total;

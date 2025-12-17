@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Format vouchers for mobile
-    const formattedVouchers = vouchers.map(voucher => ({
+    const formattedVouchers = vouchers.map((voucher: any) => ({
       id: voucher.id,
       code: voucher.code,
       status: voucher.status,

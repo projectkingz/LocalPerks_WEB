@@ -58,7 +58,6 @@ export async function POST(req: Request) {
           userId: user.id,
           method: 'email',
           email: user.email,
-          name: user.name || 'Customer',
           purpose: 'registration'
         });
         codeSent = result.success;

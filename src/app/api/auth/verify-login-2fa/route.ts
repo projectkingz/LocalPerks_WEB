@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verify2FACode } from '@/lib/auth/two-factor';
-import { signToken } from '@/lib/auth/jwt';
 
 export async function POST(req: Request) {
   try {

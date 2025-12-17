@@ -18,7 +18,7 @@ function PartnerRegistrationContent() {
     password: '',
     confirmPassword: ''
   });
-  const [subscriptionTiers, setSubscriptionTiers] = useState([]);
+  const [subscriptionTiers, setSubscriptionTiers] = useState<any[]>([]);
   const [selectedTier, setSelectedTier] = useState('BASIC');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -194,7 +194,7 @@ function PartnerRegistrationContent() {
 
   const handleStepChange = async (newStep: number) => {
     // If trying to go to step 3, check subscription status first
-    if (newfalse && false && step === 3 && userId) {
+    if (newStep === 3 && userId) {
       try {
         const response = await fetch(`/api/partner/subscription-status?userId=${userId}`);
         if (response.ok) {

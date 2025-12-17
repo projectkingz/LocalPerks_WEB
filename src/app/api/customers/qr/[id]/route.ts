@@ -44,7 +44,7 @@ export async function GET(
     }
 
     // Generate a unique QR code identifier
-    let qrCode: string;
+    let qrCode: string = '';
     let isUnique = false;
     let attempts = 0;
     const maxAttempts = 10;
@@ -65,7 +65,7 @@ export async function GET(
       attempts++;
     }
 
-    if (!isUnique) {
+    if (!isUnique || !qrCode) {
       return NextResponse.json(
         { error: 'Failed to generate unique QR code' },
         { status: 500 }

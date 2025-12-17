@@ -68,6 +68,12 @@ export async function POST(req: Request) {
     // Use 2FA system for customers, legacy system for partners
     if (user.role === 'CUSTOMER') {
       // For customers, use 2FA system
+      if (!mobileNumber) {
+        return NextResponse.json(
+          { error: 'Mobile number is required' },
+          { status: 400 }
+        );
+      }
       const normalizedMobile = normalizePhoneNumber(mobileNumber);
       const result = await generateAndSend2FACode({
         userId: user.id,

@@ -44,7 +44,7 @@ export async function GET(request: Request) {
     // Generate a unique QR code identifier
     // Format: customer-{customerId}-{shortUuid}
     // This ensures uniqueness and makes it easy to identify the customer
-    let qrCode: string;
+    let qrCode: string = '';
     let isUnique = false;
     let attempts = 0;
     const maxAttempts = 10;
@@ -65,7 +65,7 @@ export async function GET(request: Request) {
       attempts++;
     }
 
-    if (!isUnique) {
+    if (!isUnique || !qrCode) {
       return NextResponse.json(
         { error: 'Failed to generate unique QR code' },
         { status: 500 }

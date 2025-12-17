@@ -222,7 +222,7 @@ export async function GET(request: Request) {
 
     // Get reward details for popular rewards
     const popularRewardsWithDetails = await Promise.all(
-      popularRewards.map(async (redemption) => {
+      popularRewards.map(async (redemption: any) => {
         const reward = await prisma.reward.findUnique({
           where: { id: redemption.rewardId }
         });

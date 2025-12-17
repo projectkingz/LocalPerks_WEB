@@ -66,8 +66,8 @@ export async function GET(req: NextRequest) {
 
     // Calculate metrics
     const totalTransactions = transactions.length;
-    const pointsIssued = transactions.reduce((sum, t) => sum + t.points, 0);
-    const totalAmount = transactions.reduce((sum, t) => sum + t.amount, 0);
+    const pointsIssued = transactions.reduce((sum: number, t: any) => sum + t.points, 0);
+    const totalAmount = transactions.reduce((sum: number, t: any) => sum + t.amount, 0);
     const averageTransaction = totalTransactions > 0 ? totalAmount / totalTransactions : 0;
     
     // Calculate total points issue charge

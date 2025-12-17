@@ -38,7 +38,7 @@ export async function GET() {
     });
 
     // Transform transactions to match expected format
-    const formattedTransactions = transactions.map(transaction => ({
+    const formattedTransactions = transactions.map((transaction: any) => ({
       id: transaction.id,
       date: transaction.createdAt.toISOString(),
       points: transaction.points,
@@ -50,7 +50,7 @@ export async function GET() {
       amount: transaction.amount
     }));
 
-    const formattedPendingTransactions = pendingTransactions.map(transaction => ({
+    const formattedPendingTransactions = pendingTransactions.map((transaction: any) => ({
       id: transaction.id,
       date: transaction.createdAt.toISOString(),
       points: transaction.points,

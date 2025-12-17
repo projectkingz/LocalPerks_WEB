@@ -1,11 +1,4 @@
 {
-  "version": 2,
-  "buildCommand": "npm run build:vercel",
-  "installCommand": "npm install && npx prisma generate",
-  "framework": "nextjs",
-  "regions": ["lhr1"],
-  "env": {
-    "NEXTAUTH_URL": "https://${VERCEL_URL}",
-    "PRISMA_GENERATE_DATAPROXY": "true"
-  }
-} 
+  "buildCommand": "npm install && npm run build",
+  "installCommand": "npm install"
+}

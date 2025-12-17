@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
 
     // Get tenant information separately to handle potential null references
     const customersWithTenants = await Promise.all(
-      customers.map(async (customer) => {
+      customers.map(async (customer: any) => {
         let tenant = null;
         try {
           tenant = await prisma.tenant.findUnique({

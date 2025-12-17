@@ -131,7 +131,7 @@ export default function ProfilePage() {
                 <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-10 rounded-full -ml-24 -mb-24"></div>
                 
                 {/* Card Content */}
-                <div className="relative h-full p-6 flex flex-col justify-between" style={{ minHeight: '500px' }}>
+                <div className="relative h-full p-6 flex flex-col justify-between">
                   {/* Top Section */}
                   <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
                     <div className="min-w-0">

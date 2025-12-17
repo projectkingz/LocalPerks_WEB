@@ -21,7 +21,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    console.log('Points History API - User:', session.user.email);
 
     // Get customer from database
     const customer = await prisma.customer.findUnique({

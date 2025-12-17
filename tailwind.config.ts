@@ -9,7 +9,7 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['var(--font-fira-sans)', 'sans-serif'],
+        sans: ['var(--font-roboto)', 'sans-serif'],
       },
     },
   },

@@ -1,4 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
+import type { PrismaClient } from '@prisma/client';
 
 /**
  * Generates a 6-digit case-insensitive alphanumeric ID
@@ -8,42 +9,50 @@ import { PrismaClient } from '@prisma/client';
 export function generateDisplayId(): string {
   const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   let result = '';
-  
+
   for (let i = 0; i < 6; i++) {
-    const randomIndex = Math.floor(Math.random() * chars.length);
+    const randomIndex = Math.floor(Math.random() * chars.length); 
     result += chars[randomIndex];
   }
-  
+
   return result;
 }
 
 /**
- * Generates a unique display ID and checks for collisions in the database
+ * Generates a unique display ID and checks for collisions in the database                                                          
  * Will retry up to 10 times to find a unique ID
+ * 
+ * @param client - Optional Prisma client (for transactions). If not provided, uses shared client with Accelerate.
+ * @param maxAttempts - Maximum number of attempts to generate a unique ID (default: 10)
+ * 
+ * Uses the shared Prisma client with Accelerate for optimal performance when no client is provided.
  */
 export async function generateUniqueDisplayId(
-  prisma: PrismaClient,
+  client?: PrismaClient | any,
   maxAttempts: number = 10
 ): Promise<string> {
-  let attempts = 0;
+  // Use provided client (for transactions) or fall back to shared client with Accelerate
+  const dbClient = client || prisma;
   
+  let attempts = 0;
+
   while (attempts < maxAttempts) {
     const displayId = generateDisplayId();
-    
-    // Check if this displayId already exists in the database
-    const existing = await prisma.customer.findUnique({
+
+    // Check if this displayId already exists in the database     
+    const existing = await dbClient.customer.findUnique({
       where: { displayId },
       select: { id: true }
     });
-    
+
     if (!existing) {
       return displayId;
     }
-    
+
     attempts++;
   }
-  
-  throw new Error(`Failed to generate unique display ID after ${maxAttempts} attempts`);
+
+  throw new Error(`Failed to generate unique display ID after ${maxAttempts} attempts`);                                            
 }
 
 /**

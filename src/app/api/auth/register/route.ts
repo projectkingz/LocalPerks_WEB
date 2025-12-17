@@ -58,8 +58,8 @@ export async function POST(request: Request) {
       });
     }
 
-    // Generate unique display ID
-    const displayId = await generateUniqueDisplayId(prisma);
+    // Generate unique display ID (uses shared client with Accelerate)
+    const displayId = await generateUniqueDisplayId();
     
     const customer = await prisma.customer.create({
       data: {

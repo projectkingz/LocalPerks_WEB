@@ -6,8 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "build:vercel": "next build",
+    "build:analyze": "ANALYZE=true next build",
+    "analyze": "ANALYZE=true next build",
     "start": "next start",
     "lint": "next lint",
+    "lint:fix": "next lint --fix",
+    "type-check": "tsc --noEmit",
     "seed": "ts-node -P prisma/tsconfig.json prisma/seed.ts",
     "prisma:seed": "ts-node prisma/seed.ts",
     "seed:comprehensive": "ts-node prisma/seed-comprehensive.ts",
@@ -46,6 +50,7 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^15.3.4",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/next": "^8.0.7",

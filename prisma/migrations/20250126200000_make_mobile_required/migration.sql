@@ -9,3 +9,6 @@ ALTER TABLE `Admin` MODIFY `mobile` VARCHAR(191) NOT NULL;
 -- Note: Customer.mobile is already required in the schema
 
 
+
+
+

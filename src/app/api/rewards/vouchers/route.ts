@@ -86,7 +86,6 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    console.log('Received request body:', body);
     
     const { rewardId, points } = body;
 
@@ -140,12 +139,6 @@ export async function POST(request: Request) {
     const pointsBreakdown = await pointsUtil.getCustomerPointsBreakdown(customer.id);
     const actualPoints = pointsBreakdown.actualPoints;
 
-    console.log('Checking customer points before deduction:');
-    console.log('Customer email:', session.user.email);
-    console.log('Points breakdown:', pointsBreakdown);
-    console.log('Points needed:', points);
-    console.log('Has enough points:', actualPoints >= points);
-
     // Validate the point transaction
     const validation = await pointsUtil.validatePointTransaction(customer.id, points);
     if (!validation.isValid) {
@@ -160,17 +153,9 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    console.log('Transaction validation passed:', validation);
-
     // Get tenant configuration to calculate face value
     const config = await getTenantPointsConfig(customer.tenantId);
     const faceValueAmount = calculatePointsFaceValue(points, config);
-
-    console.log('Calculating face value:', {
-      points,
-      pointFaceValue: config.pointFaceValue,
-      faceValueAmount
-    });
 
     // Create redemption and update customer points in a transaction
     const result = await prisma.$transaction(async (tx) => {
@@ -180,8 +165,6 @@ export async function POST(request: Request) {
         customer.name, 
         customer.tenantId
       );
-
-      console.log('Using User ID for transaction:', userId);
 
       // Create the redemption
       const redemption = await tx.redemption.create({
@@ -254,7 +237,6 @@ export async function POST(request: Request) {
     });
 
     console.log('Redemption created successfully:', result.redemption.id);
-    console.log('User ID used for transaction:', result.userId);
 
     // Calculate remaining points from transaction history
     const updatedPointsBreakdown = await pointsUtil.getCustomerPointsBreakdown(customer.id);

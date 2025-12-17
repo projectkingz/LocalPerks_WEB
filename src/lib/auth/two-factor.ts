@@ -6,21 +6,27 @@ import { prisma } from '@/lib/prisma';
 // Initialize Redis with error handling
 let redis: Redis | null = null;
 let redisConnectionFailed = false;
+const hasRedisConfig = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+
 try {
-  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+  if (hasRedisConfig) {
     redis = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+      url: process.env.UPSTASH_REDIS_REST_URL!,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
     });
     // Test connection asynchronously (don't block initialization)
     redis.ping().catch((error) => {
+      // Only show warning if Redis was configured but failed to connect
       console.warn('Redis connection test failed, will use memory fallback:', error.message || error);
       redisConnectionFailed = true;
       redis = null;
     });
   }
 } catch (error) {
-  console.warn('Redis initialization failed:', error);
+  // Only show warning if Redis was configured but initialization failed
+  if (hasRedisConfig) {
+    console.warn('Redis initialization failed:', error);
+  }
   redisConnectionFailed = true;
   redis = null;
 }

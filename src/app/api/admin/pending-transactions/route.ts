@@ -10,13 +10,9 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  console.log('Admin API - User role:', session.user.role);
-  console.log('Admin API - User email:', session.user.email);
-
   // Check if user has permission to view pending transactions
   const allowedRoles = ['PARTNER', 'ADMIN', 'SUPER_ADMIN'];
   if (!session.user.role || !allowedRoles.includes(session.user.role.toUpperCase())) {
-    console.log('Admin API - Access denied for role:', session.user.role);
     return NextResponse.json({ 
       error: 'Access denied', 
       userRole: session.user.role,
@@ -87,13 +83,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  console.log('Admin API POST - User role:', session.user.role);
-  console.log('Admin API POST - User email:', session.user.email);
-
   // Check if user has permission to view pending transactions
   const allowedRoles = ['PARTNER', 'ADMIN', 'SUPER_ADMIN'];
   if (!session.user.role || !allowedRoles.includes(session.user.role.toUpperCase())) {
-    console.log('Admin API POST - Access denied for role:', session.user.role);
     return NextResponse.json({ 
       error: 'Access denied', 
       userRole: session.user.role,

@@ -36,15 +36,11 @@ const rewardsDatabase: { [key: string]: Reward } = globalAny.rewardsDatabase;
 
 export async function GET() {
   try {
-    console.log('Rewards API: Starting GET request');
-    
     const session = await getServerSession(authOptions);
     
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    console.log('Rewards API: Fetching rewards from database');
     
     // Build tenant filter based on user role
     let whereClause = {};
@@ -52,14 +48,11 @@ export async function GET() {
     if (session.user.role === 'PARTNER' && session.user.tenantId) {
       // Partners only see their own rewards (all statuses)
       whereClause = { tenantId: session.user.tenantId };
-      console.log('Rewards API: Filtering for partner tenant:', session.user.tenantId);
     } else if (session.user.role === 'ADMIN' || session.user.role === 'SUPER_ADMIN') {
       // Admins see all rewards (all statuses)
-      console.log('Rewards API: Admin user - showing all rewards');
     } else {
       // Customers only see approved rewards from all tenants
       whereClause = { approvalStatus: 'APPROVED' };
-      console.log('Rewards API: Customer user - showing only approved rewards from all tenants');
     }
     
     // Fetch rewards from database with tenant filtering and include tenant info
@@ -78,7 +71,6 @@ export async function GET() {
       }
     });
     
-    console.log('Rewards API: Successfully fetched rewards:', rewards.length);
     return NextResponse.json(rewards);
   } catch (error) {
     console.error('Rewards API: Error in GET:', error);
@@ -88,8 +80,6 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    console.log('Rewards API: Starting POST request');
-    
     const session = await getServerSession(authOptions);
     
     if (!session?.user) {
@@ -108,7 +98,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
     
-    console.log('Rewards API: Creating reward:', { name, description, points });
     
     // Set tenantId based on user role
     let tenantId = null;
@@ -167,7 +156,6 @@ export async function POST(request: Request) {
       },
     });
     
-    console.log('Rewards API: Successfully created reward:', reward.id);
     return NextResponse.json({ message: 'Reward created successfully', reward });
   } catch (error) {
     console.error('Rewards API: Error in POST:', error);

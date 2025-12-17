@@ -133,7 +133,6 @@ export async function GET(request: Request) {
       tier: calculateTier(finalPoints),
     };
 
-    console.log("Points API - Returning response:", response);
     return NextResponse.json(response);
   } catch (error) {
     console.error("Error fetching points:", error);

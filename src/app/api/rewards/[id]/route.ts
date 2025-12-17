@@ -8,13 +8,10 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    console.log('Individual reward API: Starting GET request for ID:', params.id);
-    
     const { id } = params;
     const reward = await prisma.reward.findUnique({ where: { id } });
     
     if (!reward) {
-      console.log('Individual reward API: Reward not found for ID:', id);
       return NextResponse.json(
         {
           error: "Reward not found",
@@ -27,7 +24,6 @@ export async function GET(
       );
     }
     
-    console.log('Individual reward API: Successfully found reward:', reward.id);
     return NextResponse.json(reward);
   } catch (error) {
     console.error('Individual reward API: Error in GET:', error);
@@ -46,12 +42,8 @@ export async function PUT(
   }
 
   try {
-    console.log('Individual reward API: Starting PUT request for ID:', params.id);
-    
     const { id } = params;
     const { name, description, points } = await request.json();
-    
-    console.log('Individual reward API: Updating reward with data:', { name, description, points });
     
     if (!name || !description || !points) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -66,7 +58,6 @@ export async function PUT(
       },
     });
     
-    console.log('Individual reward API: Successfully updated reward:', reward.id);
     return NextResponse.json({
       message: "Reward updated successfully",
       reward,
@@ -85,8 +76,6 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    console.log('Individual reward API: Starting POST request for ID:', params.id);
-    
     const session = await getServerSession(authOptions);
     
     if (!session?.user?.email) {
@@ -116,7 +105,6 @@ export async function POST(
       },
     });
     
-    console.log('Individual reward API: Successfully created redemption:', redemption.id);
     return NextResponse.json({ message: "Reward redeemed successfully", redemption });
   } catch (error) {
     console.error('Individual reward API: Error in POST:', error);

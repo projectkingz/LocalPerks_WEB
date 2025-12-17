@@ -129,10 +129,10 @@ export const authOptions: NextAuthOptions = {
             
             // For partners with pending verifications, redirect to verification flows
             if (user.role === 'PARTNER') {
-              if (user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
+              if (false && user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
                 console.log('Partner needs email verification, redirecting to verify-email');
                 throw new Error('PARTNER_EMAIL_VERIFICATION_REQUIRED');
-              } else if (user.approvalStatus === 'PENDING_MOBILE_VERIFICATION') {
+              } else if (false && user.approvalStatus === 'PENDING_MOBILE_VERIFICATION') {
                 console.log('Partner needs mobile verification, redirecting to verify-mobile');
                 throw new Error('PARTNER_MOBILE_VERIFICATION_REQUIRED');
               } else if (user.approvalStatus === 'PENDING' || user.approvalStatus === 'UNDER_REVIEW') {
@@ -156,7 +156,7 @@ export const authOptions: NextAuthOptions = {
             // For other roles (ADMIN, SUPER_ADMIN)
             else if (user.approvalStatus === 'UNDER_REVIEW') {
               throw new Error('ACCOUNT_UNDER_REVIEW');
-            } else if (user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
+            } else if (false && user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
               throw new Error('EMAIL_VERIFICATION_REQUIRED');
             } else if (user.approvalStatus === 'PENDING') {
               throw new Error('PENDING_APPROVAL');
@@ -180,7 +180,11 @@ export const authOptions: NextAuthOptions = {
               throw new Error('PARTNER_2FA_REQUIRED');
             }
 
-            // Customers do NOT require login 2FA (only email + mobile verification at registration)
+            // For active customers, require 2FA login
+            if (user.role === 'CUSTOMER' && !isSuspended && user.approvalStatus === 'ACTIVE') {
+              console.log('Customer login - 2FA required');
+              throw new Error('CUSTOMER_2FA_REQUIRED');
+            }
           } else {
             console.log('✅ 2FA bypass - already verified');
           }
@@ -205,6 +209,7 @@ export const authOptions: NextAuthOptions = {
             error.message.startsWith('EMAIL_') || 
             error.message.startsWith('PENDING_') ||
             error.message.startsWith('PARTNER_') ||
+            error.message.startsWith('CUSTOMER_') ||
             error.message === '2FA_REQUIRED'
           )) {
             // Don't log these as errors - they're expected flow control
@@ -313,9 +318,9 @@ export const authOptions: NextAuthOptions = {
                 if (!existingCustomer) {
                   console.log('Creating customer record for existing CUSTOMER user');
                   
-                  // Generate unique display ID
+                  // Generate unique display ID (uses shared client with Accelerate)
                   const { generateUniqueDisplayId } = await import('@/lib/customerId');
-                  const displayId = await generateUniqueDisplayId(prisma);
+                  const displayId = await generateUniqueDisplayId();
                   
                   // Create customer record without specific tenant assignment
                   // Customers can transact with any tenant
@@ -377,9 +382,9 @@ export const authOptions: NextAuthOptions = {
             if (!existingCustomer) {
               console.log('Creating customer record for CUSTOMER user in session callback');
               
-              // Generate unique display ID
+              // Generate unique display ID (uses shared client with Accelerate)
               const { generateUniqueDisplayId } = await import('@/lib/customerId');
-              const displayId = await generateUniqueDisplayId(prisma);
+              const displayId = await generateUniqueDisplayId();
               
               // Create customer record without specific tenant assignment
               // Customers can transact with any tenant
@@ -404,4 +409,3 @@ export const authOptions: NextAuthOptions = {
     },
   }
 }; 
-

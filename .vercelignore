@@ -5,3 +5,6 @@ backend/**
 # Exclude seed files from build
 prisma/seed*.ts
 prisma/*seed*
+
+# Exclude test/example directories
+hello-prisma/

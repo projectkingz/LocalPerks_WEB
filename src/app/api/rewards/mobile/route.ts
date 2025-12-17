@@ -21,7 +21,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    console.log('Rewards API - User:', session.user.email);
 
     // Get customer from database
     const customer = await prisma.customer.findUnique({
@@ -142,13 +141,21 @@ export async function GET(request: NextRequest) {
 }
 
 // Handle OPTIONS request for CORS
+// Note: CORS headers are handled by next.config.js headers() function
+// This OPTIONS handler is kept for compatibility but should match config
 export async function OPTIONS(request: NextRequest) {
+  const allowedOrigin = process.env.NODE_ENV === 'production'
+    ? (process.env.NEXT_PUBLIC_APP_URL || 'https://your-app.vercel.app')
+    : (process.env.NEXT_PUBLIC_APP_URL || process.env.CORS_ORIGIN || 'http://localhost:3000');
+  
   return new NextResponse(null, {
     status: 200,
     headers: {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': allowedOrigin,
       'Access-Control-Allow-Methods': 'GET, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Allow-Credentials': 'true',
+      'Vary': 'Origin',
     },
   });
 }

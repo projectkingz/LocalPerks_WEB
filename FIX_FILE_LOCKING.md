@@ -60,3 +60,6 @@ Ensure `.next` is in `.gitignore` (already done)
 - Use the `clear-next.ps1` script when errors occur
 - Consider adding `.next` to antivirus exclusions
 
+
+
+

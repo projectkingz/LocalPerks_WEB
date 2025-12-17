@@ -167,7 +167,6 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    console.log('Transaction request body:', body);
     
     // Support both old format (customerId, tenantId) and new format (customerEmail, source)
     const { amount, customerId, tenantId, customerEmail, source, points, type } = body;

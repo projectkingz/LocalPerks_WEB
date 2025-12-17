@@ -10,18 +10,14 @@ export async function GET(req: NextRequest) {
   let tenantId = session?.user?.tenantId as string | undefined;
   let role = session?.user?.role as string | undefined;
 
-  console.log('Partner stats request - Session tenantId:', tenantId, 'Role:', role);
-
   // Check for mobile JWT token if no session
   if (!tenantId) {
     const auth = req.headers.get('authorization') || '';
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : undefined;
-    console.log('Checking mobile JWT token:', token ? 'Token present' : 'No token');
     if (token) {
       try {
         const secret = process.env.NEXTAUTH_SECRET || 'fallback-secret';
         const payload: any = jwt.verify(token, secret);
-        console.log('JWT payload:', { tenantId: payload.tenantId, role: payload.role, userId: payload.userId });
         tenantId = payload.tenantId || undefined;
         role = payload.role;
       } catch (error) {

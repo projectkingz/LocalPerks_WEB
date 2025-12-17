@@ -253,7 +253,7 @@ export const authOptions: NextAuthOptions = {
 
           console.log('Existing user found:', !!existingUser);
           if (existingUser) {
-            console.log('Existing user accounts:', existingUser.accounts.map(acc => acc.provider));
+            console.log('Existing user accounts:', existingUser.accounts.map((acc: any) => acc.provider));
           }
 
           if (existingUser) {
@@ -265,7 +265,7 @@ export const authOptions: NextAuthOptions = {
             
             // Check if they have an account with this specific provider
             const hasThisProviderAccount = existingUser.accounts.some(
-              acc => acc.provider === account?.provider
+              (acc: any) => acc.provider === account?.provider
             );
             
             console.log('User has password:', hasPassword);

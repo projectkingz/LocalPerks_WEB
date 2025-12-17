@@ -27,7 +27,17 @@ export async function GET(request: NextRequest) {
 
     if (!session?.user?.email) {
       console.log('Points config: No valid session found');
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      // Return more detailed error for debugging
+      const authHeader = request.headers.get('Authorization');
+      return NextResponse.json({ 
+        error: 'Unauthorized',
+        debug: {
+          hasAuthHeader: !!authHeader,
+          authHeaderPrefix: authHeader?.substring(0, 10),
+          hasSession: !!session,
+          sessionUser: session?.user ? 'exists' : 'missing'
+        }
+      }, { status: 401 });
     }
     
     console.log('Points config: Authenticated user:', session.user.email, 'Role:', session.user.role);

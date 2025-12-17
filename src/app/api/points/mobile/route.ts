@@ -7,20 +7,27 @@ import { authenticateMobileToken, createMobileSession } from "@/lib/auth/mobile-
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('Points mobile: Request received');
+    
     // Try mobile authentication first
     const mobileUser = await authenticateMobileToken(request);
     let session;
     
     if (mobileUser) {
+      console.log('Points mobile: Mobile authentication successful for:', mobileUser.email);
       session = createMobileSession(mobileUser);
     } else {
+      console.log('Points mobile: Mobile authentication failed, trying NextAuth session');
       // Fall back to NextAuth session
       session = await getServerSession(authOptions);
     }
 
     if (!session?.user?.email) {
+      console.log('Points mobile: No valid session found');
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    
+    console.log('Points mobile: Authenticated user:', session.user.email, 'Role:', session.user.role);
 
     // Get customer from database
     const customer = await prisma.customer.findUnique({

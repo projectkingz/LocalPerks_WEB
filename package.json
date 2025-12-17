@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate --schema=./prisma/schema.prisma && next build",
+    "build": "echo 'Build script: Running prisma generate...' && prisma generate --schema=./prisma/schema.prisma && echo 'Build script: Prisma generate completed, starting Next.js build...' && next build",
     "build:vercel": "prisma generate --schema=./prisma/schema.prisma && next build",
     "build:analyze": "ANALYZE=true next build",
     "analyze": "ANALYZE=true next build",

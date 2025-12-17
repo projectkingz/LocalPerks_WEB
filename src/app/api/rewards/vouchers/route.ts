@@ -158,7 +158,7 @@ export async function POST(request: Request) {
     const faceValueAmount = calculatePointsFaceValue(points, config);
 
     // Create redemption and update customer points in a transaction
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: any) => {
       // Ensure customer has a corresponding User record for transactions
       const userId = await pointsUtil.ensureCustomerUserRecord(
         session.user.email, 

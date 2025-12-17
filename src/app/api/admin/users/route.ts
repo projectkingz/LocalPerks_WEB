@@ -78,17 +78,17 @@ export async function GET(req: NextRequest) {
   });
 
   // Convert customers to user-like format
-  const customerUsers = customers.map(customer => {
+  const customerUsers = customers.map((customer: any) => {
     const totalAmountSpent = customer.transactions
-      .filter(t => t.type === 'EARNED' && t.status === 'APPROVED')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .filter((t: any) => t.type === 'EARNED' && t.status === 'APPROVED')
+      .reduce((sum: any, t: any) => sum + t.amount, 0);
 
     const totalPointsEarned = customer.transactions
-      .filter(t => t.type === 'EARNED' && t.status === 'APPROVED')
-      .reduce((sum, t) => sum + t.points, 0);
+      .filter((t: any) => t.type === 'EARNED' && t.status === 'APPROVED')
+      .reduce((sum: any, t: any) => sum + t.points, 0);
 
     const totalPointsSpent = customer.redemptions
-      .reduce((sum, r) => sum + r.reward.points, 0);
+      .reduce((sum: any, r: any) => sum + r.reward.points, 0);
 
     return {
       id: customer.id,
@@ -109,7 +109,7 @@ export async function GET(req: NextRequest) {
   });
   
   // Convert BigInt values to numbers for JSON serialization and combine users and customers
-  const serializedUsers = (users as any[]).map(user => ({
+  const serializedUsers = (users as any[]).map((user: any) => ({
     ...user,
     points: Number(user.points),
   }));

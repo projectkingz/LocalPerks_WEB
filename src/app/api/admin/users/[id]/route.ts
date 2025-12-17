@@ -178,7 +178,7 @@ export async function DELETE(
             where: { tenantId: { in: tenantIds } },
             select: { id: true }
           });
-          customerIds.push(...tenantCustomers.map(c => c.id));
+          customerIds.push(...tenantCustomers.map((c: any) => c.id));
         }
 
         // Delete all transactions in one go

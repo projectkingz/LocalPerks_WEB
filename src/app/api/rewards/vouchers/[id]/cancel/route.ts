@@ -40,7 +40,7 @@ export async function POST(
 
   // Start transaction
   try {
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       // Delete the voucher
       await tx.voucher.delete({ where: { id: voucherId } });
       // Recredit points to the customer

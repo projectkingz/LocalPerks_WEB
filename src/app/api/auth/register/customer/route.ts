@@ -36,7 +36,7 @@ export async function POST(req: Request) {
     const hashedPassword = await hash(password, 12);
 
     // Create user and customer in transaction
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: any) => {
       // Create user with suspended status pending email verification
       const user = await tx.user.create({
         data: {

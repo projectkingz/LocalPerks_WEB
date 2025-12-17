@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     const hashedPassword = await hash(password, 12);
 
     // Create tenant and user in transaction
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: any) => {
       // Create user with hashed password first
       const user = await tx.user.create({
         data: {

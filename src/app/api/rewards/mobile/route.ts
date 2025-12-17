@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const currentPoints = Math.max(0, transactions.reduce((total, t) => {
+    const currentPoints = Math.max(0, transactions.reduce((total: any, t: any) => {
       if (t.type === "EARNED" || t.status === "VOID") return total + t.points;
       if (t.type === "SPENT") return total + t.points;
       return total;
@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Format rewards for mobile
-    const formattedRewards = rewards.map(reward => ({
+    const formattedRewards = rewards.map((reward: any) => ({
       id: reward.id,
       title: reward.name, // name field in schema
       description: reward.description,
@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
     }));
 
     // Format vouchers for mobile
-    const formattedVouchers = vouchers.map(voucher => ({
+    const formattedVouchers = vouchers.map((voucher: any) => ({
       id: voucher.id,
       code: voucher.code,
       status: voucher.status,
@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
       currentPoints,
       rewards: formattedRewards,
       vouchers: formattedVouchers,
-      availableRewards: formattedRewards.filter(r => r.canRedeem).length,
+      availableRewards: formattedRewards.filter((r: any) => r.canRedeem).length,
       totalVouchers: formattedVouchers.length,
     };
 

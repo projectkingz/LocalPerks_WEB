@@ -44,7 +44,7 @@ export async function POST(
     }
 
     // Start transaction
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: any) => {
       // Create redemption
       const redemption = await tx.redemption.create({
         data: {

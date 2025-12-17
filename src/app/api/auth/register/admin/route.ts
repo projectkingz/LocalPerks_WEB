@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create admin user and admin profile in a transaction
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: any) => {
       // Create user (suspended, pending approval)
       const user = await tx.user.create({
         data: {

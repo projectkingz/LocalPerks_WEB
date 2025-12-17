@@ -179,7 +179,7 @@ export async function GET(request: Request) {
         where: { tenantId },
         select: { id: true }
       });
-      const customerIds = tenantCustomerIds.map(c => c.id);
+      const customerIds = tenantCustomerIds.map((c: any) => c.id);
 
       popularRewards = await prisma.redemption.groupBy({
         by: ['rewardId'],
@@ -235,7 +235,7 @@ export async function GET(request: Request) {
             where: { tenantId },
             select: { id: true }
           });
-          const customerIds = tenantCustomerIds.map(c => c.id);
+          const customerIds = tenantCustomerIds.map((c: any) => c.id);
 
           pointsIssuedForReward = await prisma.redemption.aggregate({
             where: {
@@ -298,7 +298,7 @@ export async function GET(request: Request) {
       totalCustomers,
       pointsIssued,
       avgTransaction,
-      recentPointsIssued: recentPointsIssued.map(t => ({
+      recentPointsIssued: recentPointsIssued.map((t: any) => ({
         id: t.id,
         description: 'Points earned',
         points: t.points,
@@ -308,7 +308,7 @@ export async function GET(request: Request) {
           email: t.customer?.email
         }
       })),
-      recentPointsRedeemed: recentPointsRedeemed.map(t => ({
+      recentPointsRedeemed: recentPointsRedeemed.map((t: any) => ({
         id: t.id,
         description: t.type === 'REFUND' ? 'Refund processed' : 'Points spent',
         points: t.points, // Points are already negative for REFUND and SPENT
@@ -320,7 +320,7 @@ export async function GET(request: Request) {
           email: t.customer?.email
         }
       })),
-      recentTransactions: recentTransactions.map(t => ({
+      recentTransactions: recentTransactions.map((t: any) => ({
         id: t.id,
         description: t.type === 'EARNED' 
           ? 'Purchase' 

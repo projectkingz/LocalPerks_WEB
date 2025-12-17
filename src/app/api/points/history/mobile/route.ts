@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Format transactions for mobile
-    const formattedTransactions = transactions.map(t => ({
+    const formattedTransactions = transactions.map((t: any) => ({
       id: t.id,
       date: t.createdAt.toISOString(),
       points: t.points,
@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
       merchant: t.tenant?.name || 'LocalPerks',
     }));
 
-    const formattedPendingTransactions = pendingTransactions.map(t => ({
+    const formattedPendingTransactions = pendingTransactions.map((t: any) => ({
       id: t.id,
       date: t.createdAt.toISOString(),
       points: t.points,

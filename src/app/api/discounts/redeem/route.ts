@@ -65,7 +65,7 @@ export async function POST(request: Request) {
       },
     });
 
-    const actualPoints = transactions.reduce((total, t) => {
+    const actualPoints = transactions.reduce((total: any, t: any) => {
       if (t.type === "EARNED" || t.status === "VOID") return total + t.points;
       if (t.type === "SPENT") return total - t.points; // Subtract SPENT points
       return total;
@@ -164,7 +164,7 @@ export async function POST(request: Request) {
     }
 
     // Create redemption, voucher, and transaction in a database transaction
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: any) => {
       // Create the redemption record
       const redemption = await tx.redemption.create({
         data: {

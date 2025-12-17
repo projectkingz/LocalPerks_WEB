@@ -110,7 +110,7 @@ export async function GET(request: Request) {
     }
 
     // Format transactions for response
-    const formattedTransactions = transactions.map(t => ({
+    const formattedTransactions = transactions.map((t: any) => ({
       id: t.id,
       date: t.createdAt.toISOString(),
       amount: t.amount,

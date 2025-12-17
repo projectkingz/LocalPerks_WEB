@@ -54,7 +54,7 @@ export async function GET() {
     });
 
     // Transform the data to match the expected format
-    const formattedTransactions = pendingTransactions.map(transaction => ({
+    const formattedTransactions = pendingTransactions.map((transaction: any) => ({
       id: transaction.id,
       customerEmail: transaction.customer.email,
       date: transaction.createdAt.toISOString(),

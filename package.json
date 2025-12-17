@@ -29,6 +29,7 @@
     "@upstash/redis": "^1.35.0",
     "autoprefixer": "^10.4.0",
     "bcryptjs": "^2.4.3",
+    "@types/bcryptjs": "2.4.6",
     "framer-motion": "^12.16.0",
     "html5-qrcode": "^2.3.8",
     "lucide-react": "^0.513.0",
@@ -50,7 +51,6 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
-    "@types/bcryptjs": "2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/next": "^8.0.7",
     "@types/node": "^22.15.32",

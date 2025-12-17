@@ -159,7 +159,7 @@ export async function DELETE(
     if (forceDelete && relatedData.length > 0) {
       // Delete in transaction to ensure data consistency
       // Increase timeout for complex deletions with lots of related data
-      await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async (tx: any) => {
         // Get tenant IDs and customer IDs for bulk operations
         const tenantIds = targetUser.partnerTenants.map(t => t.id);
         

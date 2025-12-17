@@ -5,7 +5,20 @@ backend/**
 # Exclude seed files from build
 prisma/seed*.ts
 prisma/*seed*
+prisma/add-recent-data.ts
+prisma/test-recent-data.ts
 
 # Exclude test/example directories
 hello-prisma/
 mobile/
+scripts/
+
+# Exclude utility and config files not needed for build
+*.md
+!README.md
+*.bat
+test-*.js
+update-*.js
+fix-*.js
+start-*.js
+start-*.ps1

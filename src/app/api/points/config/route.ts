@@ -17,15 +17,20 @@ export async function GET(request: NextRequest) {
     let session;
     
     if (mobileUser) {
+      console.log('Points config: Mobile authentication successful for:', mobileUser.email);
       session = createMobileSession(mobileUser);
     } else {
+      console.log('Points config: Mobile authentication failed, trying NextAuth session');
       // Fall back to NextAuth session
       session = await getServerSession(authOptions);
     }
 
     if (!session?.user?.email) {
+      console.log('Points config: No valid session found');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    
+    console.log('Points config: Authenticated user:', session.user.email, 'Role:', session.user.role);
 
     const userEmail = session.user.email;
     const userRole = session.user.role;

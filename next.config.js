@@ -107,6 +107,16 @@ const nextConfig = {
       use: 'ignore-loader'
     });
     
+    // For server-side, ensure Prisma engine binaries are not bundled
+    // They need to be available at runtime
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push({
+        '@prisma/client': '@prisma/client',
+        '.prisma/client': '.prisma/client',
+      });
+    }
+    
     // Exclude backend directory from webpack processing
     config.watchOptions = {
       ...config.watchOptions,

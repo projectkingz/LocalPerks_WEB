@@ -12,7 +12,7 @@
     "lint": "next lint",
     "lint:fix": "next lint --fix",
     "type-check": "tsc --noEmit",
-    "postinstall": "prisma generate --schema=./prisma/schema.prisma",
+    "postinstall": "echo 'Running postinstall: prisma generate' && prisma generate --schema=./prisma/schema.prisma && echo 'Prisma generate completed'",
     "seed": "ts-node -P prisma/tsconfig.json prisma/seed.ts",
     "prisma:seed": "ts-node prisma/seed.ts",
     "seed:comprehensive": "ts-node prisma/seed-comprehensive.ts",

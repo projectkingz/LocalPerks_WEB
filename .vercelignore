@@ -8,3 +8,4 @@ prisma/*seed*
 
 # Exclude test/example directories
 hello-prisma/
+mobile/

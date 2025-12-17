@@ -11,8 +11,10 @@ import { prisma } from '@/lib/prisma';
  * Works for both web sessions and mobile JWT tokens
  */
 export async function GET(request: NextRequest) {
+  console.log('GET /api/points/config called');
   try {
     // Try mobile authentication first
+    console.log('Points config: Attempting mobile authentication...');
     const mobileUser = await authenticateMobileToken(request);
     let session;
     
@@ -20,9 +22,14 @@ export async function GET(request: NextRequest) {
       console.log('Points config: Mobile authentication successful for:', mobileUser.email);
       session = createMobileSession(mobileUser);
     } else {
-      console.log('Points config: Mobile authentication failed, trying NextAuth session');
+      console.log('Points config: Mobile authentication failed, falling back to NextAuth session...');
       // Fall back to NextAuth session
       session = await getServerSession(authOptions);
+      if (session) {
+        console.log('Points config: NextAuth session found for:', session.user?.email);
+      } else {
+        console.log('Points config: No NextAuth session found either');
+      }
     }
 
     if (!session?.user?.email) {

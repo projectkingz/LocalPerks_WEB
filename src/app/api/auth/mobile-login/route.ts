@@ -164,15 +164,19 @@ export async function POST(request: NextRequest) {
       console.error('Error stack:', error.stack);
     }
     
-    // Return more detailed error in development, generic in production
-    const errorMessage = process.env.NODE_ENV === 'development' 
-      ? (error instanceof Error ? error.message : 'Unknown error')
-      : 'Internal server error';
+    // Always return detailed error for debugging (we can restrict this later)
+    const errorDetails = error instanceof Error 
+      ? {
+          name: error.name,
+          message: error.message,
+          stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        }
+      : { message: 'Unknown error' };
     
     return NextResponse.json(
       { 
         error: 'Internal server error',
-        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+        details: errorDetails
       },
       { status: 500 }
     );

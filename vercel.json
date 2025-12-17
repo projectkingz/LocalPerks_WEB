@@ -1,16 +1,5 @@
 {
   "buildCommand": "prisma generate && next build",
-  "installCommand": "npm install",
-  "functions": {
-    "app/api/**/*.ts": {
-      "maxDuration": 30
-    },
-    "src/app/api/**/*.ts": {
-      "maxDuration": 30
-    }
-  },
-  "env": {
-    "PRISMA_ENGINES_MIRROR": "https://binaries.prisma.sh"
-  }
+  "installCommand": "npm install"
 }
 

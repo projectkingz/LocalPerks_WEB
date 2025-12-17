@@ -11,7 +11,7 @@ function getStripe(): Stripe {
       throw new Error('STRIPE_SECRET_KEY is not set');
     }
     stripeInstance = new Stripe(secretKey, {
-      apiVersion: '2024-12-18.acacia',
+      apiVersion: '2025-09-30.clover' as any, // Use type assertion to match Stripe package version
       typescript: true,
     });
   }

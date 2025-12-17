@@ -98,16 +98,16 @@ export async function GET(request: NextRequest) {
     console.log(`Filtered to ${validCustomers.length} actual customers (excluded admin/partner accounts)`);
 
     // Calculate additional fields for each customer
-    const customersWithCalculations = validCustomers.map(customer => {
+    const customersWithCalculations = validCustomers.map((customer: any) => {
       // Calculate total amount spent across all tenants
       const totalAmountSpent = customer.transactions
-        .filter(t => t.type === 'EARNED' && t.status === 'APPROVED')
-        .reduce((sum, t) => sum + t.amount, 0);
+        .filter((t: any) => t.type === 'EARNED' && t.status === 'APPROVED')
+        .reduce((sum: number, t: any) => sum + t.amount, 0);
 
       // Calculate total points earned
       const totalPointsEarned = customer.transactions
-        .filter(t => t.type === 'EARNED' && t.status === 'APPROVED')
-        .reduce((sum, t) => sum + t.points, 0);
+        .filter((t: any) => t.type === 'EARNED' && t.status === 'APPROVED')
+        .reduce((sum: number, t: any) => sum + t.points, 0);
 
       // Calculate discount earned (assuming 1 point = £0.01 face value)
       const pointFaceValue = 0.01; // £0.01 per point

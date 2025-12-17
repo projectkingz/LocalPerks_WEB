@@ -111,10 +111,11 @@ const nextConfig = {
     // They need to be available at runtime
     if (isServer) {
       config.externals = config.externals || [];
-      config.externals.push({
-        '@prisma/client': '@prisma/client',
-        '.prisma/client': '.prisma/client',
-      });
+      // Don't bundle Prisma - it needs to access engine binaries at runtime
+      config.externals.push('@prisma/client');
+      config.externals.push('.prisma/client');
+      config.externals.push('.prisma/client/query_engine-rhel-openssl-3.0.x.so.node');
+      config.externals.push('.prisma/client/libquery_engine-rhel-openssl-3.0.x.so.node');
     }
     
     // Exclude backend directory from webpack processing

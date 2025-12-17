@@ -52,7 +52,9 @@ if (!global.__2fa_cleanup_interval__) {
   global.__2fa_cleanup_interval__ = setInterval(() => {
     const now = Date.now();
     let cleaned = 0;
-    for (const [key, entry] of memoryStore.entries()) {
+    // Convert Map entries to array to avoid downlevelIteration requirement
+    const entries = Array.from(memoryStore.entries());
+    for (const [key, entry] of entries) {
       if (now > entry.expires) {
         memoryStore.delete(key);
         cleaned++;

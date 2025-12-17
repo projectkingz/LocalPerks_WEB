@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/auth.config';
-import { verifyMobileJwt } from '@/lib/auth/mobile';
+import { authenticateMobileToken, createMobileSession } from '@/lib/auth/mobile-auth';
 import { getTenantPointsConfig } from '@/lib/pointsCalculation';
 import { prisma } from '@/lib/prisma';
 
@@ -10,35 +10,33 @@ import { prisma } from '@/lib/prisma';
  * Fetch points configuration for the authenticated user's tenant
  * Works for both web sessions and mobile JWT tokens
  */
-export async function GET(request: Request) {
-  const session = await getServerSession(authOptions);
-  let userEmail = session?.user?.email as string | undefined;
-  let userRole = session?.user?.role as string | undefined;
-  let userTenantId = (session?.user as any)?.tenantId as string | undefined;
-
-  // Check for mobile JWT token if no session
-  if (!userEmail) {
-    const auth = request.headers.get('authorization') || '';
-    const token = auth.startsWith('Bearer ') ? auth.slice(7) : undefined;
-    const payload = verifyMobileJwt(token);
-    if (payload) {
-      userEmail = payload.email;
-      userRole = (payload as any).role;
-      userTenantId = payload.tenantId || undefined;
-    }
-  }
-
-  if (!userEmail) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
+export async function GET(request: NextRequest) {
   try {
+    // Try mobile authentication first
+    const mobileUser = await authenticateMobileToken(request);
+    let session;
+    
+    if (mobileUser) {
+      session = createMobileSession(mobileUser);
+    } else {
+      // Fall back to NextAuth session
+      session = await getServerSession(authOptions);
+    }
+
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const userEmail = session.user.email;
+    const userRole = session.user.role;
+    let userTenantId = (session.user as any)?.tenantId;
+
     // If user doesn't have a tenantId, try to find it
     if (!userTenantId) {
       if (userRole === 'PARTNER') {
         // For partners, find their tenant
         const tenant = await prisma.tenant.findFirst({
-          where: { partnerUserId: (session?.user as any)?.id },
+          where: { partnerUserId: session.user.id || (session.user as any)?.id },
         });
         userTenantId = tenant?.id;
       } else if (userRole === 'CUSTOMER') {

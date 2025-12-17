@@ -36,13 +36,18 @@ export async function GET(request: NextRequest) {
       console.log('Points config: No valid session found');
       // Return more detailed error for debugging
       const authHeader = request.headers.get('Authorization');
+      const jwtError = (request as any).__jwtError;
       return NextResponse.json({ 
         error: 'Unauthorized',
         debug: {
           hasAuthHeader: !!authHeader,
           authHeaderPrefix: authHeader?.substring(0, 10),
           hasSession: !!session,
-          sessionUser: session?.user ? 'exists' : 'missing'
+          sessionUser: session?.user ? 'exists' : 'missing',
+          jwtError: jwtError ? {
+            name: jwtError.name,
+            message: jwtError.message
+          } : null
         }
       }, { status: 401 });
     }

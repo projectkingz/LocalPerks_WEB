@@ -33,6 +33,7 @@ export async function authenticateMobileToken(request: NextRequest): Promise<Mob
     console.log('Mobile auth: Token preview:', token.substring(0, 20) + '...');
     
     let decoded: any;
+    let jwtErrorDetails: { name?: string; message?: string } | null = null;
     try {
       decoded = verify(token, secret) as any;
       console.log('Mobile auth: Token verified successfully');
@@ -43,6 +44,10 @@ export async function authenticateMobileToken(request: NextRequest): Promise<Mob
         hasUserId: !!decoded?.userId 
       });
     } catch (jwtError: any) {
+      jwtErrorDetails = {
+        name: jwtError?.name,
+        message: jwtError?.message
+      };
       console.error('Mobile auth: JWT verification failed');
       console.error('Mobile auth: Error name:', jwtError?.name);
       console.error('Mobile auth: Error message:', jwtError?.message);
@@ -50,9 +55,12 @@ export async function authenticateMobileToken(request: NextRequest): Promise<Mob
         console.error('Mobile auth: Token has expired');
       } else if (jwtError?.name === 'JsonWebTokenError') {
         console.error('Mobile auth: Invalid token format or signature');
+        console.error('Mobile auth: This usually means NEXTAUTH_SECRET mismatch');
       } else if (jwtError?.name === 'NotBeforeError') {
         console.error('Mobile auth: Token not active yet');
       }
+      // Store error for potential return in debug mode
+      (request as any).__jwtError = jwtErrorDetails;
       return null;
     }
     

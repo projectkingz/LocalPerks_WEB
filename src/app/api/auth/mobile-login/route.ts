@@ -5,7 +5,10 @@ import { sign } from 'jsonwebtoken';
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json();
+    console.log('Mobile login: Starting request processing');
+    const body = await request.json();
+    console.log('Mobile login: Request body parsed');
+    const { email, password } = body;
 
     if (!email || !password) {
       return NextResponse.json(
@@ -17,6 +20,7 @@ export async function POST(request: NextRequest) {
     console.log('Mobile login attempt for:', email);
 
     // Find user with password
+    console.log('Mobile login: Querying database for user');
     const user = await prisma.user.findUnique({
       where: { email },
       select: {
@@ -50,6 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check password
+    console.log('Mobile login: Starting password comparison');
     console.log('Comparing password:', password, 'with stored hash:', user.password.substring(0, 20) + '...');
     const isValidPassword = await compare(password, user.password);
     console.log('Password comparison result:', isValidPassword);
@@ -123,6 +128,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Create session token
+    console.log('Mobile login: Creating JWT token');
+    const secret = process.env.NEXTAUTH_SECRET || 'fallback-secret';
+    if (!secret || secret === 'fallback-secret') {
+      console.error('Mobile login: WARNING - NEXTAUTH_SECRET not configured, using fallback');
+    }
     const sessionToken = sign(
       { 
         userId: user.id, 
@@ -130,9 +140,10 @@ export async function POST(request: NextRequest) {
         role: user.role,
         tenantId: user.tenantId,
       },
-      process.env.NEXTAUTH_SECRET || 'fallback-secret',
+      secret,
       { expiresIn: '7d' }
     );
+    console.log('Mobile login: JWT token created successfully');
 
     // Return user data (excluding password)
     const { password: _, ...userWithoutPassword } = userData;

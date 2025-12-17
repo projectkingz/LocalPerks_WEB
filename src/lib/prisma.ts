@@ -10,12 +10,16 @@ function createPrismaClient() {
     log: ['error'],
   });
 
-  // Wrap with Accelerate for improved performance and connection pooling
-  // Accelerate provides connection pooling, query caching, and faster network round-trips
-  return client.$extends(withAccelerate());
+  // In production/serverless, use Accelerate if configured
+  // Otherwise use standard Prisma Client
+  if (process.env.PRISMA_ACCELERATE_ENDPOINT) {
+    return client.$extends(withAccelerate());
+  }
+  
+  return client;
 }
 
-// Create singleton instance with Accelerate
+// Create singleton instance
 const prismaClient = createPrismaClient();
 
 export const prisma = globalForPrisma.prisma ?? prismaClient;

@@ -5,6 +5,9 @@
     "src/app/api/**/*.ts": {
       "maxDuration": 30
     }
+  },
+  "env": {
+    "PRISMA_ENGINES_MIRROR": "https://binaries.prisma.sh"
   }
 }
 

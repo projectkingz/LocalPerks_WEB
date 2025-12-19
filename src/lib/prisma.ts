@@ -26,9 +26,7 @@ function createPrismaClient() {
       });
       
       const acceleratedClient = client.$extends(
-        withAccelerate({
-          cache: true, // Enable query result caching
-        })
+        withAccelerate()
       );
       
       console.log('[Prisma] Successfully initialized with Accelerate (Data Proxy)');

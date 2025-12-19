@@ -6,20 +6,44 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 function createPrismaClient() {
-  // Configure Prisma Client for serverless environments
-  const client = new PrismaClient({
-    log: ['error'],
-    // Explicitly set the engine type for serverless
-    // This helps Prisma locate the correct engine binary
-  });
-
-  // In production/serverless, use Accelerate if configured
-  // Otherwise use standard Prisma Client
-  if (process.env.PRISMA_ACCELERATE_ENDPOINT) {
-    return client.$extends(withAccelerate());
+  // Check if Accelerate is configured
+  const accelerateEndpoint = process.env.PRISMA_ACCELERATE_ENDPOINT;
+  
+  // Log environment info (without exposing the full endpoint)
+  if (accelerateEndpoint) {
+    console.log('[Prisma] Accelerate endpoint configured:', accelerateEndpoint.substring(0, 30) + '...');
+  } else {
+    console.warn('[Prisma] WARNING: PRISMA_ACCELERATE_ENDPOINT not set - will try to use engine binary');
+    console.warn('[Prisma] This may fail in serverless environments like Vercel');
   }
   
-  return client;
+  if (accelerateEndpoint) {
+    // When using Accelerate, create PrismaClient and extend it immediately
+    // Accelerate uses the Data Proxy, so no engine binary is needed
+    try {
+      const client = new PrismaClient({
+        log: ['error'],
+      });
+      
+      const acceleratedClient = client.$extends(
+        withAccelerate({
+          cache: true, // Enable query result caching
+        })
+      );
+      
+      console.log('[Prisma] Successfully initialized with Accelerate (Data Proxy)');
+      return acceleratedClient;
+    } catch (error) {
+      console.error('[Prisma] Error initializing with Accelerate:', error);
+      throw error;
+    }
+  }
+  
+  // Fallback to standard Prisma Client (requires engine binary)
+  console.log('[Prisma] Using standard Prisma Client - engine binary required');
+  return new PrismaClient({
+    log: ['error', 'warn'],
+  });
 }
 
 // Create singleton instance

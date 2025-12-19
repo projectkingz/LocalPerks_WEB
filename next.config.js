@@ -107,27 +107,9 @@ const nextConfig = {
       use: 'ignore-loader'
     });
     
-    // For server-side, ensure Prisma engine binaries are not bundled
-    // They need to be available at runtime
-    if (isServer) {
-      config.externals = config.externals || [];
-      // Don't bundle Prisma - it needs to access engine binaries at runtime
-      // Use a function to check if the module should be external
-      const originalExternals = config.externals;
-      config.externals = [
-        ...(Array.isArray(originalExternals) ? originalExternals : []),
-        ({ request }, callback) => {
-          // Keep Prisma and its engine binaries external
-          if (request.includes('@prisma/client') || request.includes('.prisma/client')) {
-            return callback(null, `commonjs ${request}`);
-          }
-          if (typeof originalExternals === 'function') {
-            return originalExternals({ request }, callback);
-          }
-          callback();
-        }
-      ];
-    }
+    // Note: With Prisma Accelerate, we don't need to externalize Prisma Client
+    // Accelerate handles the connection without requiring engine binaries
+    // Let Next.js bundle Prisma Client normally
     
     // Exclude backend directory from webpack processing
     config.watchOptions = {

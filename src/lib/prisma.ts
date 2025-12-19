@@ -17,6 +17,14 @@ function createPrismaClient() {
     // Check if it's the correct format
     if (accelerateEndpoint.includes('accelerate.prisma-data.net')) {
       console.log('[Prisma] ✓ Endpoint format looks correct (Prisma Accelerate)');
+      
+      // Check if protocol matches database type (MySQL vs PostgreSQL)
+      if (accelerateEndpoint.startsWith('prisma+mysql://')) {
+        console.log('[Prisma] ✓ Protocol matches MySQL database');
+      } else if (accelerateEndpoint.startsWith('prisma+postgres://')) {
+        console.warn('[Prisma] ⚠️  Endpoint uses postgres:// but database is MySQL - this may cause issues');
+        console.warn('[Prisma] ⚠️  Please update PRISMA_ACCELERATE_ENDPOINT to use prisma+mysql://');
+      }
     } else {
       console.warn('[Prisma] ⚠️  Endpoint format may be incorrect - should contain "accelerate.prisma-data.net"');
     }

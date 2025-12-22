@@ -33,6 +33,12 @@ function createPrismaClient() {
         console.error('[Prisma] ✗ This will cause connection failures!');
         console.error('[Prisma] ✗ Please update PRISMA_ACCELERATE_ENDPOINT in Vercel to use prisma+mysql://');
         // Still try to use it, but log the error
+      } else if (accelerateEndpoint.startsWith('prisma://')) {
+        console.error('[Prisma] ✗ ERROR: Endpoint is missing database protocol!');
+        console.error('[Prisma] ✗ Current format: prisma://accelerate.prisma-data.net/...');
+        console.error('[Prisma] ✗ Should be: prisma+mysql://accelerate.prisma-data.net/...');
+        console.error('[Prisma] ✗ Please update PRISMA_ACCELERATE_ENDPOINT in Vercel to include +mysql');
+        console.error('[Prisma] ✗ This will cause connection failures!');
       } else {
         console.warn('[Prisma] ⚠️  Endpoint protocol unknown:', accelerateEndpoint.substring(0, 20));
       }

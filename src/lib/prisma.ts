@@ -9,10 +9,17 @@ function createPrismaClient() {
   // Check if Accelerate is configured
   const accelerateEndpoint = process.env.PRISMA_ACCELERATE_ENDPOINT;
   
+  // Debug: Log all relevant environment variables (without exposing sensitive data)
+  console.log('[Prisma] Environment check:');
+  console.log('[Prisma]   NODE_ENV:', process.env.NODE_ENV);
+  console.log('[Prisma]   PRISMA_ACCELERATE_ENDPOINT exists:', !!accelerateEndpoint);
+  console.log('[Prisma]   DATABASE_URL exists:', !!process.env.DATABASE_URL);
+  
   // Log environment info (without exposing sensitive data)
   if (accelerateEndpoint) {
     const endpointPreview = accelerateEndpoint.substring(0, 50) + '...';
     console.log('[Prisma] Accelerate endpoint configured:', endpointPreview);
+    console.log('[Prisma] Endpoint starts with:', accelerateEndpoint.substring(0, 20));
     
     // Check if it's the correct format
     if (accelerateEndpoint.includes('accelerate.prisma-data.net')) {
@@ -22,15 +29,21 @@ function createPrismaClient() {
       if (accelerateEndpoint.startsWith('prisma+mysql://')) {
         console.log('[Prisma] ✓ Protocol matches MySQL database');
       } else if (accelerateEndpoint.startsWith('prisma+postgres://')) {
-        console.warn('[Prisma] ⚠️  Endpoint uses postgres:// but database is MySQL - this may cause issues');
-        console.warn('[Prisma] ⚠️  Please update PRISMA_ACCELERATE_ENDPOINT to use prisma+mysql://');
+        console.error('[Prisma] ✗ ERROR: Endpoint uses postgres:// but database is MySQL!');
+        console.error('[Prisma] ✗ This will cause connection failures!');
+        console.error('[Prisma] ✗ Please update PRISMA_ACCELERATE_ENDPOINT in Vercel to use prisma+mysql://');
+        // Still try to use it, but log the error
+      } else {
+        console.warn('[Prisma] ⚠️  Endpoint protocol unknown:', accelerateEndpoint.substring(0, 20));
       }
     } else {
       console.warn('[Prisma] ⚠️  Endpoint format may be incorrect - should contain "accelerate.prisma-data.net"');
+      console.warn('[Prisma] ⚠️  Current endpoint:', accelerateEndpoint.substring(0, 100));
     }
   } else {
-    console.warn('[Prisma] WARNING: PRISMA_ACCELERATE_ENDPOINT not set - will try to use engine binary');
-    console.warn('[Prisma] This may fail in serverless environments like Vercel');
+    console.error('[Prisma] ✗ ERROR: PRISMA_ACCELERATE_ENDPOINT not set!');
+    console.error('[Prisma] ✗ Will try to use engine binary - this will FAIL on Vercel!');
+    console.error('[Prisma] ✗ Please set PRISMA_ACCELERATE_ENDPOINT in Vercel environment variables');
   }
   
   if (accelerateEndpoint) {

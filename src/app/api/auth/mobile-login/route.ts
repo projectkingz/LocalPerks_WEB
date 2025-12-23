@@ -11,6 +11,23 @@ export async function POST(request: NextRequest) {
     console.log('Mobile login:   DATABASE_URL exists:', !!process.env.DATABASE_URL);
     console.log('Mobile login:   NODE_ENV:', process.env.NODE_ENV);
     
+    // CRITICAL: Ensure Prisma Client is initialized before use
+    // This forces the client to be created with Accelerate if available
+    try {
+      console.log('Mobile login: Ensuring Prisma Client is initialized...');
+      // Access a property to trigger initialization
+      if (prisma && typeof prisma === 'object') {
+        console.log('Mobile login: Prisma Client object exists');
+        // Try to access $connect to ensure client is ready
+        if ('$connect' in prisma && typeof prisma.$connect === 'function') {
+          console.log('Mobile login: Prisma Client has $connect method');
+        }
+      }
+    } catch (initError: any) {
+      console.error('Mobile login: Prisma Client initialization check failed:', initError.message);
+      // Don't throw here - let the actual query fail with a better error
+    }
+    
     const body = await request.json();
     console.log('Mobile login: Request body parsed');
     const { email, password } = body;

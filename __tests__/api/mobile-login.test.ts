@@ -6,7 +6,6 @@
 import { POST, OPTIONS } from '@/app/api/auth/mobile-login/route';
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { hash } from 'bcryptjs';
 
 // Mock dependencies
 jest.mock('@/lib/prisma', () => ({
@@ -23,13 +22,16 @@ jest.mock('@/lib/prisma', () => ({
   },
 }));
 
+const mockCompare = jest.fn();
+const mockHash = jest.fn();
 jest.mock('bcryptjs', () => ({
-  compare: jest.fn(),
-  hash: jest.fn(),
+  compare: (...args: any[]) => mockCompare(...args),
+  hash: (...args: any[]) => mockHash(...args),
 }));
 
+const mockSign = jest.fn(() => 'mock-jwt-token');
 jest.mock('jsonwebtoken', () => ({
-  sign: jest.fn(() => 'mock-jwt-token'),
+  sign: (...args: any[]) => mockSign(...args),
 }));
 
 describe('/api/auth/mobile-login', () => {
@@ -37,6 +39,8 @@ describe('/api/auth/mobile-login', () => {
     jest.clearAllMocks();
     // Set required environment variables
     process.env.NEXTAUTH_SECRET = 'test-secret-key';
+    // Reset the mock sign function
+    mockSign.mockReturnValue('mock-jwt-token');
   });
 
   afterEach(() => {
@@ -134,18 +138,19 @@ describe('/api/auth/mobile-login', () => {
     });
 
     it('should return 401 if password is incorrect', async () => {
-      const hashedPassword = await hash('correctpassword', 10);
+      const hashedPassword = 'hashed-password-123';
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         id: 'user-1',
         email: 'test@example.com',
+        name: 'Test User',
         password: hashedPassword,
         role: 'CUSTOMER',
+        tenantId: null,
         suspended: false,
         approvalStatus: 'ACTIVE',
       });
 
-      const { compare } = require('bcryptjs');
-      (compare as jest.Mock).mockResolvedValue(false);
+      mockCompare.mockResolvedValue(false);
 
       const request = new NextRequest('http://localhost:3000/api/auth/mobile-login', {
         method: 'POST',
@@ -160,22 +165,23 @@ describe('/api/auth/mobile-login', () => {
 
       expect(response.status).toBe(401);
       expect(data.error).toBe('Invalid credentials');
-      expect(compare).toHaveBeenCalledWith('wrongpassword', hashedPassword);
+      expect(mockCompare).toHaveBeenCalledWith('wrongpassword', hashedPassword);
     });
 
     it('should return 403 if user is suspended', async () => {
-      const hashedPassword = await hash('password123', 10);
+      const hashedPassword = 'hashed-password-123';
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         id: 'user-1',
         email: 'test@example.com',
+        name: 'Test User',
         password: hashedPassword,
         role: 'CUSTOMER',
+        tenantId: null,
         suspended: true,
         approvalStatus: 'ACTIVE',
       });
 
-      const { compare } = require('bcryptjs');
-      (compare as jest.Mock).mockResolvedValue(true);
+      mockCompare.mockResolvedValue(true);
 
       const request = new NextRequest('http://localhost:3000/api/auth/mobile-login', {
         method: 'POST',
@@ -193,19 +199,19 @@ describe('/api/auth/mobile-login', () => {
     });
 
     it('should return 403 if partner is not approved', async () => {
-      const hashedPassword = await hash('password123', 10);
+      const hashedPassword = 'hashed-password-123';
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         id: 'user-1',
         email: 'partner@example.com',
+        name: 'Test Partner',
         password: hashedPassword,
         role: 'PARTNER',
+        tenantId: 'tenant-1',
         suspended: false,
         approvalStatus: 'PENDING',
-        tenantId: 'tenant-1',
       });
 
-      const { compare } = require('bcryptjs');
-      (compare as jest.Mock).mockResolvedValue(true);
+      mockCompare.mockResolvedValue(true);
 
       const request = new NextRequest('http://localhost:3000/api/auth/mobile-login', {
         method: 'POST',
@@ -223,16 +229,16 @@ describe('/api/auth/mobile-login', () => {
     });
 
     it('should successfully login a customer and return session token', async () => {
-      const hashedPassword = await hash('password123', 10);
+      const hashedPassword = 'hashed-password-123';
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         id: 'user-1',
         email: 'customer@example.com',
         name: 'Test Customer',
         password: hashedPassword,
         role: 'CUSTOMER',
+        tenantId: null,
         suspended: false,
         approvalStatus: 'ACTIVE',
-        tenantId: null,
       });
 
       (prisma.customer.findUnique as jest.Mock).mockResolvedValue({
@@ -240,8 +246,7 @@ describe('/api/auth/mobile-login', () => {
         tenantId: 'tenant-1',
       });
 
-      const { compare } = require('bcryptjs');
-      (compare as jest.Mock).mockResolvedValue(true);
+      mockCompare.mockResolvedValue(true);
 
       const request = new NextRequest('http://localhost:3000/api/auth/mobile-login', {
         method: 'POST',
@@ -270,16 +275,16 @@ describe('/api/auth/mobile-login', () => {
     });
 
     it('should successfully login a partner and return tenant data', async () => {
-      const hashedPassword = await hash('password123', 10);
+      const hashedPassword = 'hashed-password-123';
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         id: 'user-1',
         email: 'partner@example.com',
         name: 'Test Partner',
         password: hashedPassword,
         role: 'PARTNER',
+        tenantId: 'tenant-1',
         suspended: false,
         approvalStatus: 'APPROVED',
-        tenantId: 'tenant-1',
       });
 
       (prisma.tenant.findUnique as jest.Mock).mockResolvedValue({
@@ -290,8 +295,7 @@ describe('/api/auth/mobile-login', () => {
         updatedAt: new Date(),
       });
 
-      const { compare } = require('bcryptjs');
-      (compare as jest.Mock).mockResolvedValue(true);
+      mockCompare.mockResolvedValue(true);
 
       const request = new NextRequest('http://localhost:3000/api/auth/mobile-login', {
         method: 'POST',

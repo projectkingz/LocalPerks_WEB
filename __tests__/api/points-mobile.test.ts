@@ -29,6 +29,11 @@ jest.mock('@/lib/prisma', () => ({
   },
 }));
 
+// Mock Redis/Upstash to avoid ESM issues
+jest.mock('@upstash/redis', () => ({
+  Redis: jest.fn(),
+}));
+
 describe('/api/points/mobile', () => {
   beforeEach(() => {
     jest.clearAllMocks();

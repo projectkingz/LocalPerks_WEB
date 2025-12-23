@@ -166,13 +166,12 @@ function getPrismaClient() {
     // IMPORTANT: Always recreate client if Accelerate endpoint exists
     // This ensures we always use Accelerate, even if client was cached without it
     if (currentAccelerateEndpoint) {
-      // Check if we need to recreate (always recreate in production to ensure Accelerate is used)
-      if (!prismaClient || !globalForPrisma.prisma || isProduction) {
-        console.log('[Prisma] Creating/Recreating client with Accelerate in production');
-        prismaClient = createPrismaClient();
-        // Don't cache in global for production - always recreate to ensure Accelerate
-        return prismaClient;
-      }
+      // In production, ALWAYS recreate the client to ensure Accelerate is used
+      // This prevents any cached client from being used without Accelerate
+      console.log('[Prisma] Creating/Recreating client with Accelerate in production');
+      prismaClient = createPrismaClient();
+      // Don't cache in global for production - always recreate to ensure Accelerate
+      return prismaClient;
     }
   }
   

@@ -167,6 +167,27 @@ export async function POST(request: NextRequest) {
       console.error('Error name:', error.name);
       console.error('Error message:', error.message);
       console.error('Error stack:', error.stack);
+      
+      // Check for Prisma Query Engine error
+      if (error.message.includes('Query Engine') || error.message.includes('rhel-openssl')) {
+        console.error('❌ PRISMA QUERY ENGINE ERROR DETECTED!');
+        console.error('❌ This means PRISMA_ACCELERATE_ENDPOINT is not set or not working correctly');
+        console.error('❌ Please check Vercel environment variables');
+        console.error('❌ Expected format: prisma+mysql://accelerate.prisma-data.net/?api_key=...');
+        
+        return NextResponse.json(
+          { 
+            error: 'Database connection error',
+            details: {
+              name: error.name,
+              message: 'Prisma Query Engine error - PRISMA_ACCELERATE_ENDPOINT may not be configured correctly in Vercel',
+              diagnosis: 'Please verify PRISMA_ACCELERATE_ENDPOINT is set in Vercel environment variables',
+              checkEndpoint: 'Visit /api/test-accelerate to verify Accelerate configuration',
+            }
+          },
+          { status: 500 }
+        );
+      }
     }
     
     // Always return detailed error for debugging (we can restrict this later)

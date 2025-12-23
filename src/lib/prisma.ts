@@ -140,13 +140,10 @@ function getPrismaClient() {
     
     // Check if we're in a build context (Next.js build process)
     // During build, Next.js might evaluate API routes, but we shouldn't fail the build
-    // Multiple ways to detect build time:
+    // Only check NEXT_PHASE for build detection - VERCEL env vars are set at runtime too
     const isBuildTime = 
       process.env.NEXT_PHASE === 'phase-production-build' ||
-      process.env.NEXT_PHASE === 'phase-production-compile' ||
-      typeof process.env.VERCEL === 'undefined' || // Vercel sets this at runtime
-      process.env.VERCEL_ENV === undefined || // Vercel sets this at runtime
-      process.env.CI === '1'; // CI environment
+      process.env.NEXT_PHASE === 'phase-production-compile';
     
     // CRITICAL: Fail at runtime if Accelerate is not configured in production
     // But only if we're NOT in build phase (to allow build to succeed)
@@ -168,11 +165,16 @@ function getPrismaClient() {
       }
     }
     
-    // If Accelerate endpoint exists but client wasn't created with it, recreate
-    if (currentAccelerateEndpoint && (!prismaClient || !globalForPrisma.prisma)) {
-      console.log('[Prisma] Recreating client with Accelerate in production');
-      prismaClient = createPrismaClient();
-      return prismaClient;
+    // IMPORTANT: Always recreate client if Accelerate endpoint exists
+    // This ensures we always use Accelerate, even if client was cached without it
+    if (currentAccelerateEndpoint) {
+      // Check if we need to recreate (always recreate in production to ensure Accelerate is used)
+      if (!prismaClient || !globalForPrisma.prisma || isProduction) {
+        console.log('[Prisma] Creating/Recreating client with Accelerate in production');
+        prismaClient = createPrismaClient();
+        // Don't cache in global for production - always recreate to ensure Accelerate
+        return prismaClient;
+      }
     }
   }
   
@@ -189,7 +191,7 @@ function getPrismaClient() {
     } catch (error) {
       // During build, if client creation fails, create a dummy client
       // This allows the build to succeed, but queries will fail at runtime
-      if (isProduction && process.env.NEXT_PHASE) {
+      if (isProduction && (process.env.NEXT_PHASE === 'phase-production-build' || process.env.NEXT_PHASE === 'phase-production-compile')) {
         console.warn('[Prisma] Build-time: Creating dummy client to allow build to succeed');
         // Return a proxy that will throw helpful errors at runtime
         prismaClient = new Proxy({}, {

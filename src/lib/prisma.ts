@@ -85,14 +85,37 @@ function createPrismaClient() {
   });
 }
 
-// Create singleton instance
-// In serverless environments, we need to ensure Prisma Client is properly initialized
-const prismaClient = createPrismaClient();
+// Create singleton instance with lazy initialization
+// In serverless environments, ensure Prisma Client uses Accelerate if available
+let prismaClient: any = null;
 
-export const prisma = globalForPrisma.prisma ?? prismaClient;
+function getPrismaClient() {
+  // Always check for Accelerate endpoint - it might not be available at module load time
+  const accelerateEndpoint = process.env.PRISMA_ACCELERATE_ENDPOINT;
+  
+  // If we don't have a client yet, or Accelerate is now available, create/recreate it
+  if (!prismaClient || (accelerateEndpoint && !globalForPrisma.prisma)) {
+    prismaClient = createPrismaClient();
+    // Cache in global for development
+    if (process.env.NODE_ENV !== 'production') {
+      globalForPrisma.prisma = prismaClient;
+    }
+  }
+  
+  return prismaClient;
+}
 
-// In development, reuse the same instance
-// In production/serverless, create a new instance per request (handled by Next.js)
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
-} 
+// Export prisma - will be initialized on first access
+export const prisma = new Proxy({} as any, {
+  get(_target, prop) {
+    const client = getPrismaClient();
+    const value = client[prop];
+    
+    // Bind functions to the client to maintain 'this' context
+    if (typeof value === 'function') {
+      return value.bind(client);
+    }
+    
+    return value;
+  }
+}); 

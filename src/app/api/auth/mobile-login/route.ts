@@ -221,6 +221,24 @@ export async function OPTIONS(request: NextRequest) {
   });
 }
 
+// Handle GET request - return method not allowed with helpful message
+export async function GET(request: NextRequest) {
+  return NextResponse.json(
+    { 
+      error: 'Method Not Allowed',
+      message: 'This endpoint only accepts POST requests. Use POST to login.',
+      allowedMethods: ['POST', 'OPTIONS']
+    },
+    { 
+      status: 405,
+      headers: {
+        'Allow': 'POST, OPTIONS',
+        'Access-Control-Allow-Origin': '*',
+      }
+    }
+  );
+}
+
 function calculateTier(points: number): string {
   if (points >= 1000) return "Platinum";
   if (points >= 500) return "Gold";

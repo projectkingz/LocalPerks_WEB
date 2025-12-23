@@ -138,8 +138,14 @@ function getPrismaClient() {
   if (isProduction) {
     const currentAccelerateEndpoint = process.env.PRISMA_ACCELERATE_ENDPOINT;
     
+    // Check if we're in a build context (Next.js build process)
+    // During build, Next.js might evaluate API routes, but we shouldn't fail the build
+    const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build' || 
+                        process.env.VERCEL_ENV === undefined; // Vercel sets this at runtime
+    
     // CRITICAL: Fail at runtime if Accelerate is not configured in production
-    if (!currentAccelerateEndpoint) {
+    // But only if we're NOT in build phase (to allow build to succeed)
+    if (!currentAccelerateEndpoint && !isBuildTime) {
       const errorMsg = '[Prisma] CRITICAL ERROR: PRISMA_ACCELERATE_ENDPOINT is not set in production!';
       console.error(errorMsg);
       console.error('[Prisma] This will cause Prisma Query Engine errors on Vercel!');

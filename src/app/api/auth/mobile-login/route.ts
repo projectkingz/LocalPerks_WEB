@@ -6,6 +6,11 @@ import { sign } from 'jsonwebtoken';
 export async function POST(request: NextRequest) {
   try {
     console.log('Mobile login: Starting request processing');
+    console.log('Mobile login: Environment check');
+    console.log('Mobile login:   PRISMA_ACCELERATE_ENDPOINT exists:', !!process.env.PRISMA_ACCELERATE_ENDPOINT);
+    console.log('Mobile login:   DATABASE_URL exists:', !!process.env.DATABASE_URL);
+    console.log('Mobile login:   NODE_ENV:', process.env.NODE_ENV);
+    
     const body = await request.json();
     console.log('Mobile login: Request body parsed');
     const { email, password } = body;

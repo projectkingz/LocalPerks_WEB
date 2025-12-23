@@ -1,5 +1,5 @@
 {
-  "buildCommand": "echo 'Starting build...' && prisma generate --schema=./prisma/schema.prisma --no-engine && echo 'Prisma generate completed (without engine binary for Accelerate), starting Next.js build...' && next build",
+  "buildCommand": "echo 'Starting build...' && prisma generate --schema=./prisma/schema.prisma --accelerate && echo 'Prisma generate completed (with Accelerate), starting Next.js build...' && next build",
   "installCommand": "npm install"
 }
 

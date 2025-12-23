@@ -140,18 +140,32 @@ function getPrismaClient() {
     
     // Check if we're in a build context (Next.js build process)
     // During build, Next.js might evaluate API routes, but we shouldn't fail the build
-    const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build' || 
-                        process.env.VERCEL_ENV === undefined; // Vercel sets this at runtime
+    // Multiple ways to detect build time:
+    const isBuildTime = 
+      process.env.NEXT_PHASE === 'phase-production-build' ||
+      process.env.NEXT_PHASE === 'phase-production-compile' ||
+      typeof process.env.VERCEL === 'undefined' || // Vercel sets this at runtime
+      process.env.VERCEL_ENV === undefined || // Vercel sets this at runtime
+      process.env.CI === '1'; // CI environment
     
     // CRITICAL: Fail at runtime if Accelerate is not configured in production
     // But only if we're NOT in build phase (to allow build to succeed)
-    if (!currentAccelerateEndpoint && !isBuildTime) {
-      const errorMsg = '[Prisma] CRITICAL ERROR: PRISMA_ACCELERATE_ENDPOINT is not set in production!';
-      console.error(errorMsg);
-      console.error('[Prisma] This will cause Prisma Query Engine errors on Vercel!');
-      console.error('[Prisma] Please set PRISMA_ACCELERATE_ENDPOINT in Vercel environment variables');
-      console.error('[Prisma] Format should be: prisma+mysql://accelerate.prisma-data.net/?api_key=...');
-      throw new Error(`${errorMsg} Please configure PRISMA_ACCELERATE_ENDPOINT in Vercel.`);
+    if (!currentAccelerateEndpoint) {
+      if (isBuildTime) {
+        // During build, just log a warning but don't throw
+        console.warn('[Prisma] ⚠️  Build-time: PRISMA_ACCELERATE_ENDPOINT not set, but allowing build to continue');
+        console.warn('[Prisma] ⚠️  This will fail at runtime if not set in Vercel environment variables');
+        // Create a dummy client for build time that will fail gracefully
+        // We'll use the fallback client creation below
+      } else {
+        // At runtime, fail immediately
+        const errorMsg = '[Prisma] CRITICAL ERROR: PRISMA_ACCELERATE_ENDPOINT is not set in production!';
+        console.error(errorMsg);
+        console.error('[Prisma] This will cause Prisma Query Engine errors on Vercel!');
+        console.error('[Prisma] Please set PRISMA_ACCELERATE_ENDPOINT in Vercel environment variables');
+        console.error('[Prisma] Format should be: prisma+mysql://accelerate.prisma-data.net/?api_key=...');
+        throw new Error(`${errorMsg} Please configure PRISMA_ACCELERATE_ENDPOINT in Vercel.`);
+      }
     }
     
     // If Accelerate endpoint exists but client wasn't created with it, recreate
@@ -163,11 +177,29 @@ function getPrismaClient() {
   }
   
   // Create if doesn't exist
+  // During build without Accelerate, this will create a client that will fail at runtime
+  // but won't fail the build itself
   if (!prismaClient) {
-    prismaClient = createPrismaClient();
-    // Cache in global for development only
-    if (!isProduction) {
-      globalForPrisma.prisma = prismaClient;
+    try {
+      prismaClient = createPrismaClient();
+      // Cache in global for development only
+      if (!isProduction) {
+        globalForPrisma.prisma = prismaClient;
+      }
+    } catch (error) {
+      // During build, if client creation fails, create a dummy client
+      // This allows the build to succeed, but queries will fail at runtime
+      if (isProduction && process.env.NEXT_PHASE) {
+        console.warn('[Prisma] Build-time: Creating dummy client to allow build to succeed');
+        // Return a proxy that will throw helpful errors at runtime
+        prismaClient = new Proxy({}, {
+          get() {
+            throw new Error('PRISMA_ACCELERATE_ENDPOINT must be set in Vercel environment variables. Build succeeded, but runtime queries will fail until this is configured.');
+          }
+        });
+      } else {
+        throw error;
+      }
     }
   }
   

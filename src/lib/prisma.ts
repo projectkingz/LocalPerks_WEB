@@ -63,28 +63,32 @@ function createPrismaClient() {
   }
   
   if (currentAccelerateEndpoint) {
-    // When using Accelerate, create PrismaClient and extend it immediately
-    // Accelerate uses the Data Proxy, so no engine binary is needed
+    // When using Accelerate, we MUST use the Accelerate endpoint as the datasource URL
+    // This prevents Prisma Client from trying to initialize the engine binary
     try {
-      // Create PrismaClient with minimal config - Accelerate will handle the connection
+      console.log('[Prisma] Creating PrismaClient with Accelerate endpoint as datasource URL');
+      
+      // Create PrismaClient with Accelerate endpoint as the datasource URL
+      // This prevents engine binary initialization
       const client = new PrismaClient({
+        datasources: {
+          db: {
+            url: currentAccelerateEndpoint, // Use Accelerate endpoint instead of DATABASE_URL
+          },
+        },
         log: ['error'],
-        // Explicitly disable engine binary download attempts
-        // Accelerate extension will override this
       });
       
-      // withAccelerate() automatically reads from PRISMA_ACCELERATE_ENDPOINT env var
-      // The format should be: prisma+postgres:// or prisma+mysql://accelerate.prisma-data.net/?api_key=...
+      // Extend with Accelerate extension
+      // This ensures all queries go through the Data Proxy
       const acceleratedClient = client.$extends(
-        withAccelerate({
-          // Explicitly pass the endpoint to ensure it's used
-          // This prevents any fallback to engine binary
-        })
+        withAccelerate()
       );
       
       console.log('[Prisma] ✓ Successfully initialized with Accelerate (Data Proxy)');
       console.log('[Prisma] ✓ Engine binary not required - using Data Proxy');
       console.log('[Prisma] ✓ All queries will route through Prisma Accelerate');
+      console.log('[Prisma] ✓ Datasource URL set to Accelerate endpoint');
       
       return acceleratedClient;
     } catch (error) {

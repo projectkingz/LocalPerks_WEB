@@ -9,10 +9,16 @@ const globalForPrisma = globalThis as unknown as {
 const isProduction = process.env.NODE_ENV === 'production';
 const accelerateEndpoint = process.env.PRISMA_ACCELERATE_ENDPOINT;
 
+// In production, Accelerate is REQUIRED - fail immediately if not set
 if (isProduction && !accelerateEndpoint) {
-  console.error('[Prisma] ⚠️  PRODUCTION WARNING: PRISMA_ACCELERATE_ENDPOINT not set!');
-  console.error('[Prisma] ⚠️  This will cause Prisma Query Engine errors on Vercel!');
-  console.error('[Prisma] ⚠️  Please set PRISMA_ACCELERATE_ENDPOINT in Vercel environment variables');
+  const errorMsg = '[Prisma] CRITICAL ERROR: PRISMA_ACCELERATE_ENDPOINT is not set in production!';
+  console.error(errorMsg);
+  console.error('[Prisma] This will cause Prisma Query Engine errors on Vercel!');
+  console.error('[Prisma] Please set PRISMA_ACCELERATE_ENDPOINT in Vercel environment variables');
+  console.error('[Prisma] Format should be: prisma+mysql://accelerate.prisma-data.net/?api_key=...');
+  
+  // Throw error to prevent Prisma Client from initializing without Accelerate
+  throw new Error(`${errorMsg} Please configure PRISMA_ACCELERATE_ENDPOINT in Vercel.`);
 }
 
 function createPrismaClient() {

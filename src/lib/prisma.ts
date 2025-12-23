@@ -20,6 +20,21 @@ if (isProduction && !accelerateEndpoint) {
   console.error('[Prisma] ⚠️  Build will continue, but API routes will fail until this is set.');
 }
 
+// Create a simple, direct Prisma Client instance
+// This matches the pattern used in test-accelerate route which works
+function createSimplePrismaClient() {
+  if (accelerateEndpoint) {
+    console.log('[Prisma] Creating Prisma Client with Accelerate extension');
+    return new PrismaClient().$extends(withAccelerate());
+  }
+  
+  if (isProduction) {
+    throw new Error('PRISMA_ACCELERATE_ENDPOINT is required in production');
+  }
+  
+  return new PrismaClient();
+}
+
 function createPrismaClient() {
   // Check if Accelerate is configured (re-check at runtime)
   const currentAccelerateEndpoint = process.env.PRISMA_ACCELERATE_ENDPOINT;
@@ -183,36 +198,20 @@ function getPrismaClient() {
   return prismaClient;
 }
 
-// In production with Accelerate, initialize the client eagerly to ensure Accelerate is set up
-// This prevents timing issues where the client might be initialized without Accelerate
-if (isProduction && accelerateEndpoint) {
-  console.log('[Prisma] Eagerly initializing Prisma Client with Accelerate in production');
-  try {
-    prismaClient = createPrismaClient();
-    console.log('[Prisma] ✓ Prisma Client initialized eagerly with Accelerate');
-  } catch (error) {
-    console.error('[Prisma] ✗ Failed to initialize Prisma Client eagerly:', error);
-    // Continue - will be initialized lazily via Proxy
+// Export prisma directly - use simple initialization that matches test-accelerate
+// In development, cache in global to prevent multiple instances
+// In production, always create fresh with Accelerate
+let prismaInstance: any = null;
+
+if (!isProduction) {
+  // Development: cache in global
+  prismaInstance = globalForPrisma.prisma || createSimplePrismaClient();
+  if (!globalForPrisma.prisma) {
+    globalForPrisma.prisma = prismaInstance;
   }
+} else {
+  // Production: always create fresh with Accelerate
+  prismaInstance = createSimplePrismaClient();
 }
 
-// Export prisma with lazy initialization via Proxy
-// This ensures Accelerate is checked on every access
-export const prisma = new Proxy({} as any, {
-  get(_target, prop) {
-    const client = getPrismaClient();
-    const value = client[prop];
-    
-    // Bind functions to maintain 'this' context
-    if (typeof value === 'function') {
-      return value.bind(client);
-    }
-    
-    return value;
-  },
-  // Also handle property access for things like $connect, $disconnect, etc.
-  has(_target, prop) {
-    const client = getPrismaClient();
-    return prop in client;
-  }
-}); 
+export const prisma = prismaInstance; 

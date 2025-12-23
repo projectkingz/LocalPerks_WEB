@@ -183,6 +183,19 @@ function getPrismaClient() {
   return prismaClient;
 }
 
+// In production with Accelerate, initialize the client eagerly to ensure Accelerate is set up
+// This prevents timing issues where the client might be initialized without Accelerate
+if (isProduction && accelerateEndpoint) {
+  console.log('[Prisma] Eagerly initializing Prisma Client with Accelerate in production');
+  try {
+    prismaClient = createPrismaClient();
+    console.log('[Prisma] ✓ Prisma Client initialized eagerly with Accelerate');
+  } catch (error) {
+    console.error('[Prisma] ✗ Failed to initialize Prisma Client eagerly:', error);
+    // Continue - will be initialized lazily via Proxy
+  }
+}
+
 // Export prisma with lazy initialization via Proxy
 // This ensures Accelerate is checked on every access
 export const prisma = new Proxy({} as any, {

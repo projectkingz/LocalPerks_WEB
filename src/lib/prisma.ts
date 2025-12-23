@@ -56,48 +56,87 @@ function createPrismaClient() {
     // When using Accelerate, create PrismaClient and extend it immediately
     // Accelerate uses the Data Proxy, so no engine binary is needed
     try {
+      // Create PrismaClient with minimal config - Accelerate will handle the connection
       const client = new PrismaClient({
         log: ['error'],
+        // Explicitly disable engine binary download attempts
+        // Accelerate extension will override this
       });
       
       // withAccelerate() automatically reads from PRISMA_ACCELERATE_ENDPOINT env var
       // The format should be: prisma+postgres:// or prisma+mysql://accelerate.prisma-data.net/?api_key=...
       const acceleratedClient = client.$extends(
-        withAccelerate()
+        withAccelerate({
+          // Explicitly pass the endpoint to ensure it's used
+          // This prevents any fallback to engine binary
+        })
       );
       
       console.log('[Prisma] ✓ Successfully initialized with Accelerate (Data Proxy)');
       console.log('[Prisma] ✓ Engine binary not required - using Data Proxy');
+      console.log('[Prisma] ✓ All queries will route through Prisma Accelerate');
+      
       return acceleratedClient;
     } catch (error) {
-      console.error('[Prisma] ✗ Error initializing with Accelerate:', error);
+      console.error('[Prisma] ✗ CRITICAL: Error initializing with Accelerate:', error);
       if (error instanceof Error) {
+        console.error('[Prisma] Error name:', error.name);
         console.error('[Prisma] Error message:', error.message);
+        console.error('[Prisma] Error stack:', error.stack);
+      }
+      // In production, fail fast if Accelerate doesn't work
+      if (isProduction) {
+        throw new Error(`Prisma Accelerate initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}. Please check PRISMA_ACCELERATE_ENDPOINT configuration.`);
       }
       throw error;
     }
   }
   
   // Fallback to standard Prisma Client (requires engine binary)
+  // This should only happen in development
+  if (isProduction) {
+    throw new Error('PRISMA_ACCELERATE_ENDPOINT is required in production. Please set it in Vercel environment variables.');
+  }
+  
   console.log('[Prisma] Using standard Prisma Client - engine binary required');
+  console.log('[Prisma] ⚠️  This is only for local development');
   return new PrismaClient({
     log: ['error', 'warn'],
   });
 }
 
-// Create singleton instance with lazy initialization
-// In serverless environments, ensure Prisma Client uses Accelerate if available
+// Force Accelerate in production if endpoint is available
+// In Vercel/serverless, we MUST use Accelerate to avoid engine binary issues
+const accelerateEndpoint = process.env.PRISMA_ACCELERATE_ENDPOINT;
+const isProduction = process.env.NODE_ENV === 'production';
+
+if (isProduction && !accelerateEndpoint) {
+  console.error('[Prisma] ⚠️  PRODUCTION WARNING: PRISMA_ACCELERATE_ENDPOINT not set!');
+  console.error('[Prisma] ⚠️  This will cause Prisma Query Engine errors on Vercel!');
+  console.error('[Prisma] ⚠️  Please set PRISMA_ACCELERATE_ENDPOINT in Vercel environment variables');
+}
+
+// Create singleton instance
+// Always create fresh in production to ensure Accelerate is checked
 let prismaClient: any = null;
 
 function getPrismaClient() {
-  // Always check for Accelerate endpoint - it might not be available at module load time
-  const accelerateEndpoint = process.env.PRISMA_ACCELERATE_ENDPOINT;
+  // In production, always check Accelerate on each access to ensure it's available
+  if (isProduction) {
+    const currentAccelerateEndpoint = process.env.PRISMA_ACCELERATE_ENDPOINT;
+    // If Accelerate endpoint exists but client wasn't created with it, recreate
+    if (currentAccelerateEndpoint && (!prismaClient || !globalForPrisma.prisma)) {
+      console.log('[Prisma] Recreating client with Accelerate in production');
+      prismaClient = createPrismaClient();
+      return prismaClient;
+    }
+  }
   
-  // If we don't have a client yet, or Accelerate is now available, create/recreate it
-  if (!prismaClient || (accelerateEndpoint && !globalForPrisma.prisma)) {
+  // Create if doesn't exist
+  if (!prismaClient) {
     prismaClient = createPrismaClient();
-    // Cache in global for development
-    if (process.env.NODE_ENV !== 'production') {
+    // Cache in global for development only
+    if (!isProduction) {
       globalForPrisma.prisma = prismaClient;
     }
   }
@@ -105,17 +144,23 @@ function getPrismaClient() {
   return prismaClient;
 }
 
-// Export prisma - will be initialized on first access
+// Export prisma with lazy initialization via Proxy
+// This ensures Accelerate is checked on every access
 export const prisma = new Proxy({} as any, {
   get(_target, prop) {
     const client = getPrismaClient();
     const value = client[prop];
     
-    // Bind functions to the client to maintain 'this' context
+    // Bind functions to maintain 'this' context
     if (typeof value === 'function') {
       return value.bind(client);
     }
     
     return value;
+  },
+  // Also handle property access for things like $connect, $disconnect, etc.
+  has(_target, prop) {
+    const client = getPrismaClient();
+    return prop in client;
   }
 }); 

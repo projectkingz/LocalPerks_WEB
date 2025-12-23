@@ -125,77 +125,58 @@ function createPrismaClient() {
 // In Vercel/serverless, we MUST use Accelerate to avoid engine binary issues
 
 // Create singleton instance
-// Always create fresh in production to ensure Accelerate is checked
+// In production with Accelerate, we create the client eagerly to ensure Accelerate is applied
 let prismaClient: any = null;
 
 function getPrismaClient() {
+  // If client already exists and we're in production with Accelerate, return it
+  // (We recreate it on each access in production to ensure Accelerate is used)
+  if (prismaClient && !isProduction) {
+    return prismaClient;
+  }
+  
   // In production, always check Accelerate on each access to ensure it's available
   if (isProduction) {
     const currentAccelerateEndpoint = process.env.PRISMA_ACCELERATE_ENDPOINT;
     
     // Check if we're in a build context (Next.js build process)
-    // During build, Next.js might evaluate API routes, but we shouldn't fail the build
-    // Only check NEXT_PHASE for build detection - VERCEL env vars are set at runtime too
     const isBuildTime = 
       process.env.NEXT_PHASE === 'phase-production-build' ||
       process.env.NEXT_PHASE === 'phase-production-compile';
     
     // CRITICAL: Fail at runtime if Accelerate is not configured in production
-    // But only if we're NOT in build phase (to allow build to succeed)
     if (!currentAccelerateEndpoint) {
       if (isBuildTime) {
-        // During build, just log a warning but don't throw
-        console.warn('[Prisma] ⚠️  Build-time: PRISMA_ACCELERATE_ENDPOINT not set, but allowing build to continue');
-        console.warn('[Prisma] ⚠️  This will fail at runtime if not set in Vercel environment variables');
-        // Create a dummy client for build time that will fail gracefully
-        // We'll use the fallback client creation below
-      } else {
-        // At runtime, fail immediately
-        const errorMsg = '[Prisma] CRITICAL ERROR: PRISMA_ACCELERATE_ENDPOINT is not set in production!';
-        console.error(errorMsg);
-        console.error('[Prisma] This will cause Prisma Query Engine errors on Vercel!');
-        console.error('[Prisma] Please set PRISMA_ACCELERATE_ENDPOINT in Vercel environment variables');
-        console.error('[Prisma] Format should be: prisma+mysql://accelerate.prisma-data.net/?api_key=...');
-        throw new Error(`${errorMsg} Please configure PRISMA_ACCELERATE_ENDPOINT in Vercel.`);
-      }
-    }
-    
-    // IMPORTANT: Always recreate client if Accelerate endpoint exists
-    // This ensures we always use Accelerate, even if client was cached without it
-    if (currentAccelerateEndpoint) {
-      // In production, ALWAYS recreate the client to ensure Accelerate is used
-      // This prevents any cached client from being used without Accelerate
-      console.log('[Prisma] Creating/Recreating client with Accelerate in production');
-      prismaClient = createPrismaClient();
-      // Don't cache in global for production - always recreate to ensure Accelerate
-      return prismaClient;
-    }
-  }
-  
-  // Create if doesn't exist
-  // During build without Accelerate, this will create a client that will fail at runtime
-  // but won't fail the build itself
-  if (!prismaClient) {
-    try {
-      prismaClient = createPrismaClient();
-      // Cache in global for development only
-      if (!isProduction) {
-        globalForPrisma.prisma = prismaClient;
-      }
-    } catch (error) {
-      // During build, if client creation fails, create a dummy client
-      // This allows the build to succeed, but queries will fail at runtime
-      if (isProduction && (process.env.NEXT_PHASE === 'phase-production-build' || process.env.NEXT_PHASE === 'phase-production-compile')) {
-        console.warn('[Prisma] Build-time: Creating dummy client to allow build to succeed');
-        // Return a proxy that will throw helpful errors at runtime
-        prismaClient = new Proxy({}, {
+        // During build, create a dummy client that will fail at runtime
+        console.warn('[Prisma] ⚠️  Build-time: PRISMA_ACCELERATE_ENDPOINT not set, creating dummy client');
+        return new Proxy({}, {
           get() {
             throw new Error('PRISMA_ACCELERATE_ENDPOINT must be set in Vercel environment variables. Build succeeded, but runtime queries will fail until this is configured.');
           }
         });
       } else {
-        throw error;
+        // At runtime, fail immediately
+        const errorMsg = '[Prisma] CRITICAL ERROR: PRISMA_ACCELERATE_ENDPOINT is not set in production!';
+        console.error(errorMsg);
+        throw new Error(`${errorMsg} Please configure PRISMA_ACCELERATE_ENDPOINT in Vercel.`);
       }
+    }
+    
+    // In production with Accelerate, ALWAYS create a fresh client
+    // This ensures Accelerate extension is always applied
+    console.log('[Prisma] Creating fresh Prisma Client with Accelerate in production');
+    prismaClient = createPrismaClient();
+    return prismaClient;
+  }
+  
+  // Development: Create client once and cache it
+  if (!prismaClient) {
+    try {
+      prismaClient = createPrismaClient();
+      globalForPrisma.prisma = prismaClient;
+    } catch (error) {
+      console.error('[Prisma] Error creating client:', error);
+      throw error;
     }
   }
   

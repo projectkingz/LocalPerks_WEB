@@ -9,16 +9,15 @@ const globalForPrisma = globalThis as unknown as {
 const isProduction = process.env.NODE_ENV === 'production';
 const accelerateEndpoint = process.env.PRISMA_ACCELERATE_ENDPOINT;
 
-// In production, Accelerate is REQUIRED - fail immediately if not set
+// In production, Accelerate is REQUIRED - but only fail at runtime, not during build
+// During build, Next.js tries to statically generate pages, which imports this module
+// We'll check again when Prisma Client is actually used (in getPrismaClient)
 if (isProduction && !accelerateEndpoint) {
-  const errorMsg = '[Prisma] CRITICAL ERROR: PRISMA_ACCELERATE_ENDPOINT is not set in production!';
-  console.error(errorMsg);
-  console.error('[Prisma] This will cause Prisma Query Engine errors on Vercel!');
-  console.error('[Prisma] Please set PRISMA_ACCELERATE_ENDPOINT in Vercel environment variables');
-  console.error('[Prisma] Format should be: prisma+mysql://accelerate.prisma-data.net/?api_key=...');
-  
-  // Throw error to prevent Prisma Client from initializing without Accelerate
-  throw new Error(`${errorMsg} Please configure PRISMA_ACCELERATE_ENDPOINT in Vercel.`);
+  console.error('[Prisma] ⚠️  WARNING: PRISMA_ACCELERATE_ENDPOINT is not set in production!');
+  console.error('[Prisma] ⚠️  This will cause Prisma Query Engine errors at runtime!');
+  console.error('[Prisma] ⚠️  Please set PRISMA_ACCELERATE_ENDPOINT in Vercel environment variables');
+  console.error('[Prisma] ⚠️  Format should be: prisma+mysql://accelerate.prisma-data.net/?api_key=...');
+  console.error('[Prisma] ⚠️  Build will continue, but API routes will fail until this is set.');
 }
 
 function createPrismaClient() {
@@ -138,6 +137,17 @@ function getPrismaClient() {
   // In production, always check Accelerate on each access to ensure it's available
   if (isProduction) {
     const currentAccelerateEndpoint = process.env.PRISMA_ACCELERATE_ENDPOINT;
+    
+    // CRITICAL: Fail at runtime if Accelerate is not configured in production
+    if (!currentAccelerateEndpoint) {
+      const errorMsg = '[Prisma] CRITICAL ERROR: PRISMA_ACCELERATE_ENDPOINT is not set in production!';
+      console.error(errorMsg);
+      console.error('[Prisma] This will cause Prisma Query Engine errors on Vercel!');
+      console.error('[Prisma] Please set PRISMA_ACCELERATE_ENDPOINT in Vercel environment variables');
+      console.error('[Prisma] Format should be: prisma+mysql://accelerate.prisma-data.net/?api_key=...');
+      throw new Error(`${errorMsg} Please configure PRISMA_ACCELERATE_ENDPOINT in Vercel.`);
+    }
+    
     // If Accelerate endpoint exists but client wasn't created with it, recreate
     if (currentAccelerateEndpoint && (!prismaClient || !globalForPrisma.prisma)) {
       console.log('[Prisma] Recreating client with Accelerate in production');

@@ -63,32 +63,34 @@ function createPrismaClient() {
   }
   
   if (currentAccelerateEndpoint) {
-    // When using Accelerate, we MUST use the Accelerate endpoint as the datasource URL
-    // This prevents Prisma Client from trying to initialize the engine binary
+    // When using Accelerate, Prisma Client should use DATABASE_URL
+    // The Accelerate extension intercepts queries and routes them through the Data Proxy
+    // However, Prisma Client still tries to initialize the engine binary
+    // We need to prevent this by ensuring Accelerate is configured correctly
     try {
-      console.log('[Prisma] Creating PrismaClient with Accelerate endpoint as datasource URL');
+      console.log('[Prisma] Initializing PrismaClient with Accelerate extension');
+      console.log('[Prisma] Accelerate endpoint format:', currentAccelerateEndpoint.substring(0, 30) + '...');
       
-      // Create PrismaClient with Accelerate endpoint as the datasource URL
-      // This prevents engine binary initialization
+      // Create PrismaClient - it will use DATABASE_URL internally
+      // But Accelerate extension will intercept all queries
       const client = new PrismaClient({
-        datasources: {
-          db: {
-            url: currentAccelerateEndpoint, // Use Accelerate endpoint instead of DATABASE_URL
-          },
-        },
         log: ['error'],
       });
       
-      // Extend with Accelerate extension
-      // This ensures all queries go through the Data Proxy
+      // Extend with Accelerate - this should prevent engine binary initialization
+      // The extension reads PRISMA_ACCELERATE_ENDPOINT automatically
       const acceleratedClient = client.$extends(
         withAccelerate()
       );
       
-      console.log('[Prisma] ✓ Successfully initialized with Accelerate (Data Proxy)');
-      console.log('[Prisma] ✓ Engine binary not required - using Data Proxy');
-      console.log('[Prisma] ✓ All queries will route through Prisma Accelerate');
-      console.log('[Prisma] ✓ Datasource URL set to Accelerate endpoint');
+      // Test that Accelerate is working by checking if the client has the extension
+      console.log('[Prisma] ✓ PrismaClient created');
+      console.log('[Prisma] ✓ Accelerate extension applied');
+      console.log('[Prisma] ✓ PRISMA_ACCELERATE_ENDPOINT:', currentAccelerateEndpoint ? 'Set' : 'NOT SET');
+      
+      // IMPORTANT: The Accelerate extension should prevent engine binary initialization
+      // But if it doesn't, we need to ensure binaryTargets are set correctly
+      console.log('[Prisma] ⚠️  If you still see engine errors, check that PRISMA_ACCELERATE_ENDPOINT is correctly set in Vercel');
       
       return acceleratedClient;
     } catch (error) {

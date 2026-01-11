@@ -10,7 +10,7 @@ prisma/test-recent-data.ts
 
 # Exclude test/example directories
 hello-prisma/
-mobile/
+/mobile/
 scripts/
 
 # Exclude utility and config files not needed for build

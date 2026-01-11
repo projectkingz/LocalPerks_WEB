@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { pointsUtil } from "@/lib/pointsUtil";
 import { authenticateMobileToken, createMobileSession } from "@/lib/auth/mobile-auth";
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     console.log('Points mobile: Request received');

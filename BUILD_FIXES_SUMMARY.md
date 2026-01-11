@@ -103,11 +103,11 @@ While the application has fallback mechanisms (in-memory storage), Redis is reco
 ## 📋 Summary Checklist
 
 - [x] Fixed React Hook dependency warnings
-- [ ] Set `DATABASE_URL` to Prisma Accelerate URL in Vercel (use same value as `PRISMA_ACCELERATE_ENDPOINT`)
+- [x] Set `DATABASE_URL` to Prisma Accelerate URL in Vercel (use same value as `PRISMA_ACCELERATE_ENDPOINT`) ✅
 - [x] `PRISMA_ACCELERATE_ENDPOINT` already set in Vercel ✅
-- [ ] Set `UPSTASH_REDIS_REST_URL` in Vercel
-- [ ] Set `UPSTASH_REDIS_REST_TOKEN` in Vercel
-- [ ] Redeploy application after setting environment variables
+- [ ] Set `UPSTASH_REDIS_REST_URL` in Vercel (optional - has fallback)
+- [ ] Set `UPSTASH_REDIS_REST_TOKEN` in Vercel (optional - has fallback)
+- [x] Redeploy application after setting environment variables
 
 ---
 

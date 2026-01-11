@@ -52,7 +52,7 @@ function PartnerRegistrationContent() {
     if (emailParam) {
       setFormData(prev => ({ ...prev, email: emailParam }));
     }
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   // Check subscription status when component mounts or userId changes
   useEffect(() => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 function VerifyMobileContent() {
@@ -15,17 +15,7 @@ function VerifyMobileContent() {
   const [resendCooldown, setResendCooldown] = useState(0);
   const [codeSent, setCodeSent] = useState(false);
 
-  useEffect(() => {
-    if (!userId || !email) {
-      router.push('/partner/signup-success');
-      return;
-    }
-    if (!codeSent) {
-      handleResend();
-    }
-  }, []);
-
-  const handleResend = async () => {
+  const handleResend = useCallback(async () => {
     try {
       setIsLoading(true);
       setError('');
@@ -58,7 +48,17 @@ function VerifyMobileContent() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [userId, email]);
+
+  useEffect(() => {
+    if (!userId || !email) {
+      router.push('/partner/signup-success');
+      return;
+    }
+    if (!codeSent) {
+      handleResend();
+    }
+  }, [userId, email, codeSent, router, handleResend]);
 
   const handleCodeChange = (index: number, value: string) => {
     if (value.length > 1) return;

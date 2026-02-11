@@ -53,23 +53,35 @@ export async function POST(req: Request) {
       });
       console.log(`✅ Mobile verified for customer: ${user.email}`);
       console.log(`   Status: ACTIVE (account activated)`);
-    } else {
-      // For partners, set to pending admin approval
+    } else if (user.role === 'PARTNER') {
+      // For partners, keep suspended and set to PENDING_ADMIN_APPROVAL (waiting for admin approval after payment)
       updatedUser = await prisma.user.update({
         where: { id: userId },
         data: {
-          approvalStatus: 'PENDING', // Partner accounts need admin approval
+          suspended: true, // Keep suspended until admin approval
+          approvalStatus: 'PENDING_ADMIN_APPROVAL', // Partner accounts pending admin approval
+        },
+      });
+      console.log(`✅ Mobile verified for partner: ${user.email}`);
+      console.log(`   Status: PENDING_ADMIN_APPROVAL (awaiting admin approval after payment)`);
+    } else {
+      // For other roles, just unsuspend
+      updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: {
+          suspended: false,
         },
       });
       console.log(`✅ Mobile verified for user: ${user.email}`);
-      console.log(`   Status: PENDING (awaiting admin approval)`);
     }
 
     return NextResponse.json({
       success: true,
       message: user.role === 'CUSTOMER' 
         ? 'Mobile verified successfully. Your account is now active!'
-        : 'Mobile verified successfully. Your account is pending admin approval.',
+        : user.role === 'PARTNER'
+        ? 'Mobile verified successfully. Please proceed to payment to complete your account setup.'
+        : 'Mobile verified successfully.',
       user: {
         id: updatedUser.id,
         email: updatedUser.email,

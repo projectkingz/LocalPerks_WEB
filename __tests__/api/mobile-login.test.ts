@@ -208,7 +208,7 @@ describe('/api/auth/mobile-login', () => {
         role: 'PARTNER',
         tenantId: 'tenant-1',
         suspended: false,
-        approvalStatus: 'PENDING',
+        approvalStatus: 'PENDING_ADMIN_APPROVAL',
       });
 
       mockCompare.mockResolvedValue(true);

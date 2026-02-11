@@ -56,7 +56,7 @@ export async function POST(req: Request) {
           { error: 'ACCOUNT_UNDER_REVIEW' },
           { status: 401 }
         );
-      } else if (user.approvalStatus === 'PENDING') {
+      } else if (user.approvalStatus === 'PENDING_ADMIN_APPROVAL') {
         return NextResponse.json(
           { error: 'PENDING_APPROVAL' },
           { status: 401 }

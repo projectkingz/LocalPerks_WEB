@@ -81,100 +81,69 @@ export async function POST(req: Request) {
       }
     }
     
-    // Send verification code - prefer WhatsApp if mobile available, otherwise use email
+    // Send verification code via WhatsApp only (no email fallback for login)
     let codeSent = false;
-    let deliveryMethod = 'email';
+    let deliveryMethod = 'whatsapp';
     
-    if (mobile) {
-      // Try WhatsApp first
-      const normalizedMobile = normalizePhoneNumber(mobile);
-      console.log(`📱 Normalized mobile: ${mobile} → ${normalizedMobile}`);
-      
-      try {
-        console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-        console.log(`📤 Sending login 2FA WhatsApp to: ${normalizedMobile}`);
-        console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
-        
-        const result = await generateAndSend2FACode({
-          userId: user.id,
-          method: 'whatsapp',
-          phone: normalizedMobile,
-          purpose: 'login'
-        });
-
-        console.log(`\n📱 WhatsApp result:`, result);
-
-        if (result.success) {
-          codeSent = true;
-          deliveryMethod = 'whatsapp';
-          console.log('✅ Login 2FA WhatsApp sent successfully');
-        } else {
-          console.warn('\n⚠️  Failed to send login 2FA WhatsApp:', result.message);
-          console.log('🔄 Falling back to email...');
-          deliveryMethod = 'email'; // Will try email below
-        }
-      } catch (error) {
-        console.error('❌ Error sending login 2FA WhatsApp:', error);
-        console.log('🔄 Falling back to email...');
-        deliveryMethod = 'email'; // Will try email below
-      }
+    // Require mobile number for login 2FA
+    if (!mobile) {
+      console.error('❌ No mobile number found for user:', user.id);
+      return NextResponse.json(
+        { 
+          message: 'Mobile number is required for login verification. Please ensure your account has a mobile number.',
+          codeSent: false
+        },
+        { status: 400 }
+      );
     }
     
-    // Fallback to email if WhatsApp failed or mobile not available
-    if (!codeSent) {
-      if (!user.email) {
-        console.error('❌ No email found for user:', user.id);
+    const normalizedMobile = normalizePhoneNumber(mobile);
+    console.log(`📱 Normalized mobile: ${mobile} → ${normalizedMobile}`);
+    
+    try {
+      console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      console.log(`📤 Sending login 2FA WhatsApp to: ${normalizedMobile}`);
+      console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+      
+      const whatsappResult = await generateAndSend2FACode({
+        userId: user.id,
+        method: 'whatsapp',
+        phone: normalizedMobile,
+        purpose: 'login'
+      });
+
+      console.log(`\n📱 WhatsApp/SMS result:`, whatsappResult);
+
+      if (whatsappResult.success) {
+        codeSent = true;
+        deliveryMethod = 'whatsapp';
+        console.log('✅ Login 2FA code sent successfully via WhatsApp (or SMS fallback)');
+      } else {
+        console.error('\n❌ Failed to send login 2FA via WhatsApp/SMS:', whatsappResult.message);
         return NextResponse.json(
           { 
-            message: 'No contact method available. Please add a mobile number or email to your account.',
+            message: 'Failed to send verification code via WhatsApp. Please try again or contact support.',
             codeSent: false
           },
-          { status: 400 }
+          { status: 500 }
         );
       }
-      
-      try {
-        console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-        console.log(`📤 Sending login 2FA email to: ${user.email}`);
-        console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
-        
-        const result = await generateAndSend2FACode({
-          userId: user.id,
-          method: 'email',
-          email: user.email,
-          purpose: 'login'
-        });
-
-        console.log(`\n📧 Email result:`, result);
-
-        if (result.success) {
-          codeSent = true;
-          console.log('✅ Login 2FA email sent successfully');
-        } else {
-          console.warn('\n⚠️  Failed to send login 2FA email:', result.message);
-          console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-          console.log('💡 IMPORTANT: Check the console output above for the');
-          console.log('   6-digit verification code. The code was generated');
-          console.log('   and logged above (look for "Generated 2FA code").');
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-          // Still allow the flow to continue since code is in console
-          codeSent = true;
-        }
-      } catch (error) {
-        console.error('❌ Error sending login 2FA email:', error);
-        console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('💡 Check the console output above for the verification code');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-      }
+    } catch (error) {
+      console.error('❌ Error sending login 2FA WhatsApp:', error);
+      return NextResponse.json(
+        { 
+          message: 'Error sending verification code. Please try again or contact support.',
+          codeSent: false
+        },
+        { status: 500 }
+      );
     }
 
-    const maskedContact = mobile && deliveryMethod === 'whatsapp'
-      ? mobile.replace(/(\+44)(\d{3})(\d{3})(\d{4})/, '$1 $2***$4')
-      : user.email?.replace(/(.{2})(.*)(@.*)/, '$1***$3') || 'your contact';
+    const maskedContact = mobile.replace(/(\+44)(\d{3})(\d{3})(\d{4})/, '$1 $2***$4');
 
     return NextResponse.json({
       message: codeSent 
-        ? `Verification code sent to your ${deliveryMethod === 'whatsapp' ? 'WhatsApp' : 'email'}`
+        ? `Verification code sent to your WhatsApp`
         : 'Failed to send verification code. Please try again.',
       codeSent,
       method: deliveryMethod,

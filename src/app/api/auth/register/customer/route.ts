@@ -67,34 +67,105 @@ export async function POST(req: Request) {
       return { user, customer };
     });
 
-    // Send email verification code
+    // Send both email and WhatsApp verification codes
     let emailVerificationSent = false;
+    let whatsappVerificationSent = false;
+    
+    // Send email verification code
     try {
       console.log('📧 Sending customer email verification code...');
-      const sendResult = await generateAndSend2FACode({
+      console.log(`📧 Sending email to: ${result.user.email}`);
+      
+      const emailResult = await generateAndSend2FACode({
         userId: result.user.id,
         method: 'email',
         email: result.user.email,
         purpose: 'registration'
       });
 
-      if (sendResult.success) {
+      if (emailResult.success) {
         emailVerificationSent = true;
         console.log('✅ Customer email verification code sent successfully');
       } else {
-        console.warn('⚠️  Failed to send customer email verification code:', sendResult.message);
+        console.error('❌ Failed to send customer email verification code:', emailResult.message);
+        // If email fails, rollback the transaction
+        await prisma.user.delete({ where: { id: result.user.id } }).catch(() => {});
+        await prisma.customer.delete({ where: { id: result.customer.id } }).catch(() => {});
+        return NextResponse.json(
+          { 
+            message: 'Registration failed: Could not send email verification code. Please ensure your email address is correct and try again.',
+            requiresEmailVerification: false,
+            emailVerificationSent: false,
+          },
+          { status: 500 }
+        );
       }
     } catch (error) {
       console.error('❌ Error sending customer email verification code:', error);
+      // Rollback on error
+      await prisma.user.delete({ where: { id: result.user.id } }).catch(() => {});
+      await prisma.customer.delete({ where: { id: result.customer.id } }).catch(() => {});
+      return NextResponse.json(
+        { 
+          message: 'Registration failed: Could not send email verification code. Please try again.',
+          requiresEmailVerification: false,
+          emailVerificationSent: false,
+        },
+        { status: 500 }
+      );
+    }
+
+    // Send WhatsApp verification code
+    try {
+      console.log('📱 Sending customer WhatsApp verification code...');
+      console.log(`📱 Sending WhatsApp to: ${normalizedMobile}`);
+      
+      const whatsappResult = await generateAndSend2FACode({
+        userId: result.user.id,
+        method: 'whatsapp',
+        phone: normalizedMobile,
+        purpose: 'registration'
+      });
+
+      if (whatsappResult.success) {
+        whatsappVerificationSent = true;
+        console.log('✅ Customer WhatsApp verification code sent successfully');
+      } else {
+        console.error('❌ Failed to send customer WhatsApp verification code:', whatsappResult.message);
+        // If WhatsApp fails, rollback the transaction
+        await prisma.user.delete({ where: { id: result.user.id } }).catch(() => {});
+        await prisma.customer.delete({ where: { id: result.customer.id } }).catch(() => {});
+        return NextResponse.json(
+          { 
+            message: 'Registration failed: Could not send WhatsApp verification code. Please ensure your mobile number is correct and try again.',
+            requiresMobileVerification: false,
+            whatsappVerificationSent: false,
+          },
+          { status: 500 }
+        );
+      }
+    } catch (error) {
+      console.error('❌ Error sending customer WhatsApp verification code:', error);
+      // Rollback on error
+      await prisma.user.delete({ where: { id: result.user.id } }).catch(() => {});
+      await prisma.customer.delete({ where: { id: result.customer.id } }).catch(() => {});
+      return NextResponse.json(
+        { 
+          message: 'Registration failed: Could not send WhatsApp verification code. Please try again.',
+          requiresMobileVerification: false,
+          whatsappVerificationSent: false,
+        },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json(
       {
-        message: emailVerificationSent 
-          ? 'Registration successful. Please check your email for the verification code.'
-          : 'Registration successful but verification email could not be sent. Please try again.',
+        message: 'Registration successful. Please check your email and WhatsApp for verification codes.',
         requiresEmailVerification: true,
+        requiresMobileVerification: true,
         emailVerificationSent: emailVerificationSent,
+        whatsappVerificationSent: whatsappVerificationSent,
         user: {
           id: result.user.id,
           name: result.user.name,

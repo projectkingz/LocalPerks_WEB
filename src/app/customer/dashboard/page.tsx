@@ -56,7 +56,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [mobile, setMobile] = useState<string | null>(null);
   const [availableDiscount, setAvailableDiscount] = useState<number>(0);
-  const [pointFaceValue, setPointFaceValue] = useState<number>(0.01);
+  const [pointFaceValue, setPointFaceValue] = useState<number>(0.008);
   const [qrCode, setQrCode] = useState('');
   const [customerId, setCustomerId] = useState('');
   const [showCardModal, setShowCardModal] = useState(false);
@@ -85,8 +85,8 @@ export default function DashboardPage() {
         if (configResponse.ok) {
           const configData = await configResponse.json();
           if (configData.success && configData.config) {
-            setPointFaceValue(configData.config.pointFaceValue || 0.01);
-            setAvailableDiscount(pointsData.points * (configData.config.pointFaceValue || 0.01));
+            setPointFaceValue(configData.config.pointFaceValue || 0.008);
+            setAvailableDiscount(pointsData.points * (configData.config.pointFaceValue || 0.008));
           }
         }
 

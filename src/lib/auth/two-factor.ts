@@ -1,7 +1,7 @@
 import { Redis } from '@upstash/redis';
-import { Resend } from 'resend';
 import { Twilio } from 'twilio';
 import { prisma } from '@/lib/prisma';
+import { sendVerificationCodeEmail } from '@/lib/email/mailtrap';
 
 // Initialize Redis with error handling
 let redis: Redis | null = null;
@@ -66,7 +66,7 @@ if (!global.__2fa_cleanup_interval__) {
   }, 5 * 60 * 1000) as any; // 5 minutes
 }
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+// Email service is now handled by Mailtrap via mailtrap.ts
 
 // Only initialize Twilio if credentials are properly set
 let twilio: Twilio | null = null;
@@ -141,49 +141,14 @@ async function storeCode(userId: string, code: string, purpose: string = 'regist
   }
 }
 
-// Send code via email
+// Send code via email using Mailtrap
 async function sendCodeViaEmail(email: string, code: string, name: string): Promise<boolean> {
-  if (!resend) {
-    console.warn('⚠️  Resend API key not configured, skipping email send');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📧 VERIFICATION CODE (DEVELOPMENT MODE)');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log(`To: ${email}`);
-    console.log(`Name: ${name}`);
-    console.log(`Code: ${code}`);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    return false;
-  }
-  
   try {
-    await resend.emails.send({
-      from: 'LocalPerks <onboarding@resend.dev>', // Use Resend's test domain
-      to: email,
-      subject: 'Your LocalPerks Verification Code',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2>Email Verification</h2>
-          <p>Hi ${name},</p>
-          <p>Your verification code is:</p>
-          <div style="
-            text-align: center;
-            padding: 20px;
-            background-color: #f3f4f6;
-            border-radius: 8px;
-            margin: 20px 0;
-            font-size: 32px;
-            font-weight: bold;
-            letter-spacing: 4px;
-          ">
-            ${code}
-          </div>
-          <p>This code will expire in 10 minutes.</p>
-          <p>If you didn't request this code, please ignore this email.</p>
-        </div>
-      `,
-    });
-    console.log(`✅ Verification email sent to ${email}`);
-    return true;
+    const success = await sendVerificationCodeEmail(email, code, name);
+    if (success) {
+      console.log(`✅ Verification email sent to ${email} via Mailtrap`);
+    }
+    return success;
   } catch (error) {
     console.error('❌ Error sending 2FA email:', error);
     return false;
@@ -242,50 +207,101 @@ export function normalizePhoneNumber(phone: string): string {
   return normalized;
 }
 
-// Send code via WhatsApp
-async function sendCodeViaWhatsApp(phone: string, code: string): Promise<boolean> {
+// Send code via WhatsApp with SMS fallback
+async function sendCodeViaWhatsApp(phone: string, code: string): Promise<{ success: boolean; method: 'whatsapp' | 'sms' | 'none'; error?: string }> {
   try {
     if (!twilio) {
       console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('⚠️  Twilio not configured - WhatsApp code NOT sent');
+      console.log('❌ Twilio not configured - WhatsApp/SMS code NOT sent');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log(`📱 WhatsApp would be sent to: ${phone}`);
+      console.log(`📱 Code would be sent to: ${phone}`);
       console.log(`🔑 VERIFICATION CODE: ${code}`);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('⚠️  Please configure Twilio credentials in .env:');
+      console.log('   TWILIO_ACCOUNT_SID=...');
+      console.log('   TWILIO_AUTH_TOKEN=...');
+      console.log('   TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886');
+      console.log('   TWILIO_PHONE_NUMBER=+14155238886');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-      // Return true to allow flow to continue - code is in console
-      return true;
+      return { success: false, method: 'none', error: 'Twilio not configured' };
     }
     
     // Normalize phone number
     const normalizedPhone = normalizePhoneNumber(phone);
     
-    // Format phone number for WhatsApp (add whatsapp: prefix)
+    // Try WhatsApp first
     const whatsappTo = `whatsapp:${normalizedPhone}`;
-    
-    // Use Twilio WhatsApp sandbox number for testing
-    // In production, you'd use your approved WhatsApp Business number
     const whatsappFrom = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+14155238886';
     
-    console.log(`📤 Sending WhatsApp to: ${whatsappTo}`);
+    console.log(`📤 Attempting WhatsApp to: ${whatsappTo}`);
     
-    await twilio.messages.create({
-      body: `Your LocalPerks verification code is: ${code}. Valid for 10 minutes.`,
-      to: whatsappTo,
-      from: whatsappFrom,
-    });
-    
-    console.log(`✅ WhatsApp sent successfully to ${normalizedPhone}`);
-    return true;
-  } catch (error) {
+    try {
+      await twilio.messages.create({
+        body: `Your LocalPerks verification code is: ${code}. Valid for 10 minutes.`,
+        to: whatsappTo,
+        from: whatsappFrom,
+      });
+      
+      console.log(`✅ WhatsApp sent successfully to ${normalizedPhone}`);
+      return { success: true, method: 'whatsapp' };
+    } catch (whatsappError: any) {
+      // Check if it's a sandbox error (user not in sandbox)
+      const errorMessage = whatsappError?.message || '';
+      const errorCode = whatsappError?.code;
+      
+      // Twilio error codes for WhatsApp sandbox issues
+      // 63007: User not in WhatsApp sandbox
+      // 63016: Unsubscribed recipient
+      if (errorCode === 63007 || errorCode === 63016 || errorMessage.includes('sandbox') || errorMessage.includes('not opted in')) {
+        console.warn(`⚠️  WhatsApp failed (user not in sandbox): ${errorMessage}`);
+        console.log(`🔄 Falling back to SMS for ${normalizedPhone}...`);
+        
+        // Fallback to SMS
+        try {
+          if (!process.env.TWILIO_PHONE_NUMBER || process.env.TWILIO_PHONE_NUMBER === 'your_twilio_phone_number') {
+            console.error('❌ TWILIO_PHONE_NUMBER not configured. Cannot send SMS fallback.');
+            return { 
+              success: false, 
+              method: 'none', 
+              error: 'WhatsApp failed and SMS fallback not configured' 
+            };
+          }
+          
+          await twilio.messages.create({
+            body: `Your LocalPerks verification code is: ${code}. Valid for 10 minutes.`,
+            to: normalizedPhone,
+            from: process.env.TWILIO_PHONE_NUMBER,
+          });
+          
+          console.log(`✅ SMS sent successfully to ${normalizedPhone} (WhatsApp fallback)`);
+          return { success: true, method: 'sms' };
+        } catch (smsError: any) {
+          console.error('❌ SMS fallback also failed:', smsError?.message || smsError);
+          return { 
+            success: false, 
+            method: 'none', 
+            error: `WhatsApp and SMS both failed: ${smsError?.message || 'Unknown error'}` 
+          };
+        }
+      } else {
+        // Other WhatsApp errors - log and return failure
+        console.error('❌ Error sending WhatsApp:', errorMessage);
+        throw whatsappError; // Re-throw to be caught by outer catch
+      }
+    }
+  } catch (error: any) {
     console.error('❌ Error sending 2FA WhatsApp:', error);
     console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📱 WHATSAPP CODE (DEVELOPMENT MODE)');
+    console.log('📱 VERIFICATION CODE (FALLBACK)');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log(`Phone: ${phone}`);
     console.log(`Code: ${code}`);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-    // Return true so the flow continues (code is available in console)
-    return true;
+    return { 
+      success: false, 
+      method: 'none', 
+      error: error?.message || 'Unknown error sending WhatsApp' 
+    };
   }
 }
 
@@ -370,12 +386,16 @@ export async function generateAndSend2FACode(options: TwoFactorOptions): Promise
         };
       }
     } else if (method === 'whatsapp' && phone) {
-      const sent = await sendCodeViaWhatsApp(phone, code);
-      if (!sent) {
+      const result = await sendCodeViaWhatsApp(phone, code);
+      if (!result.success) {
         return {
           success: false,
-          message: 'Failed to send code via WhatsApp - Twilio not configured',
+          message: result.error || 'Failed to send code via WhatsApp or SMS',
         };
+      }
+      // Log which method was used
+      if (result.method === 'sms') {
+        console.log('📱 Used SMS fallback (WhatsApp sandbox not available)');
       }
     } else {
       return {

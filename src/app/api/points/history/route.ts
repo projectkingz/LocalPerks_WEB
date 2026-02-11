@@ -107,6 +107,13 @@ export async function POST(request: Request) {
         customer.tenantId
       );
 
+      // Log receipt image info for debugging
+      console.log('Creating pending transaction with receipt:', {
+        hasReceiptImage: !!receiptImage,
+        receiptImageLength: receiptImage?.length || 0,
+        receiptImagePreview: receiptImage?.substring(0, 50) || 'none'
+      });
+
       const pendingTransaction = await prisma.transaction.create({
         data: {
           amount: amount || points,
@@ -116,6 +123,7 @@ export async function POST(request: Request) {
           userId: userId,
           customerId: customer.id,
           tenantId: customer.tenantId,
+          receiptImage: receiptImage || null,
         },
         include: {
           customer: {
@@ -204,8 +212,18 @@ export async function POST(request: Request) {
       status: 'APPROVED'
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating transaction:', error);
-    return NextResponse.json({ error: 'Failed to create transaction' }, { status: 500 });
+    
+    // Check if it's a database column size error
+    if (error?.code === 'P2000' || error?.message?.includes('too long') || error?.message?.includes('column')) {
+      return NextResponse.json({ 
+        error: 'Receipt image is too large. Please try uploading a smaller image or compress it further.' 
+      }, { status: 400 });
+    }
+    
+    return NextResponse.json({ 
+      error: error?.message || 'Failed to create transaction' 
+    }, { status: 500 });
   }
 } 

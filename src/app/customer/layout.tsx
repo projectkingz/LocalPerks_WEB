@@ -6,6 +6,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import Navigation from '../components/Navigation';
 import SuspendedUserWrapper from '@/components/SuspendedUserWrapper';
+import PostSignupQuestions from '@/components/PostSignupQuestions';
 
 export default function CustomerLayout({
   children,
@@ -57,6 +58,7 @@ export default function CustomerLayout({
           {children}
         </SuspendedUserWrapper>
       </main>
+      {status === 'authenticated' && session && <PostSignupQuestions />}
     </div>
   );
 } 

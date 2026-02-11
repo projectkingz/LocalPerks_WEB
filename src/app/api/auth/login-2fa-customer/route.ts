@@ -41,46 +41,73 @@ export async function POST(req: Request) {
       select: { mobile: true }
     });
 
+    // Send verification code via WhatsApp only (no email fallback for login)
+    let codeSent = false;
+    let deliveryMethod = 'whatsapp';
+    
+    // Require mobile number for login 2FA
     if (!customer || !customer.mobile) {
+      console.error('❌ No mobile number found for customer:', user.id);
       return NextResponse.json(
-        { message: 'Mobile number not found for this customer account' },
+        { 
+          message: 'Mobile number is required for login verification. Please ensure your account has a mobile number.',
+          codeSent: false
+        },
         { status: 400 }
       );
     }
-
-    const mobile = normalizePhoneNumber(customer.mobile);
-    console.log(`📱 Customer normalized mobile: ${customer.mobile} → ${mobile}`);
-
-    // Send WhatsApp verification code
-    let codeSent = false;
+    
+    const normalizedMobile = normalizePhoneNumber(customer.mobile);
+    console.log(`📱 Customer normalized mobile: ${customer.mobile} → ${normalizedMobile}`);
+    
     try {
-      console.log(`\n📤 Sending customer login 2FA WhatsApp to: ${mobile}`);
-      const result = await generateAndSend2FACode({
+      console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      console.log(`📤 Sending customer login 2FA WhatsApp to: ${normalizedMobile}`);
+      console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+      
+      const whatsappResult = await generateAndSend2FACode({
         userId: user.id,
         method: 'whatsapp',
-        phone: mobile,
-        purpose: 'login' // Login purpose for customers
+        phone: normalizedMobile,
+        purpose: 'login'
       });
 
-      console.log(`\n📱 WhatsApp result:`, result);
+      console.log(`\n📱 WhatsApp/SMS result:`, whatsappResult);
 
-      if (result.success) {
+      if (whatsappResult.success) {
         codeSent = true;
-        console.log('✅ Customer login 2FA WhatsApp sent successfully');
+        deliveryMethod = 'whatsapp';
+        console.log('✅ Customer login 2FA code sent successfully via WhatsApp (or SMS fallback)');
       } else {
-        console.warn('⚠️  Failed to send customer login 2FA WhatsApp:', result.message);
-        console.warn('💡 Check the console above for the verification code');
+        console.error('❌ Failed to send customer login 2FA via WhatsApp/SMS:', whatsappResult.message);
+        return NextResponse.json(
+          { 
+            message: 'Failed to send verification code via WhatsApp. Please try again or contact support.',
+            codeSent: false
+          },
+          { status: 500 }
+        );
       }
     } catch (error) {
       console.error('❌ Error sending customer login 2FA WhatsApp:', error);
+      return NextResponse.json(
+        { 
+          message: 'Error sending verification code. Please try again or contact support.',
+          codeSent: false
+        },
+        { status: 500 }
+      );
     }
+
+    const maskedContact = customer.mobile.replace(/(\+44)(\d{3})(\d{3})(\d{4})/, '$1 $2***$4');
 
     return NextResponse.json({
       message: codeSent 
-        ? 'Verification code sent to your WhatsApp'
+        ? `Verification code sent to your WhatsApp`
         : 'Failed to send verification code. Please try again.',
       codeSent,
-      mobile: mobile.replace(/(\+44)(\d{3})(\d{3})(\d{4})/, '$1 $2***$4') // Mask mobile for privacy
+      method: deliveryMethod,
+      contact: maskedContact
     });
 
   } catch (error) {

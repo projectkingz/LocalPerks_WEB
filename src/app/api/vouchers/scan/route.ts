@@ -119,7 +119,8 @@ export async function POST(request: Request) {
             id: true,
             name: true,
             description: true,
-            points: true,
+            // points field doesn't exist on Reward model - get from redemption instead
+            discountPercentage: true,
             tenant: {
               select: {
                 id: true,
@@ -138,9 +139,13 @@ export async function POST(request: Request) {
       }
     });
 
+    // Voucher redemption does NOT deduct points - points were already deducted when voucher was created
+    // Return 0 points to indicate no points deducted during redemption
     return NextResponse.json({
       message: 'Voucher redeemed successfully',
-      voucher: updatedVoucher
+      voucher: updatedVoucher,
+      points: 0, // No points deducted - voucher was already paid for when created
+      pointsDeducted: 0
     });
 
   } catch (error) {
@@ -207,7 +212,8 @@ export async function GET(request: Request) {
             id: true,
             name: true,
             description: true,
-            points: true,
+            // points field doesn't exist on Reward model - get from redemption instead
+            discountPercentage: true,
             tenant: {
               select: {
                 id: true,

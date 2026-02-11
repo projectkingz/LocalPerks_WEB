@@ -14,25 +14,69 @@ function SignupSuccessContent() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch user data from session storage if available
-    const storedUserId = sessionStorage.getItem('partnerUserId');
-    const storedEmail = sessionStorage.getItem('partnerEmail');
-    const storedTenant = sessionStorage.getItem('partnerTenant');
-    
-    if (storedUserId && storedEmail) {
-      setUserData({
-        userId: storedUserId,
-        email: storedEmail,
-        tenant: storedTenant ? JSON.parse(storedTenant) : null,
-      });
-    }
-    
-    setIsLoading(false);
-  }, []);
+    const loadUserData = async () => {
+      // Check URL parameters first
+      const urlUserId = userId || searchParams.get('userId');
+      const urlEmail = email || searchParams.get('email');
+      
+      if (urlUserId && urlEmail) {
+        setUserData({
+          userId: urlUserId,
+          email: urlEmail,
+          tenant: null,
+        });
+        setIsLoading(false);
+        return;
+      }
+      
+      // Check if we have a Stripe session_id
+      const sessionId = searchParams.get('session_id');
+      if (sessionId) {
+        try {
+          const response = await fetch(`/api/stripe/get-user-from-session?session_id=${sessionId}`);
+          if (response.ok) {
+            const data = await response.json();
+            setUserData({
+              userId: data.userId,
+              email: data.email,
+              tenant: { id: data.tenantId },
+            });
+            setIsLoading(false);
+            return;
+          }
+        } catch (error) {
+          console.error('Error fetching user from session:', error);
+        }
+      }
+      
+      // Fallback to session storage
+      const storedUserId = sessionStorage.getItem('partnerUserId');
+      const storedEmail = sessionStorage.getItem('partnerEmail');
+      const storedTenant = sessionStorage.getItem('partnerTenant');
+      
+      if (storedUserId && storedEmail) {
+        setUserData({
+          userId: storedUserId,
+          email: storedEmail,
+          tenant: storedTenant ? JSON.parse(storedTenant) : null,
+        });
+      }
+      
+      setIsLoading(false);
+    };
+
+    loadUserData();
+  }, [userId, email, searchParams]);
 
   const handleStartVerification = () => {
-    if (userData?.userId && userData?.email) {
-      router.push(`/auth/verify-email?userId=${userData.userId}&email=${encodeURIComponent(userData.email)}`);
+    // Check URL params first, then userData state
+    const urlUserId = userId || searchParams.get('userId');
+    const urlEmail = email || searchParams.get('email');
+    const finalUserId = urlUserId || userData?.userId;
+    const finalEmail = urlEmail || userData?.email;
+    
+    if (finalUserId && finalEmail) {
+      router.push(`/auth/verify-email?userId=${finalUserId}&email=${encodeURIComponent(finalEmail)}`);
     } else {
       alert('User data not found. Please contact support.');
     }

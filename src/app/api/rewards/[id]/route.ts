@@ -43,10 +43,36 @@ export async function PUT(
 
   try {
     const { id } = params;
-    const { name, description, points } = await request.json();
+    const { name, description, discountPercentage, validFrom, validTo } = await request.json();
     
-    if (!name || !description || !points) {
+    // Check if reward exists and get its current status
+    const existingReward = await prisma.reward.findUnique({
+      where: { id }
+    });
+    
+    if (!existingReward) {
+      return NextResponse.json({ error: 'Reward not found' }, { status: 404 });
+    }
+    
+    // Prevent editing if reward is approved
+    if (existingReward.approvalStatus === 'APPROVED') {
+      return NextResponse.json({ 
+        error: 'This voucher has been approved and cannot be edited. Please contact an administrator if you need to make changes.' 
+      }, { status: 403 });
+    }
+    
+    if (!name || !description || discountPercentage === undefined || !validFrom || !validTo) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+    
+    // Validate dates
+    const fromDate = new Date(validFrom);
+    const toDate = new Date(validTo);
+    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+      return NextResponse.json({ error: 'Invalid date format' }, { status: 400 });
+    }
+    if (toDate < fromDate) {
+      return NextResponse.json({ error: 'Valid To date must be after Valid From date' }, { status: 400 });
     }
     
     const reward = await prisma.reward.update({
@@ -54,7 +80,9 @@ export async function PUT(
       data: {
         name,
         description,
-        points: parseInt(points),
+        discountPercentage: Number(discountPercentage),
+        validFrom: new Date(validFrom),
+        validTo: new Date(validTo),
       },
     });
     

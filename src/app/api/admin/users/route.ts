@@ -62,12 +62,8 @@ export async function GET(req: NextRequest) {
         }
       },
       redemptions: {
-        include: {
-          reward: {
-            select: {
-              points: true
-            }
-          }
+        select: {
+          points: true
         }
       }
     },
@@ -88,7 +84,7 @@ export async function GET(req: NextRequest) {
       .reduce((sum: any, t: any) => sum + t.points, 0);
 
     const totalPointsSpent = customer.redemptions
-      .reduce((sum: any, r: any) => sum + r.reward.points, 0);
+      .reduce((sum: any, r: any) => sum + r.points, 0);
 
     return {
       id: customer.id,

@@ -18,6 +18,20 @@ export async function GET(request: NextRequest) {
 
     const rewards = await prisma.reward.findMany({
       include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            partnerUserId: true,
+            partnerUser: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              }
+            }
+          }
+        },
         redemptions: {
           include: {
             customer: {
@@ -59,20 +73,20 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, description, points, createdAt, tenantId } = body;
+    const { name, description, discountPercentage, createdAt, tenantId } = body;
 
     // Validate required fields
-    if (!name || !description || points === undefined) {
+    if (!name || !description || discountPercentage === undefined) {
       return NextResponse.json(
-        { error: 'Name, description, and points are required' },
+        { error: 'Name, description, and discountPercentage are required' },
         { status: 400 }
       );
     }
 
-    // Validate points is a positive number
-    if (points < 0) {
+    // Validate discountPercentage is a positive number between 0 and 100
+    if (discountPercentage < 0 || discountPercentage > 100) {
       return NextResponse.json(
-        { error: 'Points must be a positive number' },
+        { error: 'Discount percentage must be between 0 and 100' },
         { status: 400 }
       );
     }
@@ -112,7 +126,7 @@ export async function POST(request: NextRequest) {
       data: {
         name,
         description,
-        points: parseInt(points),
+        discountPercentage: parseFloat(discountPercentage),
         tenantId: finalTenantId,
         createdAt: createdAt ? new Date(createdAt) : new Date(),
         approvalStatus: 'APPROVED', // Admin-created rewards are auto-approved

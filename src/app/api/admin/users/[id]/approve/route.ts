@@ -23,10 +23,10 @@ export async function PATCH(
   try {
     const { approvalStatus } = await req.json();
 
-    // Get the target user
+    // Get the target user with current status
     const targetUser = await prisma.user.findUnique({
       where: { id: params.id },
-      select: { role: true, email: true },
+      select: { role: true, email: true, approvalStatus: true, emailVerified: true },
     });
 
     if (!targetUser) {
@@ -43,13 +43,38 @@ export async function PATCH(
       }
     }
 
+    // For partners stuck in verification states, handle them appropriately
+    let updateData: any = {
+      approvalStatus,
+      suspended: approvalStatus === 'ACTIVE' ? false : true
+    };
+
+    // If partner is stuck at email verification and we're approving them, mark email as verified
+    if (targetUser.role === 'PARTNER' && 
+        targetUser.approvalStatus === 'PENDING_EMAIL_VERIFICATION' && 
+        approvalStatus === 'ACTIVE') {
+      updateData.emailVerified = new Date();
+      console.log(`[Admin Approve] Partner ${targetUser.email} was stuck at email verification, marking email as verified`);
+    }
+
+    // If partner is stuck at mobile verification and we're approving them, skip to ACTIVE
+    if (targetUser.role === 'PARTNER' && 
+        targetUser.approvalStatus === 'PENDING_MOBILE_VERIFICATION' && 
+        approvalStatus === 'ACTIVE') {
+      console.log(`[Admin Approve] Partner ${targetUser.email} was stuck at mobile verification, approving directly`);
+    }
+
+    // If partner is at PENDING_ADMIN_APPROVAL and we're approving them, activate
+    if (targetUser.role === 'PARTNER' && 
+        targetUser.approvalStatus === 'PENDING_ADMIN_APPROVAL' && 
+        approvalStatus === 'ACTIVE') {
+      console.log(`[Admin Approve] Partner ${targetUser.email} approved from PENDING_ADMIN_APPROVAL to ACTIVE`);
+    }
+
     // Update approval status and unsuspend if activating
     const updatedUser = await prisma.user.update({
       where: { id: params.id },
-      data: { 
-        approvalStatus,
-        suspended: approvalStatus === 'ACTIVE' ? false : true
-      },
+      data: updateData,
       select: {
         id: true,
         name: true,

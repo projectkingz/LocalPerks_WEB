@@ -95,7 +95,7 @@ export const defaultPointsConfig: TenantPointsConfig = {
   minimumSpend: 0,
   roundPointsUp: true,
   bankHolidayBonus: 2,
-  pointFaceValue: 0.01, // £0.01 per point (100 points = £1)
+  pointFaceValue: 0.008, // £0.008 per point (125 points = £1)
   platformChargePercentage: 2.5 // 2.5% platform charge
 };
 

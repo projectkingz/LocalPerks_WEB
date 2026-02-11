@@ -172,51 +172,30 @@ function SignInContent() {
           // Redirect to customer 2FA login verification page
           window.location.href = `/auth/verify-login-2fa-customer?email=${encodeURIComponent(email)}`;
           return;
-        } else if (result.error === 'PARTNER_EMAIL_VERIFICATION_REQUIRED') {
-          // Get userId from the user - we need to fetch it
-          const userResponse = await fetch(`/api/auth/user-by-email?email=${encodeURIComponent(email)}`);
-          if (userResponse.ok) {
-            const userData = await userResponse.json();
-            window.location.href = `/auth/verify-email?userId=${userData.id}&email=${encodeURIComponent(email)}`;
-          } else {
-            setError('Please complete email verification. Check your email for the verification code.');
-          }
-          return;
-        } else if (result.error === 'PARTNER_MOBILE_VERIFICATION_REQUIRED') {
-          // Get userId from the user
-          const userResponse = await fetch(`/api/auth/user-by-email?email=${encodeURIComponent(email)}`);
-          if (userResponse.ok) {
-            const userData = await userResponse.json();
-            window.location.href = `/auth/verify-mobile?userId=${userData.id}&email=${encodeURIComponent(email)}`;
-          } else {
-            setError('Please complete mobile verification.');
-          }
-          return;
-        } else if (result.error === 'CUSTOMER_EMAIL_VERIFICATION_REQUIRED') {
-          // Get userId from the user
-          const userResponse = await fetch(`/api/auth/user-by-email?email=${encodeURIComponent(email)}`);
-          if (userResponse.ok) {
-            const userData = await userResponse.json();
-            window.location.href = `/auth/verify-email?userId=${userData.id}&email=${encodeURIComponent(email)}`;
-          } else {
-            setError('Please complete email verification. Check your email for the verification code.');
-          }
-          return;
-        } else if (result.error === 'CUSTOMER_MOBILE_VERIFICATION_REQUIRED') {
-          // Get userId from the user
-          const userResponse = await fetch(`/api/auth/user-by-email?email=${encodeURIComponent(email)}`);
-          if (userResponse.ok) {
-            const userData = await userResponse.json();
-            window.location.href = `/auth/verify-mobile?userId=${userData.id}&email=${encodeURIComponent(email)}`;
-          } else {
-            setError('Please complete mobile verification.');
-          }
-          return;
         } else if (result.error === 'ACCOUNT_UNDER_REVIEW') {
           setError('⏳ ACCOUNT UNDER REVIEW - Your account is under review and will be activated by an administrator. You will be able to sign in once approved.');
         } else if (result.error === 'EMAIL_VERIFICATION_REQUIRED') {
           setError('📧 EMAIL VERIFICATION REQUIRED - Please verify your email address before signing in. Check your inbox for the verification link.');
         } else if (result.error === 'PENDING_APPROVAL') {
+          // For partners, redirect to pending-approval page instead of showing error
+          // Check if this is a partner by fetching user info
+          try {
+            const userResponse = await fetch(`/api/auth/user-by-email?email=${encodeURIComponent(email)}`);
+            if (userResponse.ok) {
+              const userData = await userResponse.json();
+              if (userData.role === 'PARTNER') {
+                window.location.href = '/partner/pending-approval';
+                return;
+              }
+            }
+          } catch (err) {
+            console.error('Error fetching user info:', err);
+          }
+          // Fallback: also check type parameter
+          if (type === 'partner') {
+            window.location.href = '/partner/pending-approval';
+            return;
+          }
           setError('⏳ PENDING APPROVAL - Your account is pending approval. You will be notified once an administrator activates your account.');
         } else if (result.error === 'ACCOUNT_SUSPENDED') {
           setError('🚫 ACCOUNT SUSPENDED - Your account has been suspended. Please contact support for assistance.');
@@ -276,39 +255,24 @@ function SignInContent() {
 
   if (isInitialLoad) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full space-y-8 bg-white rounded-2xl shadow-lg p-8">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-blue-50/40 to-indigo-50/30 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-2xl w-full space-y-8 bg-white rounded-3xl shadow-2xl p-12 md:p-16 border-2 border-gray-100">
           <div className="animate-pulse space-y-8">
-            {/* Logo skeleton */}
             <div className="flex justify-center">
-              <div className="w-20 h-20 bg-gray-200 rounded-full"></div>
+              <div className="w-24 h-24 bg-gray-200 rounded-full"></div>
             </div>
-            
-            {/* Title skeletons */}
             <div className="space-y-3 text-center">
-              <div className="h-8 bg-gray-200 rounded-lg w-3/4 mx-auto"></div>
-              <div className="h-4 bg-gray-200 rounded-lg w-1/2 mx-auto"></div>
+              <div className="h-10 bg-gray-200 rounded-lg w-3/4 mx-auto"></div>
+              <div className="h-5 bg-gray-200 rounded-lg w-1/2 mx-auto"></div>
             </div>
-
-            {/* Social buttons skeleton */}
             <div className="space-y-4">
-              <div className="h-14 bg-gray-200 rounded-xl w-full"></div>
-              <div className="h-14 bg-gray-200 rounded-xl w-full"></div>
+              <div className="h-16 bg-gray-200 rounded-xl w-full"></div>
             </div>
-
-            {/* Divider skeleton */}
-            <div className="relative py-4">
-              <div className="h-0.5 bg-gray-200 w-full"></div>
+            <div className="space-y-8">
+              <div className="h-20 bg-gray-200 rounded-3xl w-full"></div>
+              <div className="h-20 bg-gray-200 rounded-3xl w-full"></div>
             </div>
-
-            {/* Form fields skeleton */}
-            <div className="space-y-4">
-              <div className="h-14 bg-gray-200 rounded-xl w-full"></div>
-              <div className="h-14 bg-gray-200 rounded-xl w-full"></div>
-            </div>
-
-            {/* Button skeleton */}
-            <div className="h-14 bg-gray-200 rounded-xl w-full"></div>
+            <div className="h-20 bg-gray-200 rounded-3xl w-full"></div>
           </div>
         </div>
       </div>
@@ -316,24 +280,23 @@ function SignInContent() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-blue-50/30 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-blue-50/40 to-indigo-50/30 py-12 px-4 sm:px-6 lg:px-8">
       <motion.div
-        initial="hidden"
-        animate="visible"
-        variants={fadeIn}
-        transition={{ duration: 0.5 }}
-        className="max-w-md w-full space-y-8 bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-8 border border-gray-100"
+        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.6, ease: 'easeOut' }}
+        className="max-w-2xl w-full space-y-10 bg-white rounded-3xl shadow-2xl p-10 md:p-12 border-2 border-gray-100/50 backdrop-blur-sm"
       >
         <div className="text-center">
           <motion.div
             initial={{ scale: 0.5, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.5 }}
-            className="flex justify-center mb-6"
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="flex justify-center mb-8"
           >
-            <div className="relative w-20 h-20">
+            <div className="relative w-28 h-28 md:w-32 md:h-32">
               {logoError ? (
-                <Star className="w-20 h-20 text-blue-600" />
+                <Star className="w-28 h-28 md:w-32 md:h-32 text-blue-600" />
               ) : (
                 <Image
                   src="/logo.png"
@@ -349,16 +312,16 @@ function SignInContent() {
           <motion.h2
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-            className="text-4xl font-extrabold text-gray-900 mb-2"
+            transition={{ delay: 0.2, duration: 0.6 }}
+            className="text-5xl md:text-6xl font-extrabold text-gray-900 mb-3 tracking-tight"
           >
             Welcome Back
           </motion.h2>
           <motion.p
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.3, duration: 0.5 }}
-            className="text-lg text-gray-600"
+            transition={{ delay: 0.3, duration: 0.6 }}
+            className="text-xl md:text-2xl text-gray-600 font-medium"
           >
             {type === 'admin' ? 'Sign in to access admin panel' : 
              type === 'partner' ? 'Sign in to access your partner profile' : 
@@ -383,9 +346,9 @@ function SignInContent() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1, duration: 0.3 }}
                   onClick={() => handleSocialSignIn('google')}
-                  className="w-full flex items-center justify-center px-4 py-4 bg-white text-gray-700 rounded-xl border-2 border-gray-200 hover:border-blue-500 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-200 text-lg font-medium transition-all duration-200 transform hover:scale-[1.02]"
+                  className="w-full flex items-center justify-center px-6 py-5 bg-white text-gray-700 rounded-2xl border-2 border-gray-200 hover:border-blue-500 hover:bg-gray-50 focus:outline-none focus:ring-4 focus:ring-blue-200 text-lg font-semibold transition-all duration-200 transform hover:scale-[1.02] shadow-md hover:shadow-lg"
                 >
-                  <FaGoogle className="mr-2" /> Sign in with Google
+                  <FaGoogle className="mr-3 text-xl" /> Sign in with Google
                 </motion.button>
               )}
               
@@ -398,9 +361,9 @@ function SignInContent() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3, duration: 0.3 }}
                   onClick={() => handleSocialSignIn('facebook')}
-                  className="w-full flex items-center justify-center px-4 py-4 bg-blue-600 text-white rounded-xl border-2 border-transparent hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-lg font-medium transition-all duration-200 transform hover:scale-[1.02]"
+                  className="w-full flex items-center justify-center px-6 py-5 bg-blue-600 text-white rounded-2xl border-2 border-transparent hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-offset-2 text-lg font-semibold transition-all duration-200 transform hover:scale-[1.02] shadow-lg hover:shadow-xl"
                 >
-                  <FaFacebook className="mr-2" /> Sign in with Facebook
+                  <FaFacebook className="mr-3 text-xl" /> Sign in with Facebook
                 </motion.button>
               )}
             </motion.div>
@@ -415,10 +378,10 @@ function SignInContent() {
             className="relative"
           >
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200"></div>
+              <div className="w-full border-t-2 border-gray-200"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">Or continue with email</span>
+              <span className="px-4 bg-white text-gray-500 font-medium text-base">Or continue with email</span>
             </div>
           </motion.div>
         )}
@@ -430,7 +393,7 @@ function SignInContent() {
             transition={{ delay: 0.45, duration: 0.3 }}
             className="text-center"
           >
-            <p className="text-xs text-gray-500 bg-blue-50 px-3 py-2 rounded-lg border border-blue-100">
+            <p className="text-sm text-gray-500 bg-blue-50 px-4 py-3 rounded-xl border-2 border-blue-100 font-medium">
               💡 <strong>Security Note:</strong> You can only use the same authentication method you used when signing up. 
               If you signed up with email/password, you cannot use social login and vice versa.
             </p>
@@ -441,10 +404,10 @@ function SignInContent() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4, duration: 0.5 }}
-          className="mt-8 space-y-6"
+          className="mt-10 space-y-8"
           onSubmit={handleSubmit}
         >
-          <div className="space-y-5">
+          <div className="space-y-6">
             <div className="relative group">
               <input
                 type="email"
@@ -454,17 +417,17 @@ function SignInContent() {
                 onChange={handleEmailChange}
                 onBlur={() => handleBlur('email')}
                 required
-                className="block w-full px-4 py-3.5 text-gray-900 bg-gray-50 border-2 border-gray-200 rounded-xl appearance-none transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 peer group-hover:border-gray-300"
+                className="block w-full px-8 py-8 text-2xl text-gray-900 bg-gray-50 border-2 border-gray-200 rounded-3xl appearance-none transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-500/30 focus:border-blue-500 focus:bg-white peer group-hover:border-gray-300 shadow-lg hover:shadow-xl min-h-[80px]"
                 placeholder=" "
               />
               <label
                 htmlFor="email"
-                className="absolute text-sm font-medium text-gray-500 duration-200 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-gray-50 px-2 peer-focus:px-2 peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1 peer-focus:bg-gray-50 group-hover:bg-gray-50"
+                className="absolute text-xl font-medium text-gray-600 duration-200 transform -translate-y-4 scale-75 top-4 z-10 origin-[0] bg-white px-3 peer-focus:px-3 peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-4 peer-focus:scale-75 peer-focus:-translate-y-4 left-3 peer-focus:bg-white group-hover:bg-white"
               >
                 Email address
               </label>
               {touched.email && formErrors.email && (
-                <p className="mt-1 text-sm text-red-500">{formErrors.email}</p>
+                <p className="mt-2 text-base text-red-500 font-medium">{formErrors.email}</p>
               )}
             </div>
 
@@ -477,24 +440,24 @@ function SignInContent() {
                 onChange={handlePasswordChange}
                 onBlur={() => handleBlur('password')}
                 required
-                className="block w-full px-4 py-3.5 text-gray-900 bg-gray-50 border-2 border-gray-200 rounded-xl appearance-none transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 peer group-hover:border-gray-300"
+                className="block w-full px-8 py-8 text-2xl text-gray-900 bg-gray-50 border-2 border-gray-200 rounded-3xl appearance-none transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-500/30 focus:border-blue-500 focus:bg-white peer group-hover:border-gray-300 shadow-lg hover:shadow-xl min-h-[80px]"
                 placeholder=" "
               />
               <label
                 htmlFor="password"
-                className="absolute text-sm font-medium text-gray-500 duration-200 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-gray-50 px-2 peer-focus:px-2 peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1 peer-focus:bg-gray-50 group-hover:bg-gray-50"
+                className="absolute text-xl font-medium text-gray-600 duration-200 transform -translate-y-4 scale-75 top-4 z-10 origin-[0] bg-white px-3 peer-focus:px-3 peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-4 peer-focus:scale-75 peer-focus:-translate-y-4 left-3 peer-focus:bg-white group-hover:bg-white"
               >
                 Password
               </label>
               {touched.password && formErrors.password && (
-                <p className="mt-1 text-sm text-red-500">{formErrors.password}</p>
+                <p className="mt-2 text-base text-red-500 font-medium">{formErrors.password}</p>
               )}
             </div>
 
-            <div className="flex items-center justify-end">
+            <div className="flex items-center justify-end pt-2">
               <Link
                 href="/auth/forgot-password"
-                className="text-sm font-medium text-blue-600 hover:text-blue-500 transition-colors"
+                className="text-base font-semibold text-blue-600 hover:text-blue-700 transition-colors underline decoration-2 underline-offset-2"
               >
                 Forgot your password?
               </Link>
@@ -506,7 +469,7 @@ function SignInContent() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="rounded-xl bg-red-50 p-4 border border-red-100"
+              className="rounded-2xl bg-red-50 p-5 border-2 border-red-200 shadow-md"
             >
               <div className="flex">
                 <div className="flex-shrink-0">
@@ -515,7 +478,7 @@ function SignInContent() {
                   </svg>
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm font-medium text-red-800" role="alert">
+                  <p className="text-base font-semibold text-red-800" role="alert">
                     {error?.toLowerCase().includes('suspend')
                       ? 'Your account has been suspended. Please contact Customer Support.'
                       : error}
@@ -532,10 +495,10 @@ function SignInContent() {
             <button
               type="submit"
               disabled={loading}
-              className={`group relative w-full flex justify-center py-3.5 px-4 border border-transparent text-lg font-semibold rounded-xl text-white shadow-sm ${
+              className={`group relative w-full flex justify-center py-8 px-8 border border-transparent text-2xl font-bold rounded-3xl text-white shadow-xl transition-all duration-200 min-h-[80px] ${
                 loading
                   ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200'
+                  : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-offset-2 focus:ring-blue-500 hover:shadow-2xl transform hover:scale-[1.02]'
               }`}
             >
               {loading ? (
@@ -544,10 +507,10 @@ function SignInContent() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Signing in...
+                  <span className="text-2xl">Signing in...</span>
                 </div>
               ) : (
-                'Sign In'
+                <span className="text-2xl">Sign In</span>
               )}
             </button>
           </motion.div>
@@ -557,23 +520,23 @@ function SignInContent() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.6, duration: 0.3 }}
-          className="mt-8 space-y-4"
+          className="mt-10 space-y-6"
         >
-          <div className="relative">
+          <div className="relative py-2">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200"></div>
+              <div className="w-full border-t-2 border-gray-200"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">New to Rewards?</span>
+              <span className="px-4 bg-white text-gray-500 font-medium text-base">New to Rewards?</span>
             </div>
           </div>
 
-          <div className="flex flex-col space-y-3">
+          <div className="flex flex-col space-y-4">
             <motion.a
               href="/auth/register/customer"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="flex items-center justify-center px-4 py-3 border-2 border-blue-500 text-blue-600 rounded-xl hover:bg-blue-50 transition-colors duration-200 text-lg font-medium"
+              className="flex items-center justify-center px-6 py-5 border-2 border-blue-500 text-blue-600 rounded-2xl hover:bg-blue-50 transition-colors duration-200 text-lg font-semibold shadow-md hover:shadow-lg"
             >
               <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -585,7 +548,7 @@ function SignInContent() {
               href="/auth/register/partner"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="flex items-center justify-center px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors duration-200 text-lg font-medium"
+              className="flex items-center justify-center px-6 py-5 border-2 border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-colors duration-200 text-lg font-semibold shadow-md hover:shadow-lg"
             >
               <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -594,13 +557,13 @@ function SignInContent() {
             </motion.a>
           </div>
 
-          <p className="text-center text-sm text-gray-500">
+          <p className="text-center text-base text-gray-600 font-medium">
             By signing up, you agree to our{' '}
-            <a href="/terms" className="text-blue-600 hover:text-blue-500 font-medium">
+            <a href="/terms" className="text-blue-600 hover:text-blue-700 font-bold underline decoration-2 underline-offset-2">
               Terms of Service
             </a>{' '}
             and{' '}
-            <a href="/privacy" className="text-blue-600 hover:text-blue-500 font-medium">
+            <a href="/privacy" className="text-blue-600 hover:text-blue-700 font-bold underline decoration-2 underline-offset-2">
               Privacy Policy
             </a>
           </p>

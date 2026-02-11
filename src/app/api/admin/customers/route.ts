@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
               select: {
                 id: true,
                 name: true,
-                points: true,
+                discountPercentage: true,
               }
             }
           },
@@ -109,8 +109,8 @@ export async function GET(request: NextRequest) {
         .filter((t: any) => t.type === 'EARNED' && t.status === 'APPROVED')
         .reduce((sum: number, t: any) => sum + t.points, 0);
 
-      // Calculate discount earned (assuming 1 point = £0.01 face value)
-      const pointFaceValue = 0.01; // £0.01 per point
+      // Calculate discount earned (assuming 1 point = £0.008 face value)
+      const pointFaceValue = 0.008; // £0.008 per point
       const discountEarned = totalPointsEarned * pointFaceValue;
 
       return {

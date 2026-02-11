@@ -115,6 +115,7 @@ export async function POST(request: NextRequest) {
         select: {
           points: true,
           tenantId: true,
+          displayId: true,
         }
       });
       
@@ -127,6 +128,7 @@ export async function POST(request: NextRequest) {
           points: customer.points,
           tier: tier,
           tenantId: customer.tenantId,
+          displayId: customer.displayId || null, // Include displayId for mobile app
         };
       }
     } else if (user.role === 'PARTNER' && user.tenantId) {

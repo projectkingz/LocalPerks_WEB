@@ -13,8 +13,9 @@ export default function SystemConfigPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [config, setConfig] = useState({
-    pointFaceValue: 0.01,
-    systemFixedCharge: 0.001,
+    pointFaceValue: 0.008,
+    platformReward: 0.007,
+    systemFixedCharge: 0.01,
     systemVariableCharge: 0.06,
   });
   const [subscriptionTiers, setSubscriptionTiers] = useState([
@@ -51,6 +52,7 @@ export default function SystemConfigPage() {
           const data = await response.json();
           setConfig({
             pointFaceValue: data.pointFaceValue,
+            platformReward: data.platformReward || 0.007,
             systemFixedCharge: data.systemFixedCharge,
             systemVariableCharge: data.systemVariableCharge,
           });
@@ -101,9 +103,9 @@ export default function SystemConfigPage() {
   };
 
   const calculateExampleCharge = (points: number) => {
-    const faceValueCost = points * config.pointFaceValue;
-    const fixedCost = points * config.systemFixedCharge;
-    const subtotal = faceValueCost + fixedCost;
+    const customerAndPlatformReward = points * (config.pointFaceValue + config.platformReward);
+    const fixedCharge = points * config.systemFixedCharge;
+    const subtotal = customerAndPlatformReward + fixedCharge;
     const total = subtotal * (1 + config.systemVariableCharge);
     return total.toFixed(4);
   };
@@ -176,12 +178,8 @@ export default function SystemConfigPage() {
           className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100"
         >
           <div className="space-y-6">
-            {/* Point Face Value */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-                <DollarSign className="h-4 w-4 text-blue-600 mr-2" />
-                Point Face Value (£ per point)
-              </label>
+            {/* Point Face Value (Customer Reward) */}
+            <div className="relative group">
               <input
                 type="number"
                 step="0.001"
@@ -190,19 +188,42 @@ export default function SystemConfigPage() {
                 onChange={(e) =>
                   setConfig({ ...config, pointFaceValue: parseFloat(e.target.value) || 0 })
                 }
-                className="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-lg px-4 py-3"
+                className="block w-full px-8 py-8 text-2xl text-gray-900 bg-gray-50 border-2 border-gray-200 rounded-3xl appearance-none transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-500/30 focus:border-blue-500 focus:bg-white peer group-hover:border-gray-300 shadow-lg hover:shadow-xl min-h-[80px]"
+                placeholder=" "
               />
-              <p className="mt-1 text-sm text-gray-500">
+              <label className="absolute text-xl font-medium text-gray-600 duration-200 transform -translate-y-4 scale-75 top-4 z-10 origin-[0] bg-white px-3 peer-focus:px-3 peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-4 peer-focus:scale-75 peer-focus:-translate-y-4 left-3 peer-focus:bg-white group-hover:bg-white flex items-center">
+                <DollarSign className="h-5 w-5 text-blue-600 mr-2" />
+                Customer Reward - Point Face Value (£ per point)
+              </label>
+              <p className="mt-2 text-base text-gray-500 font-medium">
                 Current: 1 point = £{config.pointFaceValue.toFixed(3)}
               </p>
             </div>
 
-            {/* System Fixed Charge */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-                <TrendingUp className="h-4 w-4 text-blue-600 mr-2" />
-                System Fixed Charge (£ per point)
+            {/* Platform Reward */}
+            <div className="relative group">
+              <input
+                type="number"
+                step="0.001"
+                min="0"
+                value={config.platformReward}
+                onChange={(e) =>
+                  setConfig({ ...config, platformReward: parseFloat(e.target.value) || 0 })
+                }
+                className="block w-full px-8 py-8 text-2xl text-gray-900 bg-gray-50 border-2 border-gray-200 rounded-3xl appearance-none transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-purple-500/30 focus:border-purple-500 focus:bg-white peer group-hover:border-gray-300 shadow-lg hover:shadow-xl min-h-[80px]"
+                placeholder=" "
+              />
+              <label className="absolute text-xl font-medium text-gray-600 duration-200 transform -translate-y-4 scale-75 top-4 z-10 origin-[0] bg-white px-3 peer-focus:px-3 peer-focus:text-purple-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-4 peer-focus:scale-75 peer-focus:-translate-y-4 left-3 peer-focus:bg-white group-hover:bg-white flex items-center">
+                <DollarSign className="h-5 w-5 text-purple-600 mr-2" />
+                Platform Reward (£ per point)
               </label>
+              <p className="mt-2 text-base text-gray-500 font-medium">
+                Current: £{config.platformReward.toFixed(3)} per point
+              </p>
+            </div>
+
+            {/* System Fixed Charge */}
+            <div className="relative group">
               <input
                 type="number"
                 step="0.0001"
@@ -211,19 +232,20 @@ export default function SystemConfigPage() {
                 onChange={(e) =>
                   setConfig({ ...config, systemFixedCharge: parseFloat(e.target.value) || 0 })
                 }
-                className="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-lg px-4 py-3"
+                className="block w-full px-8 py-8 text-2xl text-gray-900 bg-gray-50 border-2 border-gray-200 rounded-3xl appearance-none transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-500/30 focus:border-blue-500 focus:bg-white peer group-hover:border-gray-300 shadow-lg hover:shadow-xl min-h-[80px]"
+                placeholder=" "
               />
-              <p className="mt-1 text-sm text-gray-500">
+              <label className="absolute text-xl font-medium text-gray-600 duration-200 transform -translate-y-4 scale-75 top-4 z-10 origin-[0] bg-white px-3 peer-focus:px-3 peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-4 peer-focus:scale-75 peer-focus:-translate-y-4 left-3 peer-focus:bg-white group-hover:bg-white flex items-center">
+                <TrendingUp className="h-5 w-5 text-blue-600 mr-2" />
+                System Fixed Charge (£ per point)
+              </label>
+              <p className="mt-2 text-base text-gray-500 font-medium">
                 Current: £{config.systemFixedCharge.toFixed(4)} per point issued
               </p>
             </div>
 
             {/* System Variable Charge */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-                <Percent className="h-4 w-4 text-blue-600 mr-2" />
-                System Variable Charge (Issuance Margin %)
-              </label>
+            <div className="relative group">
               <input
                 type="number"
                 step="0.01"
@@ -233,9 +255,14 @@ export default function SystemConfigPage() {
                 onChange={(e) =>
                   setConfig({ ...config, systemVariableCharge: (parseFloat(e.target.value) || 0) / 100 })
                 }
-                className="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-lg px-4 py-3"
+                className="block w-full px-8 py-8 text-2xl text-gray-900 bg-gray-50 border-2 border-gray-200 rounded-3xl appearance-none transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-500/30 focus:border-blue-500 focus:bg-white peer group-hover:border-gray-300 shadow-lg hover:shadow-xl min-h-[80px]"
+                placeholder=" "
               />
-              <p className="mt-1 text-sm text-gray-500">
+              <label className="absolute text-xl font-medium text-gray-600 duration-200 transform -translate-y-4 scale-75 top-4 z-10 origin-[0] bg-white px-3 peer-focus:px-3 peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-4 peer-focus:scale-75 peer-focus:-translate-y-4 left-3 peer-focus:bg-white group-hover:bg-white flex items-center">
+                <Percent className="h-5 w-5 text-blue-600 mr-2" />
+                System Variable Charge (Issuance Margin %)
+              </label>
+              <p className="mt-2 text-base text-gray-500 font-medium">
                 Current: {(config.systemVariableCharge * 100).toFixed(2)}% margin on issuance
               </p>
             </div>
@@ -244,7 +271,7 @@ export default function SystemConfigPage() {
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mt-6">
               <h3 className="font-semibold text-blue-900 mb-3">Points Issue Charge Formula</h3>
               <p className="text-blue-800 font-mono text-sm mb-4">
-                (Points × Point Face Value + Points × System Fixed Cost) × (1 + System Variable Charge)
+                [(Points × (Customer Reward + Platform Reward)) + (Points × System Fixed Charge)] × (1 + System Variable Charge)
               </p>
               <div className="bg-white rounded-lg p-4 border border-blue-100">
                 <p className="text-sm text-gray-700 mb-2 font-medium">Example Calculation:</p>
@@ -272,15 +299,21 @@ export default function SystemConfigPage() {
             </div>
 
             {/* Save Button */}
-            <div className="flex justify-end pt-4">
-              <button
+            <div className="flex justify-end pt-6">
+              <motion.button
+                whileHover={{ scale: isSaving ? 1 : 1.02 }}
+                whileTap={{ scale: isSaving ? 1 : 0.98 }}
                 onClick={handleSave}
                 disabled={isSaving}
-                className="flex items-center px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
+                className={`group relative flex items-center justify-center py-8 px-8 border border-transparent text-2xl font-bold rounded-3xl text-white shadow-xl transition-all duration-200 min-h-[80px] ${
+                  isSaving
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-offset-2 focus:ring-blue-500 hover:shadow-2xl transform hover:scale-[1.02]'
+                }`}
               >
-                <Save className="h-5 w-5 mr-2" />
-                {isSaving ? 'Saving...' : 'Save Configuration'}
-              </button>
+                <Save className="h-6 w-6 mr-3" />
+                <span>{isSaving ? 'Saving...' : 'Save Configuration'}</span>
+              </motion.button>
             </div>
           </div>
         </motion.div>
@@ -324,7 +357,7 @@ export default function SystemConfigPage() {
                         type="text"
                         value={tier.displayName}
                         onChange={(e) => handleTierUpdate(tier.name, 'displayName', e.target.value)}
-                        className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2"
+                        className="w-full px-6 py-6 text-xl text-gray-900 bg-gray-50 border-2 border-gray-200 rounded-2xl appearance-none transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-500/30 focus:border-blue-500 focus:bg-white shadow-lg hover:shadow-xl"
                       />
                     ) : (
                       <p className="text-gray-900 font-medium">{tier.displayName}</p>
@@ -342,7 +375,7 @@ export default function SystemConfigPage() {
                         min="0"
                         value={tier.price}
                         onChange={(e) => handleTierUpdate(tier.name, 'price', parseFloat(e.target.value) || 0)}
-                        className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2"
+                        className="w-full px-6 py-6 text-xl text-gray-900 bg-gray-50 border-2 border-gray-200 rounded-2xl appearance-none transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-500/30 focus:border-blue-500 focus:bg-white shadow-lg hover:shadow-xl"
                       />
                     ) : (
                       <p className="text-2xl font-bold text-blue-600">£{tier.price}</p>
@@ -357,7 +390,7 @@ export default function SystemConfigPage() {
                       <select
                         value={tier.isActive ? 'active' : 'inactive'}
                         onChange={(e) => handleTierUpdate(tier.name, 'isActive', e.target.value === 'active')}
-                        className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2"
+                        className="w-full px-6 py-6 text-xl text-gray-900 bg-gray-50 border-2 border-gray-200 rounded-2xl appearance-none transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-500/30 focus:border-blue-500 focus:bg-white shadow-lg hover:shadow-xl"
                       >
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
@@ -374,19 +407,23 @@ export default function SystemConfigPage() {
                   </div>
                   
                   {editingTier === tier.name && (
-                    <div className="flex space-x-2 pt-2">
-                      <button
+                    <div className="flex space-x-3 pt-4">
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={() => handleTierSave(tier.name)}
-                        className="flex-1 bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                        className="flex-1 bg-blue-600 text-white px-6 py-6 rounded-2xl hover:bg-blue-700 transition-all text-lg font-bold shadow-lg hover:shadow-xl"
                       >
                         Save
-                      </button>
-                      <button
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={() => setEditingTier(null)}
-                        className="flex-1 bg-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-400 transition-colors text-sm font-medium"
+                        className="flex-1 bg-gray-300 text-gray-700 px-6 py-6 rounded-2xl hover:bg-gray-400 transition-all text-lg font-bold shadow-lg hover:shadow-xl"
                       >
                         Cancel
-                      </button>
+                      </motion.button>
                     </div>
                   )}
                 </div>

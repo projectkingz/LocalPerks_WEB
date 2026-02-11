@@ -6,7 +6,10 @@ export async function POST(req: Request) {
   try {
     const { userId, code } = await req.json();
 
+    console.log('[verify-email] Request received:', { userId, code: code ? '***' : 'missing' });
+
     if (!userId || !code) {
+      console.log('[verify-email] Missing userId or code');
       return NextResponse.json(
         { error: 'Missing userId or code' },
         { status: 400 }
@@ -14,16 +17,20 @@ export async function POST(req: Request) {
     }
 
     // Get user to check role
+    console.log('[verify-email] Looking up user with ID:', userId);
     const user = await prisma.user.findUnique({
       where: { id: userId },
     });
 
     if (!user) {
+      console.error('[verify-email] User not found with ID:', userId);
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
       );
     }
+
+    console.log('[verify-email] User found:', { id: user.id, email: user.email, role: user.role });
 
     // Verify 2FA code for registration
     const isValidCode = await verify2FACode({

@@ -26,8 +26,9 @@ export async function GET(req: NextRequest) {
     if (!config) {
       config = await prisma.systemConfig.create({
         data: {
-          pointFaceValue: 0.01,
-          systemFixedCharge: 0.001,
+          pointFaceValue: 0.008,
+          platformReward: 0.007,
+          systemFixedCharge: 0.01,
           systemVariableCharge: 0.06,
         },
       });
@@ -78,14 +79,16 @@ export async function PUT(req: NextRequest) {
 
   try {
     const data = await req.json();
-    const { pointFaceValue, systemFixedCharge, systemVariableCharge, subscriptionTiers } = data;
+    const { pointFaceValue, platformReward, systemFixedCharge, systemVariableCharge, subscriptionTiers } = data;
 
     // Validate inputs
     if (
       typeof pointFaceValue !== 'number' ||
+      typeof platformReward !== 'number' ||
       typeof systemFixedCharge !== 'number' ||
       typeof systemVariableCharge !== 'number' ||
       pointFaceValue <= 0 ||
+      platformReward < 0 ||
       systemFixedCharge < 0 ||
       systemVariableCharge < 0
     ) {
@@ -122,6 +125,7 @@ export async function PUT(req: NextRequest) {
         where: { id: config.id },
         data: {
           pointFaceValue,
+          platformReward: platformReward || 0.007,
           systemFixedCharge,
           systemVariableCharge,
         },
@@ -131,6 +135,7 @@ export async function PUT(req: NextRequest) {
       config = await prisma.systemConfig.create({
         data: {
           pointFaceValue,
+          platformReward: platformReward || 0.007,
           systemFixedCharge,
           systemVariableCharge,
         },

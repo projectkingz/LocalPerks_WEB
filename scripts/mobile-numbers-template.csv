@@ -1,0 +1,11 @@
+type,id,email,name,newMobile
+customer,clx1234567890,customer1@example.com,John Doe,07402 611112
+customer,clx1234567891,customer2@example.com,Jane Smith,07402 611112
+tenant,clx1234567892,,Business Name,07402 611112
+admin,clx1234567893,,Admin Name,07402 611112
+
+
+
+
+
+

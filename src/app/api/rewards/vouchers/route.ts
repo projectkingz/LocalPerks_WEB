@@ -4,7 +4,6 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { pointsUtil } from '@/lib/pointsUtil';
 import { generateUniqueVoucherCode, checkAndUpdateExpiredVouchers } from '@/lib/utils/voucher';
-import { getTenantPointsConfig, calculatePointsFaceValue } from '@/lib/pointsCalculation';
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -42,7 +41,8 @@ export async function GET() {
             id: true,
             name: true,
             description: true,
-            points: true,
+            // points field doesn't exist on Reward model - get from redemption instead
+            discountPercentage: true,
             tenant: {
               select: {
                 id: true,
@@ -89,12 +89,12 @@ export async function POST(request: Request) {
     
     const { rewardId, points } = body;
 
-    if (!rewardId || points === undefined || points === null) {
+    if (!rewardId) {
       console.log('Missing fields - rewardId:', rewardId, 'points:', points);
       return NextResponse.json({ 
         error: 'Missing required fields', 
         received: { rewardId, points },
-        required: ['rewardId', 'points']
+        required: ['rewardId']
       }, { status: 400 });
     }
 
@@ -110,16 +110,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Reward not found' }, { status: 404 });
     }
 
-    // Verify the points match the reward
-    if (reward.points !== points) {
-      return NextResponse.json({ 
-        error: 'Points mismatch with reward',
-        rewardPoints: reward.points,
-        requestedPoints: points
-      }, { status: 400 });
-    }
+    // Vouchers are FREE - no points are deducted when claiming or redeeming
+    // Points are set to 0 for all voucher operations
+    const pointsToDeduct = 0;
 
-    // Get customer and calculate their actual points from transactions
+    // Get customer
     const customer = await prisma.customer.findUnique({
       where: { email: session.user.email },
     });
@@ -135,29 +130,10 @@ export async function POST(request: Request) {
       tenantId: customer.tenantId
     });
 
-    // Get detailed points breakdown for debugging
-    const pointsBreakdown = await pointsUtil.getCustomerPointsBreakdown(customer.id);
-    const actualPoints = pointsBreakdown.actualPoints;
+    // No points validation needed - vouchers are free
+    // No transaction creation needed - no points deducted
 
-    // Validate the point transaction
-    const validation = await pointsUtil.validatePointTransaction(customer.id, points);
-    if (!validation.isValid) {
-      return NextResponse.json({ 
-        error: 'Insufficient points for redemption',
-        details: {
-          currentBalance: validation.currentBalance,
-          pointsRequired: points,
-          balanceAfterRedemption: validation.balanceAfterTransaction,
-          validationError: validation.error
-        }
-      }, { status: 400 });
-    }
-
-    // Get tenant configuration to calculate face value
-    const config = await getTenantPointsConfig(customer.tenantId);
-    const faceValueAmount = calculatePointsFaceValue(points, config);
-
-    // Create redemption and update customer points in a transaction
+    // Create redemption and voucher (no points deducted - vouchers are free)
     const result = await prisma.$transaction(async (tx: any) => {
       // Ensure customer has a corresponding User record for transactions
       const userId = await pointsUtil.ensureCustomerUserRecord(
@@ -166,12 +142,12 @@ export async function POST(request: Request) {
         customer.tenantId
       );
 
-      // Create the redemption
+      // Create the redemption with 0 points (vouchers are free)
       const redemption = await tx.redemption.create({
         data: {
           rewardId,
           customerId: customer.id,
-          points,
+          points: 0, // No points deducted - vouchers are free
         },
         include: {
           reward: true
@@ -207,48 +183,32 @@ export async function POST(request: Request) {
               id: true,
               name: true,
               description: true,
-              points: true,
+              // points field doesn't exist on Reward model - get from redemption instead
+              discountPercentage: true,
             }
           }
         }
       });
 
-      // Create a transaction record for points spent with face value
-      const transaction = await tx.transaction.create({
-        data: {
-          amount: faceValueAmount, // Monetary face value of points (e.g., 130 points × £0.01 = £1.30)
-          points: points, // Store positive points value (will be treated as negative when type is SPENT)
-          type: 'SPENT',
-          status: 'APPROVED',
-          userId: userId, // Use the customer's User record
-          customerId: customer.id,
-          tenantId: customer.tenantId,
-        }
-      });
-
-      console.log('Created transaction record:', {
-        id: transaction.id,
-        userId: transaction.userId,
-        customerId: transaction.customerId,
-        points: transaction.points
-      });
-
-      return { redemption, customer, userId, transaction, voucher };
+      // No transaction created - vouchers are free, no points deducted
+      // Return without transaction record
+      return { redemption, customer, userId, voucher };
     });
 
     console.log('Redemption created successfully:', result.redemption.id);
 
-    // Calculate remaining points from transaction history
-    const updatedPointsBreakdown = await pointsUtil.getCustomerPointsBreakdown(customer.id);
-    const remainingPoints = updatedPointsBreakdown.actualPoints;
+    // Get current points balance (no change since no points were deducted)
+    const pointsBreakdown = await pointsUtil.getCustomerPointsBreakdown(customer.id);
+    const currentPoints = pointsBreakdown.actualPoints;
 
-    console.log('Remaining points after deduction:', remainingPoints);
+    console.log('Voucher claimed - no points deducted. Current points:', currentPoints);
 
     return NextResponse.json({
       message: 'Voucher created successfully',
       voucher: result.voucher,
-      pointsDeducted: points,
-      remainingPoints: remainingPoints
+      pointsDeducted: 0, // No points deducted - vouchers are free
+      remainingPoints: currentPoints,
+      points: 0 // Explicitly indicate 0 points deducted
     });
   } catch (error) {
     console.error('Error creating voucher:', error);

@@ -71,7 +71,8 @@ export async function createVoucherForRedemption(
           id: true,
           name: true,
           description: true,
-          points: true,
+          // points field doesn't exist on Reward model - get from redemption instead
+          discountPercentage: true,
         }
       }
     }
@@ -117,7 +118,8 @@ export async function createVoucherForRedemptionWithTx(
           id: true,
           name: true,
           description: true,
-          points: true,
+          // points field doesn't exist on Reward model - get from redemption instead
+          discountPercentage: true,
         }
       }
     }
@@ -231,7 +233,8 @@ export async function checkAndUpdateExpiredVouchers(): Promise<{
             id: true,
             name: true,
             description: true,
-            points: true,
+            // points field doesn't exist on Reward model - get from redemption instead
+            discountPercentage: true,
           }
         }
       }
@@ -288,7 +291,8 @@ export async function getVoucherWithExpirationCheck(voucherCode: string): Promis
             id: true,
             name: true,
             description: true,
-            points: true,
+            // points field doesn't exist on Reward model - get from redemption instead
+            discountPercentage: true,
           }
         },
         redemption: {
@@ -323,7 +327,8 @@ export async function getVoucherWithExpirationCheck(voucherCode: string): Promis
               id: true,
               name: true,
               description: true,
-              points: true,
+              // points field doesn't exist on Reward model - get from redemption instead
+              discountPercentage: true,
             }
           },
           redemption: {

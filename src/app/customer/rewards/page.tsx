@@ -61,7 +61,7 @@ export default function RewardsPage() {
   const [selectedDiscount, setSelectedDiscount] = useState<number | null>(null);
   const [showDiscountConfirmation, setShowDiscountConfirmation] = useState(false);
   const [availableDiscount, setAvailableDiscount] = useState<number>(0);
-  const [pointFaceValue, setPointFaceValue] = useState<number>(0.01);
+  const [pointFaceValue, setPointFaceValue] = useState<number>(0.008);
   const [availableDiscounts, setAvailableDiscounts] = useState<number[]>([]);
 
   // Color variations with same visual weight as vibrant blue
@@ -100,7 +100,7 @@ export default function RewardsPage() {
         if (configResponse.ok) {
           const configData = await configResponse.json();
           if (configData.success && configData.config) {
-            const faceValue = configData.config.pointFaceValue || 0.01;
+            const faceValue = configData.config.pointFaceValue || 0.008;
             setPointFaceValue(faceValue);
             const totalDiscount = pointsData.points * faceValue;
             setAvailableDiscount(totalDiscount);

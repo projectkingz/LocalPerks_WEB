@@ -4,12 +4,22 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, Settings } from 'lucide-react';
+import { Lock, Settings, Edit } from 'lucide-react';
 import PasswordChangeForm from '@/components/PasswordChangeForm';
+import PostSignupQuestions from '@/components/PostSignupQuestions';
 
 interface PointsData {
   points: number;
   tier: string;
+}
+
+interface OptionalQuestionsData {
+  postcodeOutward: string | null;
+  postcodeInward: string | null;
+  yearOfBirth: number | null;
+  rewardPreference: string | null;
+  homeOwner: boolean | null;
+  carOwner: boolean | null;
 }
 
 export default function ProfilePage() {
@@ -20,6 +30,9 @@ export default function ProfilePage() {
   const [customerId, setCustomerId] = useState('');
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [showCardModal, setShowCardModal] = useState(false);
+  const [optionalQuestions, setOptionalQuestions] = useState<OptionalQuestionsData | null>(null);
+  const [showOptionalQuestions, setShowOptionalQuestions] = useState(false);
+  const [showEditQuestions, setShowEditQuestions] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -34,6 +47,17 @@ export default function ProfilePage() {
         const qrData = await qrResponse.json();
         setQrCode(qrData.qrCode);
         setCustomerId(qrData.customerId || '');
+
+        // Fetch optional questions
+        try {
+          const questionsResponse = await fetch('/api/customer/post-signup-questions');
+          if (questionsResponse.ok) {
+            const questionsData = await questionsResponse.json();
+            setOptionalQuestions(questionsData);
+          }
+        } catch (error) {
+          console.error('Error fetching optional questions:', error);
+        }
       } catch (error) {
         console.error('Error fetching profile data:', error);
       } finally {
@@ -323,6 +347,101 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Optional Questions */}
+      <div className="bg-white shadow-lg rounded-2xl p-8">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-heading font-bold text-gray-900">Optional Questions</h2>
+          <button
+            onClick={() => setShowOptionalQuestions(!showOptionalQuestions)}
+            className="text-sm font-medium text-blue-600 hover:text-blue-800"
+          >
+            {showOptionalQuestions ? 'Hide' : 'Show'}
+          </button>
+        </div>
+        
+        {showOptionalQuestions && optionalQuestions && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {optionalQuestions.postcodeOutward && (
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-6 rounded-xl border-2 border-gray-200">
+                  <p className="text-label font-bold text-gray-600 uppercase tracking-wide mb-2">Postcode Outward</p>
+                  <p className="text-heading font-bold text-gray-900">{optionalQuestions.postcodeOutward}</p>
+                </div>
+              )}
+              
+              {optionalQuestions.yearOfBirth && (
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-6 rounded-xl border-2 border-gray-200">
+                  <p className="text-label font-bold text-gray-600 uppercase tracking-wide mb-2">Year of Birth</p>
+                  <p className="text-heading font-bold text-gray-900">{optionalQuestions.yearOfBirth}</p>
+                </div>
+              )}
+              
+              {optionalQuestions.rewardPreference && (
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-6 rounded-xl border-2 border-gray-200">
+                  <p className="text-label font-bold text-gray-600 uppercase tracking-wide mb-2">Reward Preference</p>
+                  <p className="text-heading font-bold text-gray-900">{optionalQuestions.rewardPreference}</p>
+                </div>
+              )}
+              
+              {optionalQuestions.homeOwner !== null && (
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-6 rounded-xl border-2 border-gray-200">
+                  <p className="text-label font-bold text-gray-600 uppercase tracking-wide mb-2">Home Owner</p>
+                  <p className="text-heading font-bold text-gray-900">{optionalQuestions.homeOwner ? 'Yes' : 'No'}</p>
+                </div>
+              )}
+              
+              {optionalQuestions.carOwner !== null && (
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-6 rounded-xl border-2 border-gray-200">
+                  <p className="text-label font-bold text-gray-600 uppercase tracking-wide mb-2">Car Owner</p>
+                  <p className="text-heading font-bold text-gray-900">{optionalQuestions.carOwner ? 'Yes' : 'No'}</p>
+                </div>
+              )}
+            </div>
+            
+            {(!optionalQuestions.postcodeOutward && 
+              !optionalQuestions.yearOfBirth && 
+              !optionalQuestions.rewardPreference && 
+              optionalQuestions.homeOwner === null && 
+              optionalQuestions.carOwner === null) && (
+              <div className="text-center py-8 text-gray-500">
+                <p>No optional questions answered yet.</p>
+                <p className="text-sm mt-2">Complete the post-signup questions to see your responses here.</p>
+              </div>
+            )}
+            
+            <div className="pt-6 border-t border-gray-200">
+              <button
+                onClick={() => setShowEditQuestions(true)}
+                className="flex items-center justify-center w-full px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium"
+              >
+                <Edit className="h-5 w-5 mr-2" />
+                Edit Questions
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* PostSignupQuestions Modal - Controlled */}
+      {showEditQuestions && (
+        <PostSignupQuestions
+          forceVisible={true}
+          onComplete={async () => {
+            // Refresh the optional questions data
+            try {
+              const questionsResponse = await fetch('/api/customer/post-signup-questions');
+              if (questionsResponse.ok) {
+                const questionsData = await questionsResponse.json();
+                setOptionalQuestions(questionsData);
+              }
+            } catch (error) {
+              console.error('Error refreshing optional questions:', error);
+            }
+            setShowEditQuestions(false);
+          }}
+        />
+      )}
     </div>
   );
 } 

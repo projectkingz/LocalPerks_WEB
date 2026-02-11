@@ -2,14 +2,6 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { generateAndSend2FACode, normalizePhoneNumber } from '@/lib/auth/two-factor';
 
-// In-memory store for WhatsApp codes
-interface WhatsAppCode {
-  code: string;
-  expiresAt: number;
-}
-
-const whatsappCodeStore = new Map<string, WhatsAppCode>();
-
 export async function POST(req: Request) {
   try {
     const { userId, email } = await req.json();
@@ -65,38 +57,27 @@ export async function POST(req: Request) {
       );
     }
 
-    // Use 2FA system for customers, legacy system for partners
-    if (user.role === 'CUSTOMER') {
-      // For customers, use 2FA system
-      if (!mobileNumber) {
-        return NextResponse.json(
-          { error: 'Mobile number is required' },
-          { status: 400 }
-        );
-      }
-      const normalizedMobile = normalizePhoneNumber(mobileNumber);
-      const result = await generateAndSend2FACode({
-        userId: user.id,
-        method: 'whatsapp',
-        phone: normalizedMobile,
-        purpose: 'registration'
-      });
-      
-      if (!result.success) {
-        return NextResponse.json(
-          { error: result.message || 'Failed to send verification code' },
-          { status: 500 }
-        );
-      }
-    } else {
-      // For partners, use legacy system (for backward compatibility)
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
-      whatsappCodeStore.set(userId, { code, expiresAt });
-      
-      console.log(`\n📱 WhatsApp Message to ${mobileNumber}:`);
-      console.log(`   Code: ${code}`);
-      console.log(`   Expires: ${new Date(expiresAt).toLocaleString()}`);
+    // Use 2FA system for both customers and partners
+    if (!mobileNumber) {
+      return NextResponse.json(
+        { error: 'Mobile number is required' },
+        { status: 400 }
+      );
+    }
+    
+    const normalizedMobile = normalizePhoneNumber(mobileNumber);
+    const result = await generateAndSend2FACode({
+      userId: user.id,
+      method: 'whatsapp',
+      phone: normalizedMobile,
+      purpose: 'registration'
+    });
+    
+    if (!result.success) {
+      return NextResponse.json(
+        { error: result.message || 'Failed to send verification code' },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({
@@ -112,18 +93,5 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
-}
-
-// Export code store for verification
-export function getWhatsAppVerificationCode(userId: string): string | null {
-  const stored = whatsappCodeStore.get(userId);
-  if (!stored) return null;
-  
-  if (Date.now() > stored.expiresAt) {
-    whatsappCodeStore.delete(userId);
-    return null;
-  }
-  
-  return stored.code;
 }
 

@@ -1,0 +1,69 @@
+-- Migration: Combine firstName and lastName into single name field for existing partners
+-- Run this migration manually in PlanetScale console or via deploy request
+--
+-- IMPORTANT: This script assumes that if firstName/lastName columns exist in your database,
+-- they need to be combined into the existing 'name' field.
+--
+-- Step 1: First, check if firstName/lastName columns exist:
+--   SHOW COLUMNS FROM User LIKE 'firstName';
+--   SHOW COLUMNS FROM User LIKE 'lastName';
+--
+-- Step 2: If the columns exist, run the UPDATE query below
+-- Step 3: After verifying data, optionally drop the columns (see Step 4)
+
+-- ============================================
+-- STEP 2: Combine firstName and lastName into name
+-- ============================================
+-- This query combines firstName and lastName for existing PARTNER users
+-- It only updates records where name is NULL, empty, or incomplete
+-- 
+-- UPDATE User 
+-- SET name = TRIM(CONCAT(COALESCE(firstName, ''), ' ', COALESCE(lastName, '')))
+-- WHERE role = 'PARTNER' 
+--   AND (
+--     name IS NULL 
+--     OR name = '' 
+--     OR name = COALESCE(firstName, '')
+--     OR name = COALESCE(lastName, '')
+--   )
+--   AND (firstName IS NOT NULL OR lastName IS NOT NULL);
+
+-- ============================================
+-- STEP 3: Verify the update
+-- ============================================
+-- Run this query to verify the results:
+-- SELECT 
+--   id,
+--   email,
+--   name,
+--   firstName,
+--   lastName,
+--   role,
+--   CASE 
+--     WHEN name IS NULL OR name = '' THEN 'NEEDS_UPDATE'
+--     WHEN firstName IS NOT NULL AND lastName IS NOT NULL AND name != TRIM(CONCAT(firstName, ' ', lastName)) THEN 'MISMATCH'
+--     ELSE 'OK'
+--   END as status
+-- FROM User
+-- WHERE role = 'PARTNER'
+-- ORDER BY createdAt DESC
+-- LIMIT 20;
+
+-- ============================================
+-- STEP 4: (Optional) Drop firstName/lastName columns after verification
+-- ============================================
+-- Only run these if you're certain all data has been migrated:
+-- ALTER TABLE User DROP COLUMN firstName;
+-- ALTER TABLE User DROP COLUMN lastName;
+
+-- ============================================
+-- Alternative: If firstName/lastName don't exist as columns
+-- ============================================
+-- If your database never had firstName/lastName columns, then the 'name' field
+-- should already contain the full name. In this case, no migration is needed.
+--
+-- To check current state of partner names:
+-- SELECT id, email, name, role, createdAt 
+-- FROM User 
+-- WHERE role = 'PARTNER' 
+-- ORDER BY createdAt DESC;

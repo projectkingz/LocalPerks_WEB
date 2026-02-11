@@ -12,7 +12,13 @@ export async function GET() {
 
   // Check if user has permission to view pending transactions
   const allowedRoles = ['PARTNER', 'ADMIN', 'SUPER_ADMIN'];
-  if (!session.user.role || !allowedRoles.includes(session.user.role.toUpperCase())) {
+  const userRole = session.user.role?.toUpperCase();
+  if (!userRole || !allowedRoles.includes(userRole)) {
+    console.log('Access denied for pending transactions:', {
+      userEmail: session.user.email,
+      userRole: session.user.role,
+      allowedRoles: allowedRoles
+    });
     return NextResponse.json({ 
       error: 'Access denied', 
       userRole: session.user.role,
@@ -20,8 +26,14 @@ export async function GET() {
     }, { status: 403 });
   }
 
+  console.log('User authorized to view pending transactions:', {
+    email: session.user.email,
+    role: userRole
+  });
+
   try {
     // Get pending transactions from the real database
+    // MySQL string comparisons are case-insensitive by default
     const pendingTransactions = await prisma.transaction.findMany({
       where: {
         status: 'PENDING'
@@ -53,21 +65,34 @@ export async function GET() {
       }
     });
 
+    console.log(`Query found ${pendingTransactions.length} transactions with status 'PENDING'`);
+    if (pendingTransactions.length > 0) {
+      console.log('Sample transaction statuses:', pendingTransactions.slice(0, 3).map(t => ({ id: t.id, status: t.status })));
+    }
+
     // Transform the data to match the expected format
     const formattedTransactions = pendingTransactions.map((transaction: any) => ({
       id: transaction.id,
       customerEmail: transaction.customer.email,
       date: transaction.createdAt.toISOString(),
+      createdAt: transaction.createdAt.toISOString(),
       points: transaction.points,
-      description: `Transaction - £${transaction.amount.toFixed(2)}`,
+      description: transaction.description || `Receipt scan - £${transaction.amount.toFixed(2)}`,
       amount: transaction.amount,
       status: transaction.status as 'PENDING' | 'APPROVED' | 'REJECTED',
       adminNotes: '', // This would need to be added to the Transaction model if needed
       customerName: transaction.customer.name,
-      tenantName: transaction.tenant.name
+      tenantName: transaction.tenant?.name || 'N/A',
+      receiptImage: transaction.receiptImage || null
     }));
 
     console.log(`Found ${formattedTransactions.length} pending transactions in database`);
+    console.log('Sample transaction:', formattedTransactions[0] ? {
+      id: formattedTransactions[0].id,
+      customerEmail: formattedTransactions[0].customerEmail,
+      status: formattedTransactions[0].status,
+      hasReceiptImage: !!formattedTransactions[0].receiptImage
+    } : 'No transactions');
     
     return NextResponse.json({ pendingTransactions: formattedTransactions });
   } catch (error) {

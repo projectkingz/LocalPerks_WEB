@@ -21,20 +21,20 @@ export async function PUT(
 
     const { id } = params;
     const body = await request.json();
-    const { name, description, points, createdAt } = body;
+    const { name, description, discountPercentage, createdAt, validFrom, validTo } = body;
 
     // Validate required fields
-    if (!name || !description || points === undefined) {
+    if (!name || !description || discountPercentage === undefined) {
       return NextResponse.json(
-        { error: 'Name, description, and points are required' },
+        { error: 'Name, description, and discountPercentage are required' },
         { status: 400 }
       );
     }
 
-    // Validate points is a positive number
-    if (points < 0) {
+    // Validate discountPercentage is a positive number between 0 and 100
+    if (discountPercentage < 0 || discountPercentage > 100) {
       return NextResponse.json(
-        { error: 'Points must be a positive number' },
+        { error: 'Discount percentage must be between 0 and 100' },
         { status: 400 }
       );
     }
@@ -51,15 +51,41 @@ export async function PUT(
       );
     }
 
+    const updateData: any = {
+      name,
+      description,
+      discountPercentage: parseFloat(discountPercentage),
+      createdAt: createdAt ? new Date(createdAt) : existingReward.createdAt,
+    };
+
+    // Update validFrom if provided
+    if (validFrom !== undefined) {
+      updateData.validFrom = validFrom ? new Date(validFrom) : null;
+    }
+
+    // Update validTo if provided
+    if (validTo !== undefined) {
+      updateData.validTo = validTo ? new Date(validTo) : null;
+    }
+
     const reward = await prisma.reward.update({
       where: { id },
-      data: {
-        name,
-        description,
-        points: parseInt(points),
-        createdAt: createdAt ? new Date(createdAt) : existingReward.createdAt,
-      },
+      data: updateData,
       include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            partnerUserId: true,
+            partnerUser: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              }
+            }
+          }
+        },
         redemptions: {
           include: {
             customer: {

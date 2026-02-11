@@ -120,48 +120,48 @@ export const authOptions: NextAuthOptions = {
 
           console.log('Password verified successfully');
 
-          // Check if account is suspended (handle MySQL boolean as 1/0)
+          // Define isSuspended for use in 2FA checks later
           const isSuspended = Boolean(user.suspended);
           console.log('Suspended check - raw value:', user.suspended, 'converted:', isSuspended, 'approvalStatus:', user.approvalStatus);
-          
-          if (isSuspended) {
-            console.log('Account is suspended, throwing specific error');
+
+          // For PARTNERS, check approvalStatus FIRST before checking suspended
+          // Partners with PENDING status should be treated as pending, not suspended
+          // Note: Email/mobile verification only happens during registration, not login
+          if (user.role === 'PARTNER') {
+            console.log('Partner login - checking approvalStatus:', user.approvalStatus);
             
-            // For partners with pending verifications, redirect to verification flows
-            if (user.role === 'PARTNER') {
-              if (false && user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
-                console.log('Partner needs email verification, redirecting to verify-email');
-                throw new Error('PARTNER_EMAIL_VERIFICATION_REQUIRED');
-              } else if (false && user.approvalStatus === 'PENDING_MOBILE_VERIFICATION') {
-                console.log('Partner needs mobile verification, redirecting to verify-mobile');
-                throw new Error('PARTNER_MOBILE_VERIFICATION_REQUIRED');
-              } else if (user.approvalStatus === 'PENDING' || user.approvalStatus === 'UNDER_REVIEW') {
+            // Handle pending approval statuses (verification statuses are only for registration)
+            if (user.approvalStatus === 'PENDING' || user.approvalStatus === 'PENDING_ADMIN_APPROVAL' || user.approvalStatus === 'UNDER_REVIEW') {
+              console.log('Partner account is pending approval, redirecting to pending-approval page');
+              throw new Error('PENDING_APPROVAL');
+            } else if (user.approvalStatus === 'PENDING_PAYMENT') {
+              throw new Error('PENDING_PAYMENT');
+            } else if (user.approvalStatus !== 'ACTIVE') {
+              throw new Error('ACCOUNT_NOT_APPROVED');
+            }
+            
+            // Only check suspended if partner is ACTIVE
+            if (isSuspended) {
+              console.log('Partner account is suspended');
+              throw new Error('ACCOUNT_SUSPENDED');
+            }
+          } else {
+            // For non-partners, check suspended status first
+            if (isSuspended) {
+              console.log('Account is suspended, throwing specific error');
+              
+              // For customers - verification statuses are only for registration, not login
+              if (user.role === 'CUSTOMER') {
+                throw new Error('ACCOUNT_SUSPENDED');
+              }
+              // For other roles (ADMIN, SUPER_ADMIN)
+              else if (user.approvalStatus === 'UNDER_REVIEW') {
+                throw new Error('ACCOUNT_UNDER_REVIEW');
+              } else if (user.approvalStatus === 'PENDING_ADMIN_APPROVAL') {
                 throw new Error('PENDING_APPROVAL');
               } else {
                 throw new Error('ACCOUNT_SUSPENDED');
               }
-            } 
-            // For customers with pending verifications, redirect to verification flows
-            else if (user.role === 'CUSTOMER') {
-              if (user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
-                console.log('Customer needs email verification, redirecting to verify-email');
-                throw new Error('CUSTOMER_EMAIL_VERIFICATION_REQUIRED');
-              } else if (user.approvalStatus === 'PENDING_MOBILE_VERIFICATION') {
-                console.log('Customer needs mobile verification, redirecting to verify-mobile');
-                throw new Error('CUSTOMER_MOBILE_VERIFICATION_REQUIRED');
-              } else {
-                throw new Error('ACCOUNT_SUSPENDED');
-              }
-            }
-            // For other roles (ADMIN, SUPER_ADMIN)
-            else if (user.approvalStatus === 'UNDER_REVIEW') {
-              throw new Error('ACCOUNT_UNDER_REVIEW');
-            } else if (false && user.approvalStatus === 'PENDING_EMAIL_VERIFICATION') {
-              throw new Error('EMAIL_VERIFICATION_REQUIRED');
-            } else if (user.approvalStatus === 'PENDING') {
-              throw new Error('PENDING_APPROVAL');
-            } else {
-              throw new Error('ACCOUNT_SUSPENDED');
             }
           }
 
@@ -406,6 +406,18 @@ export const authOptions: NextAuthOptions = {
         }
       }
       return session;
+    },
+    async redirect({ url, baseUrl }) {
+      // If url is a relative path, resolve it against baseUrl
+      if (url.startsWith('/')) {
+        return `${baseUrl}${url}`;
+      }
+      // If url is on the same origin, allow it
+      if (new URL(url).origin === baseUrl) {
+        return url;
+      }
+      // Otherwise, redirect to baseUrl
+      return baseUrl;
     },
   }
 }; 

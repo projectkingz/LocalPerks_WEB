@@ -25,7 +25,7 @@ interface User {
   email: string;
   role: string;
   suspended?: boolean;
-  approvalStatus?: string; // "PENDING", "ACTIVE", "SUSPENDED"
+  approvalStatus?: string; // "PENDING_EMAIL_VERIFICATION", "PENDING_MOBILE_VERIFICATION", "PENDING_ADMIN_APPROVAL", "ACTIVE", "SUSPENDED"
   createdAt: string;
   updatedAt: string;
   tenantId: string | null;
@@ -241,7 +241,7 @@ export default function AdminDashboard() {
         fetch(`/api/admin/users/${userId}/approve`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ approvalStatus: 'APPROVED' }),
+          body: JSON.stringify({ approvalStatus: 'ACTIVE' }),
         })
       );
 
@@ -588,16 +588,18 @@ export default function AdminDashboard() {
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                       user.approvalStatus === 'UNDER_REVIEW'
                         ? 'bg-yellow-100 text-yellow-800'
-                        : user.approvalStatus === 'PENDING' || user.approvalStatus === 'PENDING_EMAIL_VERIFICATION'
+                        : user.approvalStatus === 'PENDING_ADMIN_APPROVAL' || user.approvalStatus === 'PENDING_EMAIL_VERIFICATION' || user.approvalStatus === 'PENDING_MOBILE_VERIFICATION'
                         ? 'bg-orange-100 text-orange-800'
                         : user.approvalStatus === 'SUSPENDED' || user.suspended
                         ? 'bg-red-100 text-red-800'
                         : 'bg-green-100 text-green-800'
                     }`}>
-                      {user.approvalStatus === 'UNDER_REVIEW' ? 'Review' :
-                       user.approvalStatus === 'PENDING' ? 'Pending' : 
-                       user.approvalStatus === 'PENDING_EMAIL_VERIFICATION' ? 'Email' :
-                       user.approvalStatus === 'SUSPENDED' || user.suspended ? 'Suspended' : 'Active'}
+                      {user.approvalStatus === 'PENDING_EMAIL_VERIFICATION' ? 'Pending Email Verification' :
+                       user.approvalStatus === 'PENDING_MOBILE_VERIFICATION' ? 'Pending Mobile Verification' :
+                       user.approvalStatus === 'PENDING_ADMIN_APPROVAL' ? 'Pending Admin Approval' :
+                       user.approvalStatus === 'UNDER_REVIEW' ? 'Under Review' :
+                       user.approvalStatus === 'SUSPENDED' || user.suspended ? 'Suspended' :
+                       user.approvalStatus === 'ACTIVE' ? 'Active' : 'Active'}
                     </span>
                   </td>
                   <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-900">
@@ -617,7 +619,7 @@ export default function AdminDashboard() {
                       
                       {/* Activate/Suspend Button */}
                       {canManageUser(user) && (
-                        user.suspended || ['PENDING', 'UNDER_REVIEW', 'PENDING_EMAIL_VERIFICATION', 'PENDING_MOBILE_VERIFICATION'].includes(user.approvalStatus || '') ? (
+                        user.suspended || ['PENDING_ADMIN_APPROVAL', 'UNDER_REVIEW', 'PENDING_EMAIL_VERIFICATION', 'PENDING_MOBILE_VERIFICATION'].includes(user.approvalStatus || '') ? (
                           <button
                             onClick={() => handleApprovePartner(user.id)}
                             className="inline-flex items-center px-1.5 py-0.5 border border-transparent text-xs font-medium rounded text-green-700 bg-green-100 hover:bg-green-200"

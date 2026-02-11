@@ -25,7 +25,9 @@ interface Reward {
   id: string;
   name: string;
   description: string;
-  points: number;
+  discountPercentage: number;
+  validFrom?: string | null;
+  validTo?: string | null;
   createdAt: string;
   approvalStatus: string;
   approvedAt?: string;
@@ -34,7 +36,13 @@ interface Reward {
   tenant?: {
     id: string;
     name: string;
-  };
+    partnerUserId: string | null;
+    partnerUser?: {
+      id: string;
+      name: string;
+      email: string;
+    } | null;
+  } | null;
   redemptions: Redemption[];
 }
 
@@ -144,7 +152,7 @@ export default function AdminRewardsDashboard() {
     setEditingReward({
       name: '',
       description: '',
-      points: 0,
+      discountPercentage: 0,
       createdAt: new Date().toISOString().split('T')[0]
     });
     setShowEditModal(true);
@@ -152,16 +160,25 @@ export default function AdminRewardsDashboard() {
   };
 
   const handleEditReward = (reward: Reward) => {
+    // Format dates for input fields (YYYY-MM-DD)
+    const formatDateForInput = (dateString: string | null | undefined) => {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      return date.toISOString().split('T')[0];
+    };
+
     setEditingReward({
       ...reward,
-      createdAt: new Date(reward.createdAt).toISOString().split('T')[0]
+      createdAt: new Date(reward.createdAt).toISOString().split('T')[0],
+      validFrom: formatDateForInput(reward.validFrom),
+      validTo: formatDateForInput(reward.validTo),
     });
     setShowEditModal(true);
     setEditError(null);
   };
 
   const handleSaveReward = async () => {
-    if (!editingReward?.name || !editingReward?.description || editingReward?.points === undefined) {
+    if (!editingReward?.name || !editingReward?.description || editingReward?.discountPercentage === undefined) {
       setEditError('Please fill in all required fields');
       return;
     }
@@ -182,8 +199,10 @@ export default function AdminRewardsDashboard() {
         body: JSON.stringify({
           name: editingReward.name,
           description: editingReward.description,
-          points: parseInt(editingReward.points.toString()),
-          createdAt: editingReward.createdAt
+          discountPercentage: parseFloat(editingReward.discountPercentage.toString()),
+          createdAt: editingReward.createdAt,
+          validFrom: editingReward.validFrom || null,
+          validTo: editingReward.validTo || null,
         }),
       });
 
@@ -569,7 +588,7 @@ export default function AdminRewardsDashboard() {
                     Reward
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Points
+                    Discount %
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Redemptions
@@ -595,7 +614,7 @@ export default function AdminRewardsDashboard() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {reward.points.toLocaleString()}
+                      {reward.discountPercentage?.toFixed(1) || 0}%
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {reward.redemptions?.length || 0}
@@ -830,108 +849,187 @@ export default function AdminRewardsDashboard() {
 
       {/* Edit Modal */}
       {showEditModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-900">
-                  {editingReward?.id ? 'Edit Reward' : 'Add New Reward'}
-                </h3>
-                <button
-                  onClick={() => setShowEditModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="h-6 w-6" />
-                </button>
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-start justify-center pt-8 pb-8 px-4 sm:px-6 lg:px-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.6, ease: 'easeOut' }}
+            className="relative max-w-2xl w-full space-y-10 bg-white rounded-3xl shadow-2xl p-10 md:p-12 border-2 border-gray-100/50 backdrop-blur-sm my-8"
+          >
+            <div className="flex justify-between items-center mb-8">
+              <h3 className="text-5xl md:text-6xl font-extrabold text-gray-900 tracking-tight">
+                {editingReward?.id ? 'Edit Reward' : 'Add New Reward'}
+              </h3>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="h-8 w-8" />
+              </button>
+            </div>
+
+            {editError && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="rounded-2xl bg-red-50 p-5 border-2 border-red-200 shadow-md"
+              >
+                <p className="text-base font-semibold text-red-800">{editError}</p>
+              </motion.div>
+            )}
+
+            <div className="space-y-8">
+              <div className="relative group">
+                <input
+                  type="text"
+                  value={editingReward?.name || ''}
+                  onChange={(e) => setEditingReward({ ...editingReward, name: e.target.value })}
+                  required
+                  className="block w-full px-8 py-8 text-2xl text-gray-900 bg-gray-50 border-2 border-gray-200 rounded-3xl appearance-none transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-500/30 focus:border-blue-500 focus:bg-white peer group-hover:border-gray-300 shadow-lg hover:shadow-xl min-h-[80px]"
+                  placeholder=" "
+                />
+                <label className="absolute text-xl font-medium text-gray-600 duration-200 transform -translate-y-4 scale-75 top-4 z-10 origin-[0] bg-white px-3 peer-focus:px-3 peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-4 peer-focus:scale-75 peer-focus:-translate-y-4 left-3 peer-focus:bg-white group-hover:bg-white">
+                  Name *
+                </label>
               </div>
 
-              {editError && (
-                <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-3">
-                  <p className="text-red-800 text-sm">{editError}</p>
+              <div className="relative group">
+                <textarea
+                  value={editingReward?.description || ''}
+                  onChange={(e) => setEditingReward({ ...editingReward, description: e.target.value })}
+                  rows={4}
+                  required
+                  className="block w-full px-8 py-8 text-2xl text-gray-900 bg-gray-50 border-2 border-gray-200 rounded-3xl appearance-none transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-500/30 focus:border-blue-500 focus:bg-white peer group-hover:border-gray-300 shadow-lg hover:shadow-xl resize-none"
+                  placeholder=" "
+                />
+                <label className="absolute text-xl font-medium text-gray-600 duration-200 transform -translate-y-4 scale-75 top-4 z-10 origin-[0] bg-white px-3 peer-focus:px-3 peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-8 peer-focus:top-4 peer-focus:scale-75 peer-focus:-translate-y-4 left-3 peer-focus:bg-white group-hover:bg-white">
+                  Description *
+                </label>
+              </div>
+
+              <div className="relative group">
+                <input
+                  type="number"
+                  value={editingReward?.discountPercentage || 0}
+                  onChange={(e) => setEditingReward({ ...editingReward, discountPercentage: parseFloat(e.target.value) || 0 })}
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  required
+                  className="block w-full px-8 py-8 text-2xl text-gray-900 bg-gray-50 border-2 border-gray-200 rounded-3xl appearance-none transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-500/30 focus:border-blue-500 focus:bg-white peer group-hover:border-gray-300 shadow-lg hover:shadow-xl min-h-[80px]"
+                  placeholder=" "
+                />
+                <label className="absolute text-xl font-medium text-gray-600 duration-200 transform -translate-y-4 scale-75 top-4 z-10 origin-[0] bg-white px-3 peer-focus:px-3 peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-4 peer-focus:scale-75 peer-focus:-translate-y-4 left-3 peer-focus:bg-white group-hover:bg-white">
+                  Discount Percentage *
+                </label>
+                <p className="mt-2 text-base text-gray-500 font-medium">Enter a number between 0 and 100 (e.g., 10 for 10% discount)</p>
+              </div>
+
+              <div className="relative group">
+                <input
+                  type="date"
+                  value={editingReward?.validFrom || ''}
+                  onChange={(e) => setEditingReward({ ...editingReward, validFrom: e.target.value })}
+                  className="block w-full px-8 py-8 text-2xl text-gray-900 bg-gray-50 border-2 border-gray-200 rounded-3xl appearance-none transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-500/30 focus:border-blue-500 focus:bg-white peer group-hover:border-gray-300 shadow-lg hover:shadow-xl min-h-[80px]"
+                />
+                <label className="absolute text-xl font-medium text-gray-600 duration-200 transform -translate-y-4 scale-75 top-4 z-10 origin-[0] bg-white px-3 peer-focus:px-3 peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-4 peer-focus:scale-75 peer-focus:-translate-y-4 left-3 peer-focus:bg-white group-hover:bg-white">
+                  Valid From
+                </label>
+              </div>
+
+              <div className="relative group">
+                <input
+                  type="date"
+                  value={editingReward?.validTo || ''}
+                  onChange={(e) => setEditingReward({ ...editingReward, validTo: e.target.value })}
+                  min={editingReward?.validFrom || undefined}
+                  className="block w-full px-8 py-8 text-2xl text-gray-900 bg-gray-50 border-2 border-gray-200 rounded-3xl appearance-none transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-500/30 focus:border-blue-500 focus:bg-white peer group-hover:border-gray-300 shadow-lg hover:shadow-xl min-h-[80px]"
+                />
+                <label className="absolute text-xl font-medium text-gray-600 duration-200 transform -translate-y-4 scale-75 top-4 z-10 origin-[0] bg-white px-3 peer-focus:px-3 peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-4 peer-focus:scale-75 peer-focus:-translate-y-4 left-3 peer-focus:bg-white group-hover:bg-white">
+                  Valid To
+                </label>
+              </div>
+
+              <div className="relative group">
+                <input
+                  type="date"
+                  value={editingReward?.createdAt || ''}
+                  onChange={(e) => setEditingReward({ ...editingReward, createdAt: e.target.value })}
+                  className="block w-full px-8 py-8 text-2xl text-gray-900 bg-gray-50 border-2 border-gray-200 rounded-3xl appearance-none transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-500/30 focus:border-blue-500 focus:bg-white peer group-hover:border-gray-300 shadow-lg hover:shadow-xl min-h-[80px]"
+                />
+                <label className="absolute text-xl font-medium text-gray-600 duration-200 transform -translate-y-4 scale-75 top-4 z-10 origin-[0] bg-white px-3 peer-focus:px-3 peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-4 peer-focus:scale-75 peer-focus:-translate-y-4 left-3 peer-focus:bg-white group-hover:bg-white">
+                  Created Date
+                </label>
+              </div>
+
+              {/* Partner Information Section - Read Only */}
+              {editingReward?.tenant && (
+                <div className="bg-gray-50 rounded-3xl p-6 border-2 border-gray-200">
+                  <h4 className="text-xl font-bold text-gray-900 mb-4">Partner Information</h4>
+                  <div className="space-y-3 text-lg">
+                    <div>
+                      <span className="font-semibold text-gray-700">Business Name: </span>
+                      <span className="text-gray-900 font-bold">{editingReward.tenant.name}</span>
+                    </div>
+                    {editingReward.tenant.partnerUser ? (
+                      <>
+                        <div>
+                          <span className="font-semibold text-gray-700">Partner Name: </span>
+                          <span className="text-gray-900 font-bold">{editingReward.tenant.partnerUser.name}</span>
+                        </div>
+                        <div>
+                          <span className="font-semibold text-gray-700">Partner Email: </span>
+                          <span className="text-gray-900">{editingReward.tenant.partnerUser.email}</span>
+                        </div>
+                      </>
+                    ) : editingReward.tenant.partnerUserId ? (
+                      <div>
+                        <span className="font-semibold text-gray-700">Partner: </span>
+                        <span className="text-gray-500 italic">Partner information not available</span>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               )}
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={editingReward?.name || ''}
-                    onChange={(e) => setEditingReward({ ...editingReward, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Reward name"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Description *
-                  </label>
-                  <textarea
-                    value={editingReward?.description || ''}
-                    onChange={(e) => setEditingReward({ ...editingReward, description: e.target.value })}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Reward description"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Points Required *
-                  </label>
-                  <input
-                    type="number"
-                    value={editingReward?.points || 0}
-                    onChange={(e) => setEditingReward({ ...editingReward, points: parseInt(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="0"
-                    min="0"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Created Date
-                  </label>
-                  <input
-                    type="date"
-                    value={editingReward?.createdAt || ''}
-                    onChange={(e) => setEditingReward({ ...editingReward, createdAt: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  onClick={() => setShowEditModal(false)}
-                  className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveReward}
-                  disabled={editLoading}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {editLoading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4 mr-2" />
-                      {editingReward?.id ? 'Update' : 'Create'}
-                    </>
-                  )}
-                </button>
-              </div>
             </div>
-          </div>
+
+            <div className="flex justify-end space-x-4 mt-10">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setShowEditModal(false)}
+                className="px-8 py-8 border-2 border-gray-300 text-2xl font-bold rounded-3xl text-gray-700 bg-white hover:bg-gray-50 transition-all duration-200 shadow-lg hover:shadow-xl min-h-[80px]"
+              >
+                Cancel
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: editLoading ? 1 : 1.02 }}
+                whileTap={{ scale: editLoading ? 1 : 0.98 }}
+                onClick={handleSaveReward}
+                disabled={editLoading}
+                className={`group relative w-full flex justify-center items-center py-8 px-8 border border-transparent text-2xl font-bold rounded-3xl text-white shadow-xl transition-all duration-200 min-h-[80px] ${
+                  editLoading
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-offset-2 focus:ring-blue-500 hover:shadow-2xl transform hover:scale-[1.02]'
+                }`}
+              >
+                {editLoading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-3 h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span className="text-2xl">Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-6 w-6 mr-3" />
+                    <span className="text-2xl">{editingReward?.id ? 'Update' : 'Create'}</span>
+                  </>
+                )}
+              </motion.button>
+            </div>
+          </motion.div>
         </div>
       )}
     </div>

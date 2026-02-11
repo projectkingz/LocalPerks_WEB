@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
             id: true,
             name: true,
             description: true,
-            points: true,
+            discountPercentage: true,
           }
         }
       },

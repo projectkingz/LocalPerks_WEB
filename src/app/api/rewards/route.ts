@@ -8,7 +8,7 @@ interface Reward {
   id: string;
   name: string;
   description: string;
-  points: number;
+  discountPercentage: number;
   createdAt: string;
 }
 
@@ -19,15 +19,15 @@ if (!globalAny.rewardsDatabase) {
     '1': {
       id: '1',
       name: 'Free Coffee',
-      description: 'Get a free coffee with 100 points',
-      points: 100,
+      description: 'Get a free coffee with 10% discount',
+      discountPercentage: 10.0,
       createdAt: new Date().toISOString(),
     },
     '2': {
       id: '2',
       name: 'Discounted Lunch',
       description: '50% off your next lunch',
-      points: 200,
+      discountPercentage: 50.0,
       createdAt: new Date().toISOString(),
     },
   };
@@ -92,10 +92,20 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, description, points, tenantId: requestTenantId } = body;
+    const { name, description, discountPercentage, validFrom, validTo, tenantId: requestTenantId } = body;
     
-    if (!name || !description || points === undefined) {
+    if (!name || !description || discountPercentage === undefined || !validFrom || !validTo) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+    
+    // Validate dates
+    const fromDate = new Date(validFrom);
+    const toDate = new Date(validTo);
+    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+      return NextResponse.json({ error: 'Invalid date format' }, { status: 400 });
+    }
+    if (toDate < fromDate) {
+      return NextResponse.json({ error: 'Valid To date must be after Valid From date' }, { status: 400 });
     }
     
     
@@ -148,7 +158,9 @@ export async function POST(request: Request) {
       data: { 
         name, 
         description, 
-        points: Number(points),
+        discountPercentage: Number(discountPercentage),
+        validFrom: new Date(validFrom),
+        validTo: new Date(validTo),
         tenantId: tenantId,
         approvalStatus: approvalStatus,
         approvedAt: approvalStatus === 'APPROVED' ? new Date() : null,

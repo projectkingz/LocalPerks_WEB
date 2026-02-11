@@ -126,6 +126,7 @@ model Transaction {
   status     String   @default("pending")
   type       String
   userId     String
+  receiptImage String? @db.LongText
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user       User     @relation(fields: [userId], references: [id])
@@ -136,22 +137,25 @@ model Transaction {
 }
 
 model Reward {
-  id              String       @id @default(cuid())
-  name            String
-  description     String
-  points          Int
-  createdAt       DateTime     @default(now())
-  tenantId        String
-  approvalStatus  String       @default("PENDING") // PENDING, APPROVED, REJECTED
-  approvedAt      DateTime?
-  approvedBy      String?
-  rejectionReason String?
-  redemptions     Redemption[]
-  tenant          Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  vouchers        Voucher[]
+  id                String       @id @default(cuid())
+  name              String
+  description       String
+  discountPercentage Float       // Percentage discount (e.g., 10.0 for 10%)
+  validFrom         DateTime?    // Voucher valid from date
+  validTo           DateTime?    // Voucher valid to date (expires after this)
+  createdAt         DateTime     @default(now())
+  tenantId          String
+  approvalStatus    String       @default("PENDING") // PENDING, APPROVED, REJECTED
+  approvedAt        DateTime?
+  approvedBy        String?
+  rejectionReason   String?
+  redemptions       Redemption[]
+  tenant            Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vouchers          Voucher[]
 
   @@index([tenantId])
   @@index([approvalStatus])
+  @@index([validTo])
 }
 
 model Redemption {

@@ -5,8 +5,8 @@ generator client {
 }
 
 datasource db {
-  provider     = "mysql"
-  url          = env("DATABASE_URL")
+  provider = "mysql"
+  url      = env("DATABASE_URL")
 }
 
 model Account {
@@ -72,20 +72,26 @@ model VerificationToken {
 }
 
 model Customer {
-  id           String        @id @default(cuid())
-  displayId    String?       @unique // 6-digit case-insensitive alphanumeric display ID
-  points       Int           @default(0)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  tenantId     String?       // Optional - customers can transact with any tenant
-  email        String        @unique
-  name         String
-  mobile       String
-  qrCode       String?       @unique // Persistent unique QR code identifier
-  tenant       Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  redemptions  Redemption[]
-  transactions Transaction[]
-  vouchers     Voucher[]
+  id               String        @id @default(cuid())
+  displayId        String?       @unique // 6-digit case-insensitive alphanumeric display ID
+  points           Int           @default(0)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  tenantId         String? // Optional - customers can transact with any tenant
+  email            String        @unique
+  name             String
+  mobile           String
+  qrCode           String?       @unique // Persistent unique QR code identifier
+  postcodeOutward  String? // Postcode outward code (e.g., SW1A)
+  postcodeInward   String? // Postcode inward code (e.g., 1AA)
+  yearOfBirth      Int? // Year of birth
+  rewardPreference String? // Money off, Free items, Exclusive local events, Surprise gifts
+  homeOwner        Boolean? // Yes or No
+  carOwner         Boolean? // Yes or No
+  tenant           Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  redemptions      Redemption[]
+  transactions     Transaction[]
+  vouchers         Voucher[]
 
   @@index([tenantId])
   @@index([qrCode])
@@ -116,20 +122,20 @@ model Tenant {
 }
 
 model Transaction {
-  id         String   @id @default(cuid())
-  amount     Float
-  points     Int
-  customerId String
-  tenantId   String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  status     String   @default("pending")
-  type       String
-  userId     String
-  receiptImage String? @db.LongText
-  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user       User     @relation(fields: [userId], references: [id])
+  id           String   @id @default(cuid())
+  amount       Float
+  points       Int
+  customerId   String
+  tenantId     String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  status       String   @default("pending")
+  type         String
+  userId       String
+  receiptImage String?  @db.LongText
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([customerId])
@@ -137,21 +143,22 @@ model Transaction {
 }
 
 model Reward {
-  id                String       @id @default(cuid())
-  name              String
-  description       String
-  discountPercentage Float       // Percentage discount (e.g., 10.0 for 10%)
-  validFrom         DateTime?    // Voucher valid from date
-  validTo           DateTime?    // Voucher valid to date (expires after this)
-  createdAt         DateTime     @default(now())
-  tenantId          String
-  approvalStatus    String       @default("PENDING") // PENDING, APPROVED, REJECTED
-  approvedAt        DateTime?
-  approvedBy        String?
-  rejectionReason   String?
-  redemptions       Redemption[]
-  tenant            Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  vouchers          Voucher[]
+  id                      String       @id @default(cuid())
+  name                    String
+  description             String
+  discountPercentage      Float // Percentage discount (e.g., 10.0 for 10%)
+  validFrom               DateTime? // Voucher valid from date
+  validTo                 DateTime? // Voucher valid to date (expires after this)
+  createdAt               DateTime     @default(now())
+  tenantId                String
+  approvalStatus          String       @default("PENDING") // PENDING, APPROVED, REJECTED
+  approvedAt              DateTime?
+  approvedBy              String?
+  rejectionReason         String?
+  maxRedemptionsPerCustomer Int? // null = unlimited; e.g. 2 = each customer can redeem at most 2 times
+  redemptions             Redemption[]
+  tenant                  Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vouchers                Voucher[]
 
   @@index([tenantId])
   @@index([approvalStatus])

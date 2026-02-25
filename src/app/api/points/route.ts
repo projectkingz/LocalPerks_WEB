@@ -119,8 +119,13 @@ export async function GET(request: Request) {
     });
 
     const calculatedPoints = transactions.reduce((total: number, t: any) => {
-      if (t.type === "EARNED" || t.status === "VOID") return total + t.points;
-      if (t.type === "SPENT" || t.type === "REFUND") return total + t.points; // SPENT/REFUND already negative
+      if (t.type === "EARNED" || t.status === "VOID") {
+        return total + t.points;
+      }
+      if (t.type === "SPENT" || t.type === "REFUND") {
+        const delta = t.points <= 0 ? t.points : -t.points;
+        return total + delta;
+      }
       return total;
     }, 0);
 

@@ -39,6 +39,7 @@ export async function GET(request: Request) {
         mobile: true,
         points: true,
         displayId: true,
+        qrCode: true,
         tenantId: true,
         tenant: {
           select: {
@@ -68,6 +69,7 @@ export async function GET(request: Request) {
         mobile: customer.mobile,
         points: calculatedPoints, // Use calculated points instead of stored value
         displayId: customer.displayId,
+        qrCode: customer.qrCode,
         tenantId: customer.tenantId,
         tenant: customer.tenant
       }
@@ -117,6 +119,7 @@ export async function POST(request: Request) {
         mobile: true,
         points: true,
         displayId: true,
+        qrCode: true,
         tenantId: true,
         tenant: {
           select: {
@@ -146,6 +149,7 @@ export async function POST(request: Request) {
         mobile: customer.mobile,
         points: calculatedPoints, // Use calculated points instead of stored value
         displayId: customer.displayId,
+        qrCode: customer.qrCode,
         tenantId: customer.tenantId,
         tenant: customer.tenant
       }

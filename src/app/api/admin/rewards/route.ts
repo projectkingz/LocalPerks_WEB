@@ -16,7 +16,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    // Get all admin user IDs (ADMIN and SUPER_ADMIN roles)
+    const adminUsers = await prisma.user.findMany({
+      where: {
+        role: { in: ['ADMIN', 'SUPER_ADMIN'] }
+      },
+      select: {
+        id: true
+      }
+    });
+    const adminUserIds = adminUsers.map(u => u.id);
+
+    // Fetch all rewards: admin-created/approved ones OR PENDING (partner-submitted) for approval
     const rewards = await prisma.reward.findMany({
+      where: {
+        OR: [
+          { approvedBy: { in: adminUserIds } },
+          { approvalStatus: 'PENDING' }
+        ]
+      },
       include: {
         tenant: {
           select: {
@@ -73,7 +91,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, description, discountPercentage, createdAt, tenantId } = body;
+    const { name, description, discountPercentage, discountType, createdAt, tenantId } = body;
 
     // Validate required fields
     if (!name || !description || discountPercentage === undefined) {
@@ -83,12 +101,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate discountPercentage is a positive number between 0 and 100
-    if (discountPercentage < 0 || discountPercentage > 100) {
-      return NextResponse.json(
-        { error: 'Discount percentage must be between 0 and 100' },
-        { status: 400 }
-      );
+    // Determine discount type if not provided
+    const finalDiscountType = discountType || (discountPercentage === 0 && name.match(/£\d+/) ? 'fixed' : 'percentage');
+
+    // Validate discountPercentage based on type
+    if (finalDiscountType === 'percentage') {
+      // Percentage discounts must be between 0 and 100
+      if (discountPercentage < 0 || discountPercentage > 100) {
+        return NextResponse.json(
+          { error: 'Discount percentage must be between 0 and 100' },
+          { status: 400 }
+        );
+      }
+    } else {
+      // Fixed amount discounts must have discountPercentage = 0 and £ amount in name
+      if (discountPercentage !== 0) {
+        return NextResponse.json(
+          { error: 'Fixed amount discounts must have discountPercentage set to 0' },
+          { status: 400 }
+        );
+      }
+      if (!name.match(/£\d+/)) {
+        return NextResponse.json(
+          { error: 'Fixed amount discounts must include £ amount in the name (e.g., "£35 Discount Voucher")' },
+          { status: 400 }
+        );
+      }
     }
 
     // For admin users, tenantId is optional (can be null for LocalPerks rewards)
@@ -102,21 +140,24 @@ export async function POST(request: NextRequest) {
       });
 
       if (!defaultTenant) {
-        // Create a system user first for the tenant
-        const systemUser = await prisma.user.create({
-          data: {
+        // Upsert system user (avoids unique constraint if already exists)
+        const systemUser = await prisma.user.upsert({
+          where: { email: 'system@localperks.com' },
+          create: {
             email: 'system@localperks.com',
             name: 'LocalPerks System',
             role: 'ADMIN',
             suspended: false,
-          }
+          },
+          update: {},
         });
 
         defaultTenant = await prisma.tenant.create({
           data: {
             name: 'System Default Tenant',
             partnerUserId: systemUser.id,
-          }
+            mobile: 'N/A',
+          },
         });
       }
       finalTenantId = defaultTenant.id;

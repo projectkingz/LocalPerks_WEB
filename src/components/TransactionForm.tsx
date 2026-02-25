@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { CreditCard, Loader2 } from 'lucide-react';
+import { CreditCard, Loader2, Calendar } from 'lucide-react';
 
 interface TransactionFormProps {
   customerQRCode: string | null;
@@ -79,35 +79,42 @@ export default function TransactionForm({
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Spend Amount (£)
+          <label className="block text-sm font-bold uppercase tracking-wide text-gray-700 mb-2">
+            Spend Amount
           </label>
-          <div className="mt-1">
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <span className="text-2xl font-bold text-gray-900">£</span>
+            </div>
             <input
               type="number"
               step="0.01"
               min={minimumPurchase}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              placeholder="0.00"
+              className="block w-full pl-10 pr-5 py-4 text-2xl font-bold text-gray-900 rounded-xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all outline-none"
               required
             />
           </div>
-          <p className="mt-1 text-sm text-gray-500">
-            Will earn {Math.floor(parseFloat(amount || '0') * pointsPerPound)} points
+          <p className="mt-2 text-sm font-semibold text-blue-600">
+            Will earn {Math.floor(parseFloat(amount || '0') * pointsPerPound).toLocaleString()} points
           </p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="block text-sm font-bold uppercase tracking-wide text-gray-700 mb-2">
             Spend Date
           </label>
-          <div className="mt-1">
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <Calendar className="h-6 w-6 text-gray-500" />
+            </div>
             <input
               type="date"
               value={spendDate}
               onChange={(e) => setSpendDate(e.target.value)}
-              className="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              className="block w-full pl-12 pr-5 py-4 text-xl font-bold text-gray-900 rounded-xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all outline-none"
               required
             />
           </div>

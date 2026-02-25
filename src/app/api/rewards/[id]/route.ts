@@ -43,7 +43,7 @@ export async function PUT(
 
   try {
     const { id } = params;
-    const { name, description, discountPercentage, validFrom, validTo } = await request.json();
+    const { name, description, discountPercentage, validFrom, validTo, maxRedemptionsPerCustomer } = await request.json();
     
     // Check if reward exists and get its current status
     const existingReward = await prisma.reward.findUnique({
@@ -65,6 +65,24 @@ export async function PUT(
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
     
+    // PARTNERS CAN ONLY CREATE/EDIT PERCENTAGE DISCOUNTS
+    if (session.user.role === 'PARTNER') {
+      // Partners must create percentage discounts only
+      if (discountPercentage === 0 && name.match(/£\d+/)) {
+        return NextResponse.json(
+          { error: 'Partners can only create percentage discounts. Fixed amount discounts are only available to administrators.' },
+          { status: 403 }
+        );
+      }
+      // Validate percentage is between 0 and 100
+      if (discountPercentage < 0 || discountPercentage > 100) {
+        return NextResponse.json(
+          { error: 'Discount percentage must be between 0 and 100' },
+          { status: 400 }
+        );
+      }
+    }
+    
     // Validate dates
     const fromDate = new Date(validFrom);
     const toDate = new Date(validTo);
@@ -83,6 +101,7 @@ export async function PUT(
         discountPercentage: Number(discountPercentage),
         validFrom: new Date(validFrom),
         validTo: new Date(validTo),
+        maxRedemptionsPerCustomer: maxRedemptionsPerCustomer != null && maxRedemptionsPerCustomer !== '' ? Number(maxRedemptionsPerCustomer) : null,
       },
     });
     

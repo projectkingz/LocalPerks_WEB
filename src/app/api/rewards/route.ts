@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/auth.config';
 import { prisma } from '@/lib/prisma';
+import { getTenantPointsConfig, calculatePointsForDiscount } from '@/lib/pointsCalculation';
 
 // Import or redefine the Reward interface and rewardsDatabase
 interface Reward {
@@ -71,6 +72,61 @@ export async function GET() {
       }
     });
     
+    // For customers, check voucher status for discount rewards and filter/hide used vouchers
+    if (session.user.role === 'CUSTOMER') {
+      const customer = await prisma.customer.findUnique({
+        where: { email: session.user.email as string },
+        select: { id: true }
+      });
+      
+      if (customer) {
+        // Get all vouchers for this customer
+        const customerVouchers = await (prisma as any).voucher.findMany({
+          where: { customerId: customer.id },
+          select: {
+            id: true,
+            rewardId: true,
+            status: true,
+            usedAt: true
+          }
+        });
+        
+        // Create a map of rewardId -> voucher status
+        const voucherMap = new Map<string, { status: string; usedAt: Date | null }>();
+        customerVouchers.forEach((v: any) => {
+          voucherMap.set(v.rewardId, { status: v.status, usedAt: v.usedAt });
+        });
+        
+        // Enrich rewards with voucher info and points cost (£ discount rewards require points)
+        const enrichedRewards = await Promise.all(rewards.map(async (reward: any) => {
+          const voucher = voucherMap.get(reward.id);
+          let points = 0;
+          const amountMatch = reward.name?.match(/£(\d+(?:\.\d+)?)/);
+          if (amountMatch) {
+            const discountAmount = parseFloat(amountMatch[1]);
+            const config = await getTenantPointsConfig(reward.tenantId);
+            points = calculatePointsForDiscount(discountAmount, config);
+          }
+          return {
+            ...reward,
+            points,
+            hasVoucher: !!voucher,
+            voucherStatus: voucher ? voucher.status : null,
+            voucherUsedAt: voucher ? voucher.usedAt : null
+          };
+        }));
+        const filteredRewards = enrichedRewards.filter((reward: any) => {
+          // Hide rewards where voucher has been used (status is 'used' OR usedAt is set)
+          if (reward.voucherStatus === 'used' || reward.voucherUsedAt) {
+            return false;
+          }
+          return true;
+        });
+
+        return NextResponse.json(filteredRewards);
+      }
+    }
+    
     return NextResponse.json(rewards);
   } catch (error) {
     console.error('Rewards API: Error in GET:', error);
@@ -92,10 +148,28 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, description, discountPercentage, validFrom, validTo, tenantId: requestTenantId } = body;
+    const { name, description, discountPercentage, validFrom, validTo, tenantId: requestTenantId, discountType, maxRedemptionsPerCustomer } = body;
     
     if (!name || !description || discountPercentage === undefined || !validFrom || !validTo) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+    
+    // PARTNERS CAN ONLY CREATE PERCENTAGE DISCOUNTS
+    if (session.user.role === 'PARTNER') {
+      // Partners must create percentage discounts only
+      if (discountType === 'fixed' || (discountPercentage === 0 && name.match(/£\d+/))) {
+        return NextResponse.json(
+          { error: 'Partners can only create percentage discounts. Fixed amount discounts are only available to administrators.' },
+          { status: 403 }
+        );
+      }
+      // Validate percentage is between 0 and 100
+      if (discountPercentage < 0 || discountPercentage > 100) {
+        return NextResponse.json(
+          { error: 'Discount percentage must be between 0 and 100' },
+          { status: 400 }
+        );
+      }
     }
     
     // Validate dates
@@ -164,7 +238,8 @@ export async function POST(request: Request) {
         tenantId: tenantId,
         approvalStatus: approvalStatus,
         approvedAt: approvalStatus === 'APPROVED' ? new Date() : null,
-        approvedBy: approvalStatus === 'APPROVED' ? session.user.id : null
+        approvedBy: approvalStatus === 'APPROVED' ? session.user.id : null,
+        maxRedemptionsPerCustomer: maxRedemptionsPerCustomer != null && maxRedemptionsPerCustomer !== '' ? Number(maxRedemptionsPerCustomer) : null
       },
     });
     

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
+import toast from 'react-hot-toast';
 import ScrollControls from '@/components/ScrollControls';
 
 interface PointsData {
@@ -19,43 +20,16 @@ interface Reward {
     id: string;
     name: string;
   };
-}
-
-interface Voucher {
-  id: string;
-  code: string;
-  customerId: string;
-  rewardId: string;
-  status: string;
-  usedAt?: string;
-  expiresAt?: string;
-  createdAt: string;
-  customer: {
-    id: string;
-    name: string;
-    email: string;
-  };
-  reward: {
-    id: string;
-    name: string;
-    description: string;
-    points: number;
-  };
-  redemption: {
-    id: string;
-    points: number;
-    createdAt: string;
-  };
+  hasVoucher?: boolean;
+  voucherStatus?: string | null;
+  voucherUsedAt?: Date | null;
 }
 
 export default function RewardsPage() {
   const { data: session } = useSession();
   const [pointsData, setPointsData] = useState<PointsData>({ points: 0, tier: 'Standard' });
   const [rewards, setRewards] = useState<Reward[]>([]);
-  const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [selectedReward, setSelectedReward] = useState<string | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [selectedDiscount, setSelectedDiscount] = useState<number | null>(null);
@@ -79,21 +53,41 @@ export default function RewardsPage() {
     return colorSets[index % colorSets.length];
   };
 
+  // Helper to recalculate available monetary discount and tiers
+  const recalculateDiscounts = (points: number, faceValue: number) => {
+    if (!faceValue || points < 0) {
+      setAvailableDiscount(0);
+      setAvailableDiscounts([]);
+      return;
+    }
+
+    const totalDiscount = points * faceValue;
+    setAvailableDiscount(totalDiscount);
+
+    const discounts: number[] = [];
+    const maxDiscountPounds = Math.floor(totalDiscount);
+    for (let i = 1; i <= 20; i++) {
+      if (i <= maxDiscountPounds) {
+        discounts.push(i);
+      }
+    }
+    setAvailableDiscounts(discounts);
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        setError('');
 
         // Fetch points data
         const pointsResponse = await fetch('/api/points');
         if (!pointsResponse.ok) {
-          setError('Failed to fetch points data');
+          toast.error('Failed to fetch points data');
           return;
         }
-        const pointsData = await pointsResponse.json();
-        console.log('Points data fetched:', pointsData);
-        setPointsData(pointsData);
+        const pointsJson = await pointsResponse.json();
+        console.log('Points data fetched:', pointsJson);
+        setPointsData(pointsJson);
 
         // Fetch points configuration to get face value
         const configResponse = await fetch('/api/points/config');
@@ -102,40 +96,24 @@ export default function RewardsPage() {
           if (configData.success && configData.config) {
             const faceValue = configData.config.pointFaceValue || 0.008;
             setPointFaceValue(faceValue);
-            const totalDiscount = pointsData.points * faceValue;
-            setAvailableDiscount(totalDiscount);
-            
-            // Calculate available discount tiers (£1 to £20)
-            const discounts: number[] = [];
-            const maxDiscountPounds = Math.floor(totalDiscount);
-            for (let i = 1; i <= 20; i++) {
-              if (i <= maxDiscountPounds) {
-                discounts.push(i);
-              }
-            }
-            setAvailableDiscounts(discounts);
+            recalculateDiscounts(pointsJson.points, faceValue);
+          } else {
+            // Fallback: still compute with default face value if config missing
+            recalculateDiscounts(pointsJson.points, pointFaceValue || 0.008);
           }
         }
 
         // Fetch rewards
         const rewardsResponse = await fetch('/api/rewards');
         if (!rewardsResponse.ok) {
-          setError('Failed to fetch rewards');
+          toast.error('Failed to fetch rewards');
           return;
         }
         const rewardsData = await rewardsResponse.json();
         console.log('Rewards data fetched:', rewardsData);
         setRewards(rewardsData);
-
-        // Fetch vouchers
-        const vouchersResponse = await fetch('/api/rewards/vouchers');
-        if (vouchersResponse.ok) {
-          const vouchersData = await vouchersResponse.json();
-          console.log('Vouchers data fetched:', vouchersData);
-          setVouchers(vouchersData);
-        }
       } catch (error) {
-        setError('Failed to load data');
+        toast.error('Failed to load data');
         console.error('Error fetching data:', error);
       } finally {
         setLoading(false);
@@ -151,23 +129,25 @@ export default function RewardsPage() {
     const reward = rewards.find(r => r.id === rewardId);
     if (!reward) return;
 
+    // Rewards/vouchers are free (0 points) - default to 0 if points field is missing
+    const rewardPoints = reward.points ?? 0;
+
     console.log('Reward selected:', {
       rewardId,
       rewardName: reward.name,
-      rewardPoints: reward.points,
+      rewardPoints,
       userPoints: pointsData.points,
-      hasEnoughPoints: pointsData.points >= reward.points
+      hasEnoughPoints: pointsData.points >= rewardPoints
     });
 
-    if (pointsData.points < reward.points) {
-      console.log('Insufficient points - user has', pointsData.points, 'but needs', reward.points);
-      setError('Not enough points for this reward');
+    if (pointsData.points < rewardPoints) {
+      console.log('Insufficient points - user has', pointsData.points, 'but needs', rewardPoints);
+      toast.error('Not enough points for this reward');
       return;
     }
 
     setSelectedReward(rewardId);
     setShowConfirmation(true);
-    setError('');
   };
 
   const createVoucher = async () => {
@@ -183,7 +163,6 @@ export default function RewardsPage() {
     });
 
     setLoading(true);
-    setError('');
 
     try {
       const requestBody = {
@@ -209,32 +188,21 @@ export default function RewardsPage() {
 
       const data = await response.json();
       console.log('Success response:', data);
-      setSuccess(`Voucher created successfully! Your voucher code is: ${data.voucher.code}`);
+      toast.success(`Voucher created! View it in Vouchers. Code: ${data.voucher.code}`);
       
       // Update points
       const pointsResponse = await fetch('/api/points');
-      const pointsData = await pointsResponse.json();
-      setPointsData(pointsData);
-
-      // Update vouchers
-      const vouchersResponse = await fetch('/api/rewards/vouchers');
-      if (vouchersResponse.ok) {
-        const vouchersData = await vouchersResponse.json();
-        setVouchers(vouchersData);
-      }
+      const updatedPoints = await pointsResponse.json();
+      setPointsData(updatedPoints);
+      recalculateDiscounts(updatedPoints.points, pointFaceValue);
     } catch (error) {
       console.error('Error in createVoucher:', error);
-      setError(error instanceof Error ? error.message : 'Failed to create voucher');
+      toast.error(error instanceof Error ? error.message : 'Failed to create voucher');
     } finally {
       setLoading(false);
       setShowConfirmation(false);
       setSelectedReward(null);
     }
-  };
-
-  const getRewardName = (rewardId: string) => {
-    const reward = rewards.find(r => r.id === rewardId);
-    return reward ? reward.name : 'Unknown Reward';
   };
 
   const handleDiscountSelect = (discountAmount: number) => {
@@ -248,20 +216,18 @@ export default function RewardsPage() {
     });
 
     if (pointsData.points < requiredPoints) {
-      setError(`Not enough points for £${discountAmount} discount`);
+      toast.error(`Not enough points for £${discountAmount} discount`);
       return;
     }
 
     setSelectedDiscount(discountAmount);
     setShowDiscountConfirmation(true);
-    setError('');
   };
 
   const redeemDiscount = async () => {
     if (!selectedDiscount || !session?.user?.email) return;
 
     setLoading(true);
-    setError('');
 
     try {
       const response = await fetch('/api/discounts/redeem', {
@@ -276,34 +242,25 @@ export default function RewardsPage() {
       }
 
       const data = await response.json();
-      setSuccess(`Successfully redeemed £${selectedDiscount} discount voucher! Code: ${data.voucher?.code || 'N/A'}`);
-      
-      // Refresh vouchers
-      const vouchersResponse = await fetch('/api/rewards/vouchers');
-      if (vouchersResponse.ok) {
-        const vouchersData = await vouchersResponse.json();
-        setVouchers(vouchersData);
-      }
+      toast.success(`Redeemed £${selectedDiscount} discount! View in Vouchers. Code: ${data.voucher?.code || 'N/A'}`);
       
       // Update points
       const pointsResponse = await fetch('/api/points');
-      const pointsData = await pointsResponse.json();
-      setPointsData(pointsData);
+      const updatedPoints = await pointsResponse.json();
+      setPointsData(updatedPoints);
+
+      // Recalculate available discounts based on the new balance
+      recalculateDiscounts(updatedPoints.points, pointFaceValue);
       
-      // Recalculate available discounts
-      const totalDiscount = pointsData.points * pointFaceValue;
-      setAvailableDiscount(totalDiscount);
-      const discounts: number[] = [];
-      const maxDiscountPounds = Math.floor(totalDiscount);
-      for (let i = 1; i <= 20; i++) {
-        if (i <= maxDiscountPounds) {
-          discounts.push(i);
-        }
+      // Refresh rewards list to update voucher status
+      const rewardsResponse = await fetch('/api/rewards');
+      if (rewardsResponse.ok) {
+        const rewardsData = await rewardsResponse.json();
+        setRewards(rewardsData);
       }
-      setAvailableDiscounts(discounts);
     } catch (error) {
       console.error('Error redeeming discount:', error);
-      setError(error instanceof Error ? error.message : 'Failed to redeem discount');
+      toast.error(error instanceof Error ? error.message : 'Failed to redeem discount');
     } finally {
       setLoading(false);
       setShowDiscountConfirmation(false);
@@ -433,18 +390,40 @@ export default function RewardsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {rewards.map((reward, index) => {
               const colors = getCardColors(index);
-              const canRedeem = pointsData.points >= reward.points;
+              // Rewards/vouchers are free (0 points) - default to 0 if points field is missing
+              const rewardPoints = reward.points ?? 0;
+              const canRedeem = pointsData.points >= rewardPoints;
+              const isRedeemed = reward.hasVoucher === true && reward.voucherStatus === 'active';
+              const isSuspended = reward.hasVoucher === true && reward.voucherStatus === 'suspended';
+              const isClickable = canRedeem && !isRedeemed && !isSuspended;
+              
               return (
                 <div
                   key={reward.id}
-                  className={`rounded-lg p-6 text-white transition-all duration-200 ${
-                    canRedeem
+                  className={`rounded-lg p-6 text-white transition-all duration-200 relative ${
+                    isClickable
                       ? 'cursor-pointer hover:shadow-lg hover:scale-105'
-                      : 'opacity-50'
+                      : isSuspended
+                      ? 'opacity-60'
+                      : 'opacity-75'
                   }`}
                   style={{ backgroundColor: colors.primary }}
-                  onClick={() => handleRewardSelect(reward.id)}
+                  onClick={() => isClickable && handleRewardSelect(reward.id)}
                 >
+                  {/* Redeemed Badge */}
+                  {isRedeemed && (
+                    <div className="absolute top-2 right-2 bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+                      ✓ Redeemed
+                    </div>
+                  )}
+                  
+                  {/* Suspended Badge */}
+                  {isSuspended && (
+                    <div className="absolute top-2 right-2 bg-amber-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+                      ⚠ Suspended
+                    </div>
+                  )}
+                  
                   <div className="flex items-center justify-center mb-4">
                     <div className="w-12 h-12 rounded-full bg-white bg-opacity-20 flex items-center justify-center">
                       <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -461,15 +440,25 @@ export default function RewardsPage() {
                     style={{ backgroundColor: colors.light }}
                   >
                     <p className="text-sm font-semibold" style={{ color: colors.primary }}>
-                      Redeem At: {reward.tenant?.name || 'Unknown Business'}
+                      Redeem At: {reward.tenant?.name === 'LocalPerks System' || reward.tenant?.name === 'System Default Tenant'
+                        ? 'Any LocalPerks Partner'
+                        : (reward.tenant?.name || 'Unknown Business')}
                     </p>
                   </div>
                   
                   <div className="flex justify-center items-center gap-2">
                     <p className="text-lg font-bold text-white">
-                      {reward.points} points
+                      {rewardPoints === 0 ? 'Free' : `${rewardPoints} points`}
                     </p>
-                    {canRedeem ? (
+                    {isRedeemed ? (
+                      <svg className="w-5 h-5 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    ) : isSuspended ? (
+                      <svg className="w-5 h-5 text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    ) : canRedeem ? (
                       <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
@@ -479,62 +468,21 @@ export default function RewardsPage() {
                       </svg>
                     )}
                   </div>
+                  
+                  {isRedeemed && (
+                    <p className="text-xs text-white text-opacity-80 text-center mt-2">
+                      Voucher created - view in Vouchers page
+                    </p>
+                  )}
+                  
+                  {isSuspended && (
+                    <p className="text-xs text-white text-opacity-80 text-center mt-2">
+                      This voucher has been suspended and cannot be used
+                    </p>
+                  )}
                 </div>
               );
             })}
-          </div>
-        )}
-      </div>
-
-      {/* My Vouchers */}
-      <div className="bg-white shadow rounded-lg p-6">
-        <h2 className="text-xl font-semibold mb-4">My Vouchers</h2>
-        {vouchers.length === 0 ? (
-          <p className="text-gray-600">No vouchers yet. Redeem a reward to get started!</p>
-        ) : (
-          <div className="space-y-4">
-            {vouchers.map((voucher) => (
-              <div key={voucher.id} className="border rounded-lg p-4">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <h3 className="font-semibold">{voucher.reward.name}</h3>
-                    <p className="text-sm text-gray-600">{voucher.reward.description}</p>
-                    <p className="text-sm text-gray-600">
-                      Redeemed for {voucher.redemption.points} points
-                    </p>
-                    <div className="mt-2">
-                      <p className="text-xs text-gray-500">
-                        Created: {new Date(voucher.createdAt).toLocaleDateString()}
-                      </p>
-                      {voucher.expiresAt && (
-                        <p className="text-xs text-gray-500">
-                          Expires: {new Date(voucher.expiresAt).toLocaleDateString()}
-                        </p>
-                      )}
-                      {voucher.usedAt && (
-                        <p className="text-xs text-gray-500">
-                          Used: {new Date(voucher.usedAt).toLocaleDateString()}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-right ml-4">
-                    <div className="mb-2">
-                      <code className="text-sm bg-gray-100 px-2 py-1 rounded font-mono">
-                        {voucher.code}
-                      </code>
-                    </div>
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      voucher.status === 'active' ? 'bg-green-100 text-green-800' :
-                      voucher.status === 'used' ? 'bg-blue-100 text-blue-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {voucher.status}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
         )}
       </div>
@@ -546,8 +494,10 @@ export default function RewardsPage() {
             <h3 className="text-lg font-semibold mb-4">Confirm Reward</h3>
             <p className="text-gray-600 mb-4">
               Are you sure you want to redeem{' '}
-              {rewards.find(r => r.id === selectedReward)?.name} for{' '}
-              {rewards.find(r => r.id === selectedReward)?.points} points?
+              {rewards.find(r => r.id === selectedReward)?.name}?
+              {(rewards.find(r => r.id === selectedReward)?.points ?? 0) > 0 && (
+                <> This will cost {rewards.find(r => r.id === selectedReward)?.points ?? 0} points.</>
+              )}
             </p>
             <div className="flex justify-end space-x-4">
               <button
@@ -614,17 +564,6 @@ export default function RewardsPage() {
         </div>
       )}
 
-      {/* Error and Success Messages */}
-      {error && (
-        <div className="fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          {error}
-        </div>
-      )}
-      {success && (
-        <div className="fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
-          {success}
-        </div>
-      )}
     </div>
     </>
   );

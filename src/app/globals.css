@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 50% larger base font - scales all rem-based text */
+html {
+  font-size: 150%;
+}
+
 :root {
   --font-roboto: 'Roboto', sans-serif;
   --font-roboto-mono: 'Roboto Mono', monospace;

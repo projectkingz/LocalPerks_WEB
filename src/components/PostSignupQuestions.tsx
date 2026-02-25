@@ -219,7 +219,22 @@ export default function PostSignupQuestions({ onComplete, forceVisible = false }
       });
 
       if (!response.ok) {
-        throw new Error('Failed to save answers');
+        const errorData = await response.json().catch(() => ({ error: 'Failed to save answers' }));
+        throw new Error(errorData.error || 'Failed to save answers');
+      }
+
+      // Reload the data to ensure UI is updated with latest responses
+      const updatedResponse = await fetch('/api/customer/post-signup-questions');
+      if (updatedResponse.ok) {
+        const updatedData = await updatedResponse.json();
+        setFormData({
+          postcodeOutward: updatedData.postcodeOutward || '',
+          postcodeInward: updatedData.postcodeInward || '',
+          yearOfBirth: updatedData.yearOfBirth?.toString() || '',
+          rewardPreference: updatedData.rewardPreference || '',
+          homeOwner: updatedData.homeOwner === true ? 'Yes' : updatedData.homeOwner === false ? 'No' : '',
+          carOwner: updatedData.carOwner === true ? 'Yes' : updatedData.carOwner === false ? 'No' : ''
+        });
       }
 
       setIsVisible(false);
@@ -305,12 +320,20 @@ export default function PostSignupQuestions({ onComplete, forceVisible = false }
                   <div className="relative group">
                     <input
                       type="text"
-                      value=""
-                      placeholder="Inward e.g., 1AA"
+                      value={formData.postcodeInward}
+                      onChange={(e) => handleChange('postcodeInward', e.target.value.toUpperCase())}
+                      placeholder=" "
                       maxLength={3}
-                      disabled
-                      className="block w-full px-8 py-8 text-2xl text-center text-gray-400 bg-gray-100 border-2 rounded-3xl appearance-none transition-all duration-200 cursor-not-allowed min-h-[80px] border-gray-300 opacity-60 placeholder:text-gray-400"
+                      className={`block w-full px-8 py-8 text-2xl text-gray-900 bg-gray-50 border-2 rounded-3xl appearance-none transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-500/30 focus:border-blue-500 focus:bg-white peer group-hover:border-gray-300 shadow-lg hover:shadow-xl min-h-[80px] ${
+                        errors.postcodeInward ? 'border-red-300' : 'border-gray-200'
+                      }`}
                     />
+                    <label className="absolute text-xl font-medium text-gray-600 duration-200 transform -translate-y-4 scale-75 top-4 z-10 origin-[0] bg-white px-3 peer-focus:px-3 peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-4 peer-focus:scale-75 peer-focus:-translate-y-4 left-3 peer-focus:bg-white group-hover:bg-white">
+                      Inward (e.g., 1AA)
+                    </label>
+                    {errors.postcodeInward && (
+                      <p className="mt-2 text-lg text-red-600 font-medium">{errors.postcodeInward}</p>
+                    )}
                   </div>
                 </div>
               </div>

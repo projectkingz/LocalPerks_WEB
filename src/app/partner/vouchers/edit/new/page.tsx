@@ -11,7 +11,8 @@ export default function AddVoucherPage() {
     description: "", 
     discountPercentage: 0,
     validFrom: "",
-    validTo: ""
+    validTo: "",
+    maxRedemptionsPerCustomer: "" as string | number
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -25,10 +26,14 @@ export default function AddVoucherPage() {
     setSaving(true);
     setError("");
     try {
+      const payload = {
+        ...form,
+        maxRedemptionsPerCustomer: form.maxRedemptionsPerCustomer === "" ? null : Number(form.maxRedemptionsPerCustomer)
+      };
       const res = await fetch("/api/rewards", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("Failed to add voucher");
       router.push("/partner/vouchers");
@@ -113,6 +118,21 @@ export default function AddVoucherPage() {
                 Discount Percentage *
               </label>
               <p className="mt-2 text-base text-gray-500 font-medium">Enter a number between 0 and 100. This will be the percentage discount applied to purchases.</p>
+            </div>
+            <div className="relative group">
+              <input
+                type="number"
+                name="maxRedemptionsPerCustomer"
+                value={form.maxRedemptionsPerCustomer}
+                onChange={handleChange}
+                min={1}
+                placeholder=""
+                className="block w-full px-8 py-8 text-2xl text-gray-900 bg-gray-50 border-2 border-gray-200 rounded-3xl appearance-none transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-500/30 focus:border-blue-500 focus:bg-white peer group-hover:border-gray-300 shadow-lg hover:shadow-xl min-h-[80px]"
+              />
+              <label className="absolute text-xl font-medium text-gray-600 duration-200 transform -translate-y-4 scale-75 top-4 z-10 origin-[0] bg-white px-3 peer-focus:px-3 peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-4 peer-focus:scale-75 peer-focus:-translate-y-4 left-3 peer-focus:bg-white group-hover:bg-white">
+                Max redemptions per customer (optional)
+              </label>
+              <p className="mt-2 text-base text-gray-500 font-medium">Leave empty for unlimited. E.g. 2 = each customer can redeem this reward at most 2 times.</p>
             </div>
             <div className="relative group">
               <input

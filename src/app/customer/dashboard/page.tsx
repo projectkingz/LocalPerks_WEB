@@ -144,25 +144,33 @@ export default function DashboardPage() {
   }, [session?.user?.email]);
 
   const getProgressToNextTier = () => {
-    const pointsNeeded = {
+    const pointsNeeded: Record<string, number> = {
       Standard: 100,
       Silver: 500,
       Gold: 1000,
       Platinum: Infinity
     };
+    const nextTierName: Record<string, string> = {
+      Standard: 'Silver',
+      Silver: 'Gold',
+      Gold: 'Platinum',
+      Platinum: ''
+    };
 
     if (pointsData.tier === 'Platinum') {
-      return { current: pointsData.points, target: pointsData.points, percentage: 100 };
+      return { current: pointsData.points, target: pointsData.points, percentage: 100, nextTier: '' };
     }
 
     const currentTierPoints = pointsData.points;
     const nextTierPoints = pointsNeeded[pointsData.tier as keyof typeof pointsNeeded];
     const percentage = Math.min(Math.round((currentTierPoints / nextTierPoints) * 100), 100);
+    const nextTier = nextTierName[pointsData.tier] || '';
 
     return {
       current: currentTierPoints,
       target: nextTierPoints,
-      percentage
+      percentage,
+      nextTier
     };
   };
 
@@ -263,7 +271,7 @@ export default function DashboardPage() {
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Progress to Next</p>
+                <p className="text-sm font-medium text-gray-600">Progress to {progress.nextTier || 'Next'}</p>
                 <p className="text-2xl font-semibold text-gray-900">{progress.percentage}%</p>
               </div>
               <div className="p-3 bg-green-50 rounded-xl">
@@ -674,7 +682,7 @@ export default function DashboardPage() {
               </Link>
 
               <Link
-                href="/customer/voucher"
+                href="/customer/vouchers"
                 className="flex items-center justify-between p-4 bg-purple-50 rounded-xl hover:bg-purple-100 transition-colors duration-200 group"
               >
                 <div className="flex items-center">

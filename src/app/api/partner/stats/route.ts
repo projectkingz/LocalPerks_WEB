@@ -87,10 +87,12 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('Error fetching partner stats:', error);
-    return NextResponse.json(
-      { message: error.message || 'Failed to fetch stats' },
-      { status: 500 }
-    );
+    const isDbUnavailable = error?.code === 'P1001' || error?.code === 'P2024';
+    const status = isDbUnavailable ? 503 : 500;
+    const message = isDbUnavailable
+      ? 'Database temporarily unavailable. Please try again in a moment.'
+      : (error?.message || 'Failed to fetch stats');
+    return NextResponse.json({ message }, { status });
   }
 }
 

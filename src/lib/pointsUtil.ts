@@ -392,10 +392,17 @@ export const pointsUtil = {
         }
       });
 
-      // Match web /api/points logic: include EARNED and any VOID (any type), and SPENT/REFUND (negative)
+      // Match web /api/points logic:
+      // - EARNED and any VOID add their points
+      // - SPENT/REFUND always DEDUCT points, regardless of stored sign
       const calculatedPoints = transactions.reduce((total, t) => {
-        if (t.type === 'EARNED' || t.status === 'VOID') return total + t.points;
-        if (t.type === 'SPENT' || t.type === 'REFUND') return total + t.points; // SPENT/REFUND already negative
+        if (t.type === 'EARNED' || t.status === 'VOID') {
+          return total + t.points;
+        }
+        if (t.type === 'SPENT' || t.type === 'REFUND') {
+          const delta = t.points <= 0 ? t.points : -t.points;
+          return total + delta;
+        }
         return total;
       }, 0);
 
@@ -433,10 +440,15 @@ export const pointsUtil = {
         }
       });
 
-      // Match web calculation rules
+      // Match web calculation rules (see calculateCustomerPoints):
       const calculatedPoints = transactions.reduce((total, t) => {
-        if (t.type === 'EARNED' || t.status === 'VOID') return total + t.points;
-        if (t.type === 'SPENT' || t.type === 'REFUND') return total + t.points;
+        if (t.type === 'EARNED' || t.status === 'VOID') {
+          return total + t.points;
+        }
+        if (t.type === 'SPENT' || t.type === 'REFUND') {
+          const delta = t.points <= 0 ? t.points : -t.points;
+          return total + delta;
+        }
         return total;
       }, 0);
 

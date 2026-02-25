@@ -11,7 +11,8 @@ import {
   Save,
   QrCode,
   Lock,
-  Edit
+  Edit,
+  KeyRound
 } from 'lucide-react';
 import QRScanner from '@/components/QRScanner';
 import TransactionForm from '@/components/TransactionForm';
@@ -20,6 +21,10 @@ import ScrollControls from '@/components/ScrollControls';
 
 export default function PartnerProfile() {
   const [customerQRCode, setCustomerQRCode] = useState<string | null>(null);
+  const [manualCode, setManualCode] = useState('');
+  const [manualCodeLoading, setManualCodeLoading] = useState(false);
+  const [manualCodeError, setManualCodeError] = useState<string | null>(null);
+  const [voucherSuccess, setVoucherSuccess] = useState<string | null>(null);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -77,6 +82,70 @@ export default function PartnerProfile() {
 
   const handleScanError = (error: string) => {
     console.error('QR scan error:', error);
+  };
+
+  const handleManualCodeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const code = manualCode?.trim();
+    if (!code) {
+      setManualCodeError('Please enter a code');
+      return;
+    }
+
+    setManualCodeLoading(true);
+    setManualCodeError(null);
+    setVoucherSuccess(null);
+
+    try {
+      // Try customer QR code first (for recording transactions)
+      const customerRes = await fetch('/api/customers/qr', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+
+      if (customerRes.ok) {
+        setCustomerQRCode(code);
+        setManualCode('');
+        return;
+      }
+
+      // Try customer display ID (6-char format) as fallback - transactions API accepts displayId too
+      if (/^[0-9A-Za-z]{6}$/.test(code)) {
+        const lookupRes = await fetch(`/api/customers/lookup?displayId=${encodeURIComponent(code.toUpperCase())}`);
+        if (lookupRes.ok) {
+          const data = await lookupRes.json();
+          if (data.customer) {
+            // Use qrCode if available, else displayId (transactions API resolves both)
+            setCustomerQRCode(data.customer.qrCode || code.toUpperCase());
+            setManualCode('');
+            return;
+          }
+        }
+      }
+
+      // Try voucher code (for redeeming vouchers)
+      const voucherRes = await fetch('/api/vouchers/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voucherCode: code }),
+      });
+
+      if (voucherRes.ok) {
+        const data = await voucherRes.json();
+        setVoucherSuccess(data.message || 'Voucher redeemed successfully!');
+        setManualCode('');
+        setTimeout(() => setVoucherSuccess(null), 4000);
+        return;
+      }
+
+      const errData = await voucherRes.json().catch(() => ({}));
+      setManualCodeError(errData.error || 'Invalid code. Enter customer QR code, display ID, or voucher code.');
+    } catch (err) {
+      setManualCodeError('Failed to validate code');
+    } finally {
+      setManualCodeLoading(false);
+    }
   };
 
   const handleTransactionSubmit = async (data: {
@@ -148,6 +217,41 @@ export default function PartnerProfile() {
                 onScanSuccess={handleScanSuccess}
                 onScanError={handleScanError}
               />
+
+              <div className="mt-6 pt-6 border-t border-gray-100">
+                <label className="block text-sm font-bold uppercase tracking-wide text-gray-700 mb-2 flex items-center">
+                  <KeyRound className="h-4 w-4 text-gray-600 mr-2" />
+                  Camera not available? Enter code manually
+                </label>
+                <form onSubmit={handleManualCodeSubmit} className="flex gap-3">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={manualCode}
+                      onChange={(e) => {
+                        setManualCode(e.target.value.toUpperCase());
+                        setManualCodeError(null);
+                      }}
+                      placeholder="Customer QR, display ID (6 chars), or voucher code"
+                      className="block w-full pl-4 pr-5 py-4 text-xl font-bold text-gray-900 rounded-xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all outline-none placeholder:text-gray-400 placeholder:font-medium disabled:opacity-60"
+                      disabled={manualCodeLoading}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={manualCodeLoading || !manualCode.trim()}
+                    className="px-6 py-4 rounded-xl bg-blue-600 text-white text-base font-bold hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  >
+                    {manualCodeLoading ? 'Checking...' : 'Use Code'}
+                  </button>
+                </form>
+                {manualCodeError && (
+                  <p className="mt-2 text-sm text-red-600">{manualCodeError}</p>
+                )}
+                {voucherSuccess && (
+                  <p className="mt-2 text-sm text-green-600 font-medium">{voucherSuccess}</p>
+                )}
+              </div>
             </motion.div>
           )}
 

@@ -59,6 +59,8 @@ export default function PartnerDashboard() {
   const [popularError, setPopularError] = useState<string | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
+  const [statsRetryKey, setStatsRetryKey] = useState(0);
+  const [popularRetryKey, setPopularRetryKey] = useState(0);
 
   useEffect(() => {
     setStatsLoading(true);
@@ -75,9 +77,13 @@ export default function PartnerDashboard() {
     const periodDays = periodMap[dateRange] || 7;
     
     fetch(`/api/partner/stats?period=${periodDays}`)
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch partner stats');
-        return res.json();
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const msg = res.status === 503 ? (data.message || 'Service temporarily unavailable. Please try again.') : 'Failed to fetch partner stats';
+          throw new Error(msg);
+        }
+        return data;
       })
       .then(data => {
         setStats({
@@ -116,15 +122,19 @@ export default function PartnerDashboard() {
       .catch((err) => {
         console.error('Error loading activity:', err);
       });
-  }, [dateRange]);
+  }, [dateRange, statsRetryKey]);
 
   useEffect(() => {
     setPopularLoading(true);
     setPopularError(null);
     fetch(`/api/dashboard-stats?period=${popularPeriod}`)
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch popular rewards');
-        return res.json();
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const msg = res.status === 503 ? (data.error || data.message || 'Service temporarily unavailable. Please try again.') : 'Failed to fetch popular rewards';
+          throw new Error(msg);
+        }
+        return data;
       })
       .then(data => {
         setPopularRewards(data.popularRewards || []);
@@ -134,7 +144,7 @@ export default function PartnerDashboard() {
         setPopularError(err.message || 'Error loading popular rewards');
         setPopularLoading(false);
       });
-  }, [popularPeriod]);
+  }, [popularPeriod, popularRetryKey]);
 
   useEffect(() => {
     // Always fetch mobile number from profile
@@ -204,7 +214,14 @@ export default function PartnerDashboard() {
             </>
           ) : statsError ? (
             <div className="col-span-full text-center py-8">
-              <p className="text-red-500">{statsError}</p>
+              <p className="text-red-500 mb-3">{statsError}</p>
+              <button
+                type="button"
+                onClick={() => setStatsRetryKey((k) => k + 1)}
+                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+              >
+                Try again
+              </button>
             </div>
           ) : (
             <>
@@ -373,7 +390,16 @@ export default function PartnerDashboard() {
                 <div className="flex items-center justify-center py-8"><span className="animate-spin mr-2">🔄</span>Loading popular rewards...</div>
               )}
               {popularError && (
-                <div className="text-red-500 text-sm">{popularError}</div>
+                <div className="space-y-2">
+                  <div className="text-red-500 text-sm">{popularError}</div>
+                  <button
+                    type="button"
+                    onClick={() => setPopularRetryKey((k) => k + 1)}
+                    className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    Try again
+                  </button>
+                </div>
               )}
               {!popularLoading && !popularError && popularRewards.length === 0 && (
                 <div className="text-gray-500 text-sm">No data for this period.</div>

@@ -168,11 +168,31 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     
-    // Support both old format (customerId, tenantId) and new format (customerEmail, source)
-    const { amount, customerId, tenantId, customerEmail, source, points, type } = body;
+    // Support old format (customerId, tenantId), new format (customerEmail, source), and customerQRCode (from scan/manual entry)
+    const { amount, customerId, tenantId, customerEmail, source, points, type, customerQRCode } = body;
 
     // Determine if this is a mobile request
     const isMobileRequest = source === 'partner' && customerEmail;
+
+    // Resolve customerQRCode or displayId to customerId for partner/admin scan/manual entry flow
+    let resolvedCustomerId = customerId;
+    let resolvedCustomerTenantId: string | null = null;
+    if (!resolvedCustomerId && customerQRCode && (userRole === 'PARTNER' || userRole === 'ADMIN' || userRole === 'SUPER_ADMIN')) {
+      let customerByCode = await prisma.customer.findUnique({
+        where: { qrCode: customerQRCode },
+        select: { id: true, tenantId: true }
+      });
+      if (!customerByCode && /^[0-9A-Za-z]{6}$/.test(customerQRCode)) {
+        customerByCode = await prisma.customer.findUnique({
+          where: { displayId: customerQRCode.toUpperCase() },
+          select: { id: true, tenantId: true }
+        });
+      }
+      if (customerByCode) {
+        resolvedCustomerId = customerByCode.id;
+        resolvedCustomerTenantId = customerByCode.tenantId;
+      }
+    }
 
     if (isMobileRequest) {
       // Mobile partner request - find customer by email
@@ -277,18 +297,29 @@ export async function POST(request: Request) {
         }
       });
     } else {
-      // Original web request format - use tenantId from body or session for partners
-      const finalTenantId = tenantId || (userRole === 'PARTNER' ? userTenantId : undefined);
+      // Original web request format - use tenantId from body, session (partners), or customer (admins)
+      let finalTenantId = tenantId || (userRole === 'PARTNER' ? userTenantId : undefined);
+      if (!finalTenantId && (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && resolvedCustomerTenantId) {
+        finalTenantId = resolvedCustomerTenantId;
+      }
+      if (!finalTenantId && (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && resolvedCustomerId) {
+        const cust = await prisma.customer.findUnique({ where: { id: resolvedCustomerId }, select: { tenantId: true } });
+        finalTenantId = cust?.tenantId || undefined;
+      }
+      if (!finalTenantId && (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN')) {
+        const defaultTenant = await prisma.tenant.findFirst({ where: { name: 'System Default Tenant' } });
+        finalTenantId = defaultTenant?.id;
+      }
       
-      if (!amount || !customerId || !finalTenantId) {
+      if (!amount || !resolvedCustomerId || !finalTenantId) {
         return NextResponse.json({ 
-          error: 'Missing required fields: amount, customerId, or tenantId' 
+          error: 'Missing required fields: amount, customerId (or valid customerQRCode). Could not determine tenant.' 
         }, { status: 400 });
       }
 
     // Verify customer exists
     const customer = await prisma.customer.findUnique({
-      where: { id: customerId }
+      where: { id: resolvedCustomerId }
     });
 
     if (!customer) {
@@ -338,7 +369,7 @@ export async function POST(request: Request) {
     if (isRefund) {
       const currentPoints = await prisma.transaction.aggregate({
         where: {
-          customerId: customerId,
+          customerId: resolvedCustomerId,
           status: { in: ['APPROVED', 'VOID'] }
         },
         _sum: {
@@ -362,7 +393,7 @@ export async function POST(request: Request) {
           type: transactionType,
           status: 'APPROVED',
           userId: user.id,
-          customerId: customerId,
+          customerId: resolvedCustomerId,
           tenantId: finalTenantId
         },
       include: {

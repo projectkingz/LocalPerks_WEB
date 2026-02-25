@@ -18,7 +18,8 @@ import {
   BarChart3,
   UserCheck,
   CreditCard,
-  ChevronDown
+  ChevronDown,
+  LayoutGrid
 } from 'lucide-react';
 
 export default function Navigation() {
@@ -26,7 +27,11 @@ export default function Navigation() {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAdminDropdownOpen, setIsAdminDropdownOpen] = useState(false);
+  const [isManageDropdownOpen, setIsManageDropdownOpen] = useState(false);
+  const [isCustomerManageDropdownOpen, setIsCustomerManageDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const manageDropdownRef = useRef<HTMLDivElement>(null);
+  const customerManageDropdownRef = useRef<HTMLDivElement>(null);
 
   const isActive = (path: string) => {
     return pathname === path;
@@ -35,19 +40,26 @@ export default function Navigation() {
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (dropdownRef.current && !dropdownRef.current.contains(target)) {
         setIsAdminDropdownOpen(false);
+      }
+      if (manageDropdownRef.current && !manageDropdownRef.current.contains(target)) {
+        setIsManageDropdownOpen(false);
+      }
+      if (customerManageDropdownRef.current && !customerManageDropdownRef.current.contains(target)) {
+        setIsCustomerManageDropdownOpen(false);
       }
     };
 
-    if (isAdminDropdownOpen) {
+    if (isAdminDropdownOpen || isManageDropdownOpen || isCustomerManageDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isAdminDropdownOpen]);
+  }, [isAdminDropdownOpen, isManageDropdownOpen, isCustomerManageDropdownOpen]);
 
   // Check if user is a partner (should access partner routes)
   const isPartner = session?.user?.role === 'PARTNER';
@@ -81,16 +93,27 @@ export default function Navigation() {
     ...(isSuperAdmin ? [{ name: 'System Config', href: '/admin/system-config', icon: Settings }] : []),
   ];
 
-  // Other admin navigation items
-  const adminNavItems = [
+  // Manage dropdown items (Rewards, Vouchers, Pending Transactions)
+  const manageDropdownItems = [
     { name: 'Rewards', href: '/admin/rewards', icon: Award },
-    { name: 'Redemptions', href: '/admin/redemptions', icon: Gift },
     { name: 'Vouchers', href: '/admin/vouchers', icon: CreditCard },
-    { name: 'Customers', href: '/admin/customers', icon: UserCheck },
     { name: 'Pending Transactions', href: '/admin/pending-transactions', icon: Clock },
+  ];
+
+  // Other admin navigation items (direct links)
+  const adminNavItems = [
+    { name: 'Customers', href: '/admin/customers', icon: UserCheck },
   ];
   
   const isAdminActive = pathname === '/admin' || pathname === '/admin/system-config';
+  const isManageActive = pathname === '/admin/rewards' || pathname === '/admin/vouchers' || pathname === '/admin/pending-transactions';
+  const isCustomerManageActive = pathname === '/customer/rewards' || pathname === '/customer/vouchers';
+
+  // Customer Manage dropdown items (Rewards, Vouchers)
+  const customerManageDropdownItems = [
+    { name: 'Rewards', href: '/customer/rewards', icon: Award },
+    { name: 'Vouchers', href: '/customer/vouchers', icon: Gift },
+  ];
 
   return (
     <nav className="bg-white shadow mb-8">
@@ -131,6 +154,43 @@ export default function Navigation() {
                               key={item.href}
                               href={item.href}
                               onClick={() => setIsAdminDropdownOpen(false)}
+                              className={`flex items-center px-4 py-2 text-sm hover:bg-gray-50 ${
+                                isActive(item.href) ? 'text-blue-600 bg-blue-50' : 'text-gray-700'
+                              }`}
+                            >
+                              <IconComponent className="h-4 w-4 mr-2" />
+                              {item.name}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Manage dropdown (Rewards + Vouchers) */}
+                  <div className="relative" ref={manageDropdownRef}>
+                    <button
+                      onClick={() => setIsManageDropdownOpen(!isManageDropdownOpen)}
+                      className={`inline-flex items-center px-1 pt-1 pb-1 border-b-2 text-sm font-medium h-16 ${
+                        isManageActive
+                          ? 'border-blue-500 text-gray-900'
+                          : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                      }`}
+                    >
+                      <LayoutGrid className="h-4 w-4 mr-1" />
+                      Manage
+                      <ChevronDown className={`h-4 w-4 ml-1 transition-transform ${isManageDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    
+                    {isManageDropdownOpen && (
+                      <div className="absolute left-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                        {manageDropdownItems.map((item) => {
+                          const IconComponent = item.icon;
+                          return (
+                            <Link
+                              key={item.href}
+                              href={item.href}
+                              onClick={() => setIsManageDropdownOpen(false)}
                               className={`flex items-center px-4 py-2 text-sm hover:bg-gray-50 ${
                                 isActive(item.href) ? 'text-blue-600 bg-blue-50' : 'text-gray-700'
                               }`}
@@ -218,27 +278,41 @@ export default function Navigation() {
                   >
                     Dashboard
                   </Link>
-                  <Link
-                    href="/customer/rewards"
-                    className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
-                      isActive('/customer/rewards')
-                        ? 'border-blue-500 text-gray-900'
-                        : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                    }`}
-                  >
-                    Rewards
-                  </Link>
-                  <Link
-                    href="/customer/voucher"
-                    className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
-                      isActive('/customer/voucher')
-                        ? 'border-blue-500 text-gray-900'
-                        : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                    }`}
-                  >
-                    <Gift className="h-4 w-4 mr-1" />
-                    Vouchers
-                  </Link>
+                  {/* Manage dropdown (Rewards + Vouchers) */}
+                  <div className="relative" ref={customerManageDropdownRef}>
+                    <button
+                      onClick={() => setIsCustomerManageDropdownOpen(!isCustomerManageDropdownOpen)}
+                      className={`inline-flex items-center px-1 pt-1 pb-1 border-b-2 text-sm font-medium h-16 ${
+                        isCustomerManageActive
+                          ? 'border-blue-500 text-gray-900'
+                          : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                      }`}
+                    >
+                      <LayoutGrid className="h-4 w-4 mr-1" />
+                      Manage
+                      <ChevronDown className={`h-4 w-4 ml-1 transition-transform ${isCustomerManageDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {isCustomerManageDropdownOpen && (
+                      <div className="absolute left-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                        {customerManageDropdownItems.map((item) => {
+                          const IconComponent = item.icon;
+                          return (
+                            <Link
+                              key={item.href}
+                              href={item.href}
+                              onClick={() => setIsCustomerManageDropdownOpen(false)}
+                              className={`flex items-center px-4 py-2 text-sm hover:bg-gray-50 ${
+                                isActive(item.href) ? 'text-blue-600 bg-blue-50' : 'text-gray-700'
+                              }`}
+                            >
+                              <IconComponent className="h-4 w-4 mr-2" />
+                              {item.name}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                   <Link
                     href="/customer/transactions"
                     className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
@@ -296,12 +370,50 @@ export default function Navigation() {
           <div className="pt-2 pb-3 space-y-1">
             {isAdmin ? (
               <>
+                {adminDropdownItems.map((item) => {
+                  const IconComponent = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
+                        isActive(item.href)
+                          ? 'border-blue-500 text-blue-700 bg-blue-50'
+                          : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800'
+                      }`}
+                    >
+                      <IconComponent className="h-4 w-4 mr-2 inline" />
+                      {item.name}
+                    </Link>
+                  );
+                })}
+                <div className="pl-3 pt-2 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Manage</div>
+                {manageDropdownItems.map((item) => {
+                  const IconComponent = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={`block pl-6 pr-4 py-2 border-l-4 text-base font-medium ${
+                        isActive(item.href)
+                          ? 'border-blue-500 text-blue-700 bg-blue-50'
+                          : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800'
+                      }`}
+                    >
+                      <IconComponent className="h-4 w-4 mr-2 inline" />
+                      {item.name}
+                    </Link>
+                  );
+                })}
                 {adminNavItems.map((item) => {
                   const IconComponent = item.icon;
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
+                      onClick={() => setIsMobileMenuOpen(false)}
                       className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
                         isActive(item.href)
                           ? 'border-blue-500 text-blue-700 bg-blue-50'
@@ -370,27 +482,25 @@ export default function Navigation() {
                 >
                   Dashboard
                 </Link>
-                <Link
-                  href="/customer/rewards"
-                  className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
-                    isActive('/customer/rewards')
-                      ? 'border-blue-500 text-blue-700 bg-blue-50'
-                      : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800'
-                  }`}
-                >
-                  Rewards
-                </Link>
-                <Link
-                  href="/customer/voucher"
-                  className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
-                    isActive('/customer/voucher')
-                      ? 'border-blue-500 text-blue-700 bg-blue-50'
-                      : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800'
-                  }`}
-                >
-                  <Gift className="h-4 w-4 mr-2 inline" />
-                  Vouchers
-                </Link>
+                <div className="pl-3 pt-2 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Manage</div>
+                {customerManageDropdownItems.map((item) => {
+                  const IconComponent = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={`block pl-6 pr-4 py-2 border-l-4 text-base font-medium ${
+                        isActive(item.href)
+                          ? 'border-blue-500 text-blue-700 bg-blue-50'
+                          : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800'
+                      }`}
+                    >
+                      <IconComponent className="h-4 w-4 mr-2 inline" />
+                      {item.name}
+                    </Link>
+                  );
+                })}
                 <Link
                   href="/customer/transactions"
                   className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${

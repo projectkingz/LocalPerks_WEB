@@ -32,7 +32,8 @@ export default function EditVoucherPage() {
     description: "", 
     discountPercentage: 0,
     validFrom: "",
-    validTo: ""
+    validTo: "",
+    maxRedemptionsPerCustomer: "" as string | number
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -63,6 +64,7 @@ export default function EditVoucherPage() {
             discountPercentage: data.discountPercentage || 0,
             validFrom: formatDateForInput(data.validFrom),
             validTo: formatDateForInput(data.validTo),
+            maxRedemptionsPerCustomer: data.maxRedemptionsPerCustomer ?? "",
           });
           setLoading(false);
         })

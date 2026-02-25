@@ -11,8 +11,12 @@ import {
   Lock,
   Edit,
   Save,
-  X
+  X,
+  KeyRound,
+  QrCode
 } from 'lucide-react';
+import QRScanner from '@/components/QRScanner';
+import TransactionForm from '@/components/TransactionForm';
 import PasswordChangeForm from '@/components/PasswordChangeForm';
 import ScrollControls from '@/components/ScrollControls';
 
@@ -33,14 +37,23 @@ export default function AdminProfile() {
     mobile: ""
   });
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [customerQRCode, setCustomerQRCode] = useState<string | null>(null);
+  const [manualCode, setManualCode] = useState('');
+  const [manualCodeLoading, setManualCodeLoading] = useState(false);
+  const [manualCodeError, setManualCodeError] = useState<string | null>(null);
+  const [voucherSuccess, setVoucherSuccess] = useState<string | null>(null);
+  const [pointsConfig, setPointsConfig] = useState({ basePointsPerPound: 5, minimumSpend: 0 });
 
-  // Fetch admin profile data
+  // Fetch admin profile data and points config
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const response = await fetch('/api/admin/profile');
-        if (response.ok) {
-          const data = await response.json();
+        const [profileRes, configRes] = await Promise.all([
+          fetch('/api/admin/profile'),
+          fetch('/api/points/config')
+        ]);
+        if (profileRes.ok) {
+          const data = await profileRes.json();
           setAdminProfile({
             name: data.name || "",
             email: data.email || "",
@@ -51,6 +64,15 @@ export default function AdminProfile() {
             name: data.name || "",
             mobile: data.mobile || ""
           });
+        }
+        if (configRes.ok) {
+          const configData = await configRes.json();
+          if (configData.config) {
+            setPointsConfig({
+              basePointsPerPound: configData.config.basePointsPerPound ?? 5,
+              minimumSpend: configData.config.minimumSpend ?? 0
+            });
+          }
         }
       } catch (error) {
         console.error('Error fetching profile:', error);
@@ -66,6 +88,102 @@ export default function AdminProfile() {
     setShowPasswordForm(false);
     setMessage({ type: 'success', text: 'Password changed successfully' });
     setTimeout(() => setMessage(null), 3000);
+  };
+
+  const handleScanSuccess = (qrCode: string) => {
+    setCustomerQRCode(qrCode);
+  };
+
+  const handleScanError = (error: string) => {
+    console.error('QR scan error:', error);
+  };
+
+  const handleManualCodeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const code = manualCode?.trim();
+    if (!code) {
+      setManualCodeError('Please enter a code');
+      return;
+    }
+
+    setManualCodeLoading(true);
+    setManualCodeError(null);
+    setVoucherSuccess(null);
+
+    try {
+      // Try customer QR code first (for recording transactions)
+      const customerRes = await fetch('/api/customers/qr', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+
+      if (customerRes.ok) {
+        setCustomerQRCode(code);
+        setManualCode('');
+        return;
+      }
+
+      // Try customer display ID (6-char format) as fallback
+      if (/^[0-9A-Za-z]{6}$/.test(code)) {
+        const lookupRes = await fetch(`/api/customers/lookup?displayId=${encodeURIComponent(code.toUpperCase())}`);
+        if (lookupRes.ok) {
+          const data = await lookupRes.json();
+          if (data.customer) {
+            setCustomerQRCode(data.customer.qrCode || code.toUpperCase());
+            setManualCode('');
+            return;
+          }
+        }
+      }
+
+      // Try voucher code (for redeeming vouchers)
+      const voucherRes = await fetch('/api/vouchers/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voucherCode: code }),
+      });
+
+      if (voucherRes.ok) {
+        const data = await voucherRes.json();
+        setVoucherSuccess(data.message || 'Voucher redeemed successfully!');
+        setManualCode('');
+        setTimeout(() => setVoucherSuccess(null), 4000);
+        return;
+      }
+
+      const errData = await voucherRes.json().catch(() => ({}));
+      setManualCodeError(errData.error || 'Invalid code. Enter customer QR code, display ID, or voucher code.');
+    } catch (err) {
+      setManualCodeError('Failed to validate code');
+    } finally {
+      setManualCodeLoading(false);
+    }
+  };
+
+  const handleTransactionSubmit = async (data: {
+    amount: number;
+    spendDate: string;
+    customerQRCode: string;
+  }) => {
+    try {
+      const response = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to record transaction');
+      }
+
+      setCustomerQRCode(null);
+      setMessage({ type: 'success', text: 'Transaction recorded successfully' });
+      setTimeout(() => setMessage(null), 3000);
+    } catch (error) {
+      throw error;
+    }
   };
 
   const handleEditSave = async () => {
@@ -122,6 +240,69 @@ export default function AdminProfile() {
         )}
 
         <div className="space-y-6">
+          {/* Scan Customer QR Code / Redeem Voucher - same as partner */}
+          {!customerQRCode && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100"
+            >
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <QrCode className="h-5 w-5 text-blue-600 mr-2" />
+                Scan Customer QR Code or Redeem Voucher
+              </h2>
+              <QRScanner
+                onScanSuccess={handleScanSuccess}
+                onScanError={handleScanError}
+              />
+
+              <div className="mt-6 pt-6 border-t border-gray-100">
+                <label className="block text-sm font-bold uppercase tracking-wide text-gray-700 mb-2 flex items-center">
+                  <KeyRound className="h-4 w-4 text-gray-600 mr-2" />
+                  Camera not available? Enter code manually
+                </label>
+                <form onSubmit={handleManualCodeSubmit} className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={manualCode}
+                      onChange={(e) => {
+                        setManualCode(e.target.value.toUpperCase());
+                        setManualCodeError(null);
+                      }}
+                      placeholder="Customer QR, display ID (6 chars), or voucher code"
+                      className="block w-full pl-4 pr-5 py-4 text-xl font-bold text-gray-900 rounded-xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all outline-none placeholder:text-gray-400 placeholder:font-medium disabled:opacity-60"
+                      disabled={manualCodeLoading}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={manualCodeLoading || !manualCode.trim()}
+                    className="px-6 py-4 rounded-xl bg-blue-600 text-white text-base font-bold hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  >
+                    {manualCodeLoading ? 'Checking...' : 'Use Code'}
+                  </button>
+                </form>
+                {manualCodeError && (
+                  <p className="mt-2 text-sm text-red-600">{manualCodeError}</p>
+                )}
+                {voucherSuccess && (
+                  <p className="mt-2 text-sm text-green-600 font-medium">{voucherSuccess}</p>
+                )}
+              </div>
+            </motion.div>
+          )}
+
+          {customerQRCode && (
+            <TransactionForm
+              customerQRCode={customerQRCode}
+              pointsPerPound={pointsConfig.basePointsPerPound}
+              minimumPurchase={Math.max(pointsConfig.minimumSpend, 0)}
+              onSubmit={handleTransactionSubmit}
+              onReset={() => setCustomerQRCode(null)}
+            />
+          )}
+
           {/* Account Settings */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}

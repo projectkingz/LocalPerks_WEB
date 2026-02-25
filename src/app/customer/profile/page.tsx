@@ -237,68 +237,56 @@ export default function ProfilePage() {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="relative w-full max-w-xl my-8"
+              className="relative w-full max-w-sm my-8 flex-shrink-0"
             >
-              {/* Enlarged Digital Card */}
-              <div className="relative w-full bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-3xl shadow-2xl overflow-hidden" style={{ minHeight: '450px', maxHeight: '85vh' }}>
+              {/* Enlarged Digital Card - compact, all details visible */}
+              <div className="relative w-full bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl shadow-2xl overflow-hidden">
                 {/* Decorative elements */}
-                <div className="absolute top-0 right-0 w-72 h-72 bg-white opacity-10 rounded-full -mr-36 -mt-36"></div>
-                <div className="absolute bottom-0 left-0 w-56 h-56 bg-white opacity-10 rounded-full -ml-28 -mb-28"></div>
+                <div className="absolute top-0 right-0 w-40 h-40 bg-white opacity-10 rounded-full -mr-20 -mt-20 pointer-events-none"></div>
+                <div className="absolute bottom-0 left-0 w-32 h-32 bg-white opacity-10 rounded-full -ml-16 -mb-16 pointer-events-none"></div>
                 
                 {/* Card Content */}
-                <div className="relative h-full p-5 md:p-6 lg:p-7 flex flex-col justify-between" style={{ minHeight: '450px' }}>
+                <div className="relative p-4 flex flex-col gap-2">
                   {/* Top Section */}
-                    <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
-                      <div className="min-w-0">
-                      <h3 className="text-2xl md:text-3xl lg:text-4xl font-medium text-white mb-1" style={{ fontFamily: 'var(--font-roboto)' }}>LocalPerks</h3>
-                      <p className="text-blue-200 text-sm md:text-base font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Loyalty Card</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-lg font-medium text-white" style={{ fontFamily: 'var(--font-roboto)' }}>LocalPerks</h3>
+                      <p className="text-blue-200 text-sm font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Loyalty Card</p>
                     </div>
-                    {/* Chip */}
-                    <div className="w-11 h-8 md:w-12 md:h-9 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-lg shadow-lg flex-shrink-0"></div>
+                    <div className="w-9 h-7 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded shadow-lg flex-shrink-0"></div>
                   </div>
                   
-                  {/* Middle Section - QR Code */}
-                  <div className="flex justify-center my-2 flex-shrink-0">
-                    <div className="bg-white rounded-xl p-3 md:p-4 shadow-xl">
+                  {/* Middle - QR Code */}
+                  <div className="flex justify-center">
+                    <div className="bg-white rounded-lg p-2 shadow-xl">
                       <QRCodeSVG 
                         value={qrCode || `rewards-${session?.user?.email || 'guest'}-app`} 
-                        size={210}
+                        size={140}
                         level="H"
-                        className="rounded-lg"
+                        className="rounded"
                       />
                     </div>
                   </div>
                   
                   {/* Bottom Section */}
-                  <div className="space-y-2 mt-2">
-                    {/* Customer Name - Aligned */}
-                    <div className="min-h-[28px] flex items-center">
-                      <p className="text-white text-sm md:text-base lg:text-lg font-medium tracking-wider" style={{ fontFamily: 'var(--font-roboto)' }}>
-                        {session?.user?.name || 'Member'}
-                      </p>
-                    </div>
-                    
-                    {/* Customer ID - Aligned */}
-                    <div className="min-h-[28px] flex items-center">
-                      {customerId ? (
-                        <div className="flex items-center space-x-2">
-                          <p className="text-blue-200 text-sm md:text-base font-medium uppercase" style={{ fontFamily: 'var(--font-roboto)' }}>ID:</p>
-                          <p className="text-white text-sm md:text-base font-medium break-all uppercase" style={{ fontFamily: 'var(--font-roboto)' }}>{customerId}</p>
-                        </div>
-                      ) : (
-                        <div className="h-[28px]"></div>
-                      )}
-                    </div>
-                    
-                    {/* Points and Tier - Aligned */}
-                      <div className="flex flex-wrap items-start justify-between gap-4 pt-2 border-t border-blue-500 border-opacity-30 min-h-[60px]">
-                        <div className="min-w-[140px]">
-                        <p className="text-blue-200 text-xs md:text-sm tracking-wide font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Points</p>
-                        <p className="text-white text-xl md:text-2xl lg:text-3xl font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>{pointsData.points.toLocaleString()}</p>
+                  <div className="space-y-2">
+                    <p className="text-white text-sm font-medium tracking-wider break-words" style={{ fontFamily: 'var(--font-roboto)' }}>
+                      {session?.user?.name || 'Member'}
+                    </p>
+                    {customerId && (
+                      <div>
+                        <p className="text-blue-200 text-xs font-medium uppercase" style={{ fontFamily: 'var(--font-roboto)' }}>ID</p>
+                        <p className="text-white text-xs font-medium break-all uppercase" style={{ fontFamily: 'var(--font-roboto)' }}>{customerId}</p>
                       </div>
-                        <div className="text-right min-w-[140px]">
-                        <p className="text-blue-200 text-xs md:text-sm tracking-wide font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Tier</p>
-                        <p className="text-white text-lg md:text-xl lg:text-2xl font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>{pointsData.tier}</p>
+                    )}
+                    <div className="flex items-start justify-between gap-4 pt-2 border-t border-blue-500 border-opacity-30">
+                      <div>
+                        <p className="text-blue-200 text-xs font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Points</p>
+                        <p className="text-white text-base font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>{pointsData.points.toLocaleString()}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-blue-200 text-xs font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>Tier</p>
+                        <p className="text-white text-base font-medium" style={{ fontFamily: 'var(--font-roboto)' }}>{pointsData.tier}</p>
                       </div>
                     </div>
                   </div>

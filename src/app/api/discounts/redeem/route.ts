@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/auth.config';
 import { prisma } from '@/lib/prisma';
 import { verifyMobileJwt } from '@/lib/auth/mobile';
+import { pointsUtil } from '@/lib/pointsUtil';
 import { 
   getTenantPointsConfig, 
   calculatePointsForDiscount,
@@ -54,24 +55,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
     }
 
-    // Calculate ACTUAL points from transactions (same logic as /api/points)
-    const transactions = await prisma.transaction.findMany({
-      where: {
-        customerId: customer.id,
-        status: { in: ["APPROVED", "VOID"] },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
-
-    const actualPoints = transactions.reduce((total: any, t: any) => {
-      if (t.type === "EARNED" || t.status === "VOID") return total + t.points;
-      if (t.type === "SPENT") return total - t.points; // Subtract SPENT points
-      return total;
-    }, 0);
-
-    const currentPoints = Math.max(0, actualPoints);
+    // Calculate ACTUAL points using shared utility (same rules as /api/points)
+    const currentPoints = await pointsUtil.calculateCustomerPoints(customer.id);
 
     // Get tenant configuration
     const config = await getTenantPointsConfig(customer.tenantId);
@@ -112,19 +97,49 @@ export async function POST(request: Request) {
       );
     }
 
-    // Find the system discount reward for this amount
-    const systemTenant = await prisma.tenant.findFirst({
+    // Find or create the system tenant for discount rewards
+    let systemTenant = await prisma.tenant.findFirst({
       where: { name: 'LocalPerks System' }
     });
 
     if (!systemTenant) {
-      return NextResponse.json(
-        { error: 'System discount rewards not configured. Please contact support.' },
-        { status: 500 }
-      );
+      // Create system tenant if it doesn't exist
+      // First, we need a system user to own the tenant
+      let systemUser = await prisma.user.findFirst({
+        where: { 
+          email: 'system@localperks.com',
+          role: 'ADMIN'
+        }
+      });
+
+      if (!systemUser) {
+        // Create system admin user
+        systemUser = await prisma.user.create({
+          data: {
+            email: 'system@localperks.com',
+            name: 'LocalPerks System',
+            role: 'ADMIN',
+            approvalStatus: 'ACTIVE'
+          }
+        });
+      }
+
+      // Create system tenant
+      systemTenant = await prisma.tenant.create({
+        data: {
+          name: 'LocalPerks System',
+          mobile: '00000000000', // Placeholder
+          partnerUserId: systemUser.id,
+          subscriptionStatus: 'ACTIVE',
+          subscriptionTier: 'BASIC'
+        }
+      });
+
+      console.log('Created system tenant:', systemTenant.id);
     }
 
-    const discountReward = await prisma.reward.findFirst({
+    // Find or create the discount reward for this amount
+    let discountReward = await prisma.reward.findFirst({
       where: {
         name: `£${discountAmount} Discount Voucher`,
         tenantId: systemTenant.id
@@ -132,10 +147,25 @@ export async function POST(request: Request) {
     });
 
     if (!discountReward) {
-      return NextResponse.json(
-        { error: `£${discountAmount} discount reward not found. Please contact support.` },
-        { status: 500 }
-      );
+      // Create discount reward if it doesn't exist
+      // Note: For fixed-amount discount vouchers (e.g., £34 off), the discountPercentage
+      // field is not used. The actual discount amount is the discountAmount parameter
+      // passed to this endpoint. The reward is just a template/container.
+      discountReward = await prisma.reward.create({
+        data: {
+          name: `£${discountAmount} Discount Voucher`,
+          description: `Fixed-amount discount voucher worth £${discountAmount} off your purchase. The discount amount is fixed at £${discountAmount}, not a percentage.`,
+          discountPercentage: 0.0, // Not applicable for fixed-amount vouchers
+          tenantId: systemTenant.id,
+          approvalStatus: 'APPROVED',
+          approvedAt: new Date(),
+          validFrom: new Date(),
+          // Valid for a long time (10 years)
+          validTo: new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000)
+        }
+      });
+
+      console.log(`Created discount reward template: £${discountAmount} Discount Voucher`, discountReward.id);
     }
 
     // Get or create user record for the customer
@@ -166,90 +196,168 @@ export async function POST(request: Request) {
     // Create redemption, voucher, and transaction in a database transaction
     const result = await prisma.$transaction(async (tx: any) => {
       // Create the redemption record
-      const redemption = await tx.redemption.create({
-        data: {
-          rewardId: discountReward.id,
-          customerId: customer.id,
-          points: requiredPoints,
-        },
-        include: {
-          reward: true
-        }
-      });
+      let redemption;
+      try {
+        redemption = await tx.redemption.create({
+          data: {
+            rewardId: discountReward.id,
+            customerId: customer.id,
+            points: requiredPoints,
+          },
+          include: {
+            reward: true
+          }
+        });
+      } catch (error: any) {
+        console.error('Error creating redemption:', error);
+        throw new Error(`Failed to create redemption: ${error?.message || 'Unknown error'}`);
+      }
 
-      // Generate unique voucher code
-      const voucherCode = await generateUniqueVoucherCode();
+      // Generate unique voucher code (inside transaction to ensure uniqueness)
+      let voucherCode: string;
+      let isUnique = false;
+      let attempts = 0;
+      const maxAttempts = 10;
+      
+      while (!isUnique && attempts < maxAttempts) {
+        // Generate a random 8-character code
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        voucherCode = '';
+        for (let i = 0; i < 8; i++) {
+          voucherCode += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        
+        // Check if code exists in database (using transaction instance)
+        const existingVoucher = await tx.voucher.findUnique({
+          where: { code: voucherCode }
+        });
+        
+        if (!existingVoucher) {
+          isUnique = true;
+        }
+        attempts++;
+      }
+      
+      if (!isUnique) {
+        throw new Error('Failed to generate unique voucher code after multiple attempts');
+      }
       
       // Set expiration date to 1 year from now
       const expiresAt = new Date();
       expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
       // Create the voucher
-      const voucher = await tx.voucher.create({
-        data: {
+      let voucher;
+      try {
+        voucher = await tx.voucher.create({
+          data: {
+            code: voucherCode!,
+            redemptionId: redemption.id,
+            customerId: customer.id,
+            rewardId: discountReward.id,
+            status: 'active',
+            expiresAt,
+          },
+          include: {
+            customer: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              }
+            },
+            reward: {
+              select: {
+                id: true,
+                name: true,
+                description: true,
+                discountPercentage: true,
+              }
+            }
+          }
+        });
+      } catch (error: any) {
+        console.error('Error creating voucher:', error);
+        console.error('Voucher creation details:', {
           code: voucherCode,
           redemptionId: redemption.id,
           customerId: customer.id,
           rewardId: discountReward.id,
-          status: 'active',
-          expiresAt,
-        },
-        include: {
-          customer: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            }
-          },
-          reward: {
-            select: {
-              id: true,
-              name: true,
-              description: true,
-              points: true,
-            }
-          }
-        }
-      });
+          errorCode: error?.code,
+          errorMeta: error?.meta
+        });
+        throw new Error(`Failed to create voucher: ${error?.message || 'Unknown error'}`);
+      }
 
       // Create transaction record
-      const transaction = await tx.transaction.create({
-        data: {
-          amount: discountAmount,
-          points: requiredPoints,
-          type: 'SPENT',
-          status: 'APPROVED',
-          user: {
-            connect: { id: user.id }
-          },
-          customer: {
-            connect: { id: customer.id }
-          },
-          tenant: {
-            connect: { id: customer.tenantId }
-          }
+      // Note: tenantId is optional for customers, so we need to handle null case
+      const transactionData: any = {
+        amount: discountAmount,
+        points: requiredPoints,
+        type: 'SPENT',
+        status: 'APPROVED',
+        user: {
+          connect: { id: user.id }
+        },
+        customer: {
+          connect: { id: customer.id }
         }
-      });
+      };
+
+      // Only connect tenant if it exists
+      if (customer.tenantId) {
+        transactionData.tenant = {
+          connect: { id: customer.tenantId }
+        };
+      } else {
+        // If no tenant, connect to system tenant
+        if (!systemTenant || !systemTenant.id) {
+          throw new Error('System tenant not found. Cannot create transaction without tenant.');
+        }
+        transactionData.tenant = {
+          connect: { id: systemTenant.id }
+        };
+      }
+
+      let transaction;
+      try {
+        transaction = await tx.transaction.create({
+          data: transactionData
+        });
+      } catch (error: any) {
+        console.error('Error creating transaction:', error);
+        console.error('Transaction data:', transactionData);
+        throw new Error(`Failed to create transaction: ${error?.message || 'Unknown error'}`);
+      }
 
       // Update customer balance
       const newPointsBalance = currentPoints - requiredPoints;
-      await tx.customer.update({
-        where: { id: customer.id },
-        data: {
-          points: Math.max(0, newPointsBalance)
-        }
-      });
+      try {
+        await tx.customer.update({
+          where: { id: customer.id },
+          data: {
+            points: Math.max(0, newPointsBalance)
+          }
+        });
+      } catch (error: any) {
+        console.error('Error updating customer balance:', error);
+        throw new Error(`Failed to update customer balance: ${error?.message || 'Unknown error'}`);
+      }
 
       // Create activity log
-      await tx.activity.create({
-        data: {
-          type: 'DISCOUNT_REDEEMED',
-          description: `Discount Voucher Redeemed - £${discountAmount} (${requiredPoints} points)`,
-          points: -requiredPoints,
-          userId: user.id,
-        }
-      });
+      try {
+        await tx.activity.create({
+          data: {
+            type: 'DISCOUNT_REDEEMED',
+            description: `Discount Voucher Redeemed - £${discountAmount} (${requiredPoints} points)`,
+            points: -requiredPoints,
+            userId: user.id,
+          }
+        });
+      } catch (error: any) {
+        console.error('Error creating activity log:', error);
+        throw new Error(`Failed to create activity log: ${error?.message || 'Unknown error'}`);
+      }
 
       return { redemption, voucher, transaction };
     });
@@ -280,10 +388,19 @@ export async function POST(request: Request) {
         availableDiscount: calculatePointsFaceValue(currentPoints - requiredPoints, config)
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error redeeming discount:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      stack: error?.stack,
+      code: error?.code,
+      meta: error?.meta
+    });
     return NextResponse.json(
-      { error: 'Failed to redeem discount' },
+      { 
+        error: 'Failed to redeem discount',
+        details: process.env.NODE_ENV === 'development' ? error?.message : undefined
+      },
       { status: 500 }
     );
   }

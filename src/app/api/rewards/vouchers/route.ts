@@ -3,6 +3,7 @@ import { authOptions } from '@/app/api/auth/auth.config';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { pointsUtil } from '@/lib/pointsUtil';
+import { getTenantPointsConfig, calculatePointsForDiscount } from '@/lib/pointsCalculation';
 import { generateUniqueVoucherCode, checkAndUpdateExpiredVouchers } from '@/lib/utils/voucher';
 
 export async function GET() {
@@ -98,21 +99,15 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // Check if reward exists
-    console.log('Looking for reward with ID:', rewardId);
+    // Check if reward exists (include tenant for points config)
     const reward = await prisma.reward.findUnique({
       where: { id: rewardId },
+      include: { tenant: true },
     });
-
-    console.log('Found reward:', reward);
 
     if (!reward) {
       return NextResponse.json({ error: 'Reward not found' }, { status: 404 });
     }
-
-    // Vouchers are FREE - no points are deducted when claiming or redeeming
-    // Points are set to 0 for all voucher operations
-    const pointsToDeduct = 0;
 
     // Get customer
     const customer = await prisma.customer.findUnique({
@@ -123,45 +118,55 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
     }
 
-    console.log('Found customer:', {
-      id: customer.id,
-      email: customer.email,
-      name: customer.name,
-      tenantId: customer.tenantId
-    });
+    // Calculate points required for £ amount discounts (parse from reward name, e.g. "£35 Discount Voucher")
+    let pointsToDeduct = 0;
+    let discountAmount: number | null = null;
+    const amountMatch = reward.name.match(/£(\d+(?:\.\d+)?)/);
+    if (amountMatch) {
+      discountAmount = parseFloat(amountMatch[1]);
+      const config = await getTenantPointsConfig(reward.tenantId);
+      pointsToDeduct = calculatePointsForDiscount(discountAmount, config);
+    }
 
-    // No points validation needed - vouchers are free
-    // No transaction creation needed - no points deducted
-
-    // Create redemption and voucher (no points deducted - vouchers are free)
-    const result = await prisma.$transaction(async (tx: any) => {
-      // Ensure customer has a corresponding User record for transactions
-      const userId = await pointsUtil.ensureCustomerUserRecord(
-        session.user.email, 
-        customer.name, 
-        customer.tenantId
+    // Check customer has enough points
+    const currentPoints = await pointsUtil.calculateCustomerPoints(customer.id);
+    if (pointsToDeduct > 0 && currentPoints < pointsToDeduct) {
+      return NextResponse.json(
+        {
+          error: 'Insufficient points',
+          required: pointsToDeduct,
+          available: currentPoints,
+          message: `You need ${pointsToDeduct.toLocaleString()} points but only have ${currentPoints.toLocaleString()} points.`,
+        },
+        { status: 400 }
       );
+    }
 
-      // Create the redemption with 0 points (vouchers are free)
+    // Ensure customer has User record for transactions
+    const userId = await pointsUtil.ensureCustomerUserRecord(
+      session.user.email!,
+      customer.name,
+      customer.tenantId ?? undefined
+    );
+
+    // Use reward's tenant for transaction (or customer's tenant, or system default)
+    const tenantIdForTx = reward.tenantId;
+
+    const result = await prisma.$transaction(async (tx: any) => {
       const redemption = await tx.redemption.create({
         data: {
           rewardId,
           customerId: customer.id,
-          points: 0, // No points deducted - vouchers are free
+          points: pointsToDeduct,
         },
-        include: {
-          reward: true
-        }
+        include: { reward: true },
       });
 
-      // Create the voucher for this redemption using the transaction instance
       const code = await generateUniqueVoucherCode();
-      
-      // Set expiration date to 1 year from now
       const expiresAt = new Date();
       expiresAt.setFullYear(expiresAt.getFullYear() + 1);
-      
-      const voucher = await (tx as any).voucher.create({
+
+      const voucher = await tx.voucher.create({
         data: {
           code,
           redemptionId: redemption.id,
@@ -171,44 +176,43 @@ export async function POST(request: Request) {
           expiresAt,
         },
         include: {
-          customer: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            }
-          },
-          reward: {
-            select: {
-              id: true,
-              name: true,
-              description: true,
-              // points field doesn't exist on Reward model - get from redemption instead
-              discountPercentage: true,
-            }
-          }
-        }
+          customer: { select: { id: true, name: true, email: true } },
+          reward: { select: { id: true, name: true, description: true, discountPercentage: true } },
+        },
       });
 
-      // No transaction created - vouchers are free, no points deducted
-      // Return without transaction record
-      return { redemption, customer, userId, voucher };
+      // Create SPENT transaction to deduct points from customer balance
+      if (pointsToDeduct > 0) {
+        await tx.transaction.create({
+          data: {
+            amount: discountAmount ?? 0,
+            points: pointsToDeduct,
+            type: 'SPENT',
+            status: 'APPROVED',
+            userId,
+            customerId: customer.id,
+            tenantId: tenantIdForTx,
+          },
+        });
+
+        await tx.customer.update({
+          where: { id: customer.id },
+          data: { points: Math.max(0, currentPoints - pointsToDeduct) },
+        });
+      }
+
+      return { redemption, customer, voucher };
     });
 
-    console.log('Redemption created successfully:', result.redemption.id);
-
-    // Get current points balance (no change since no points were deducted)
     const pointsBreakdown = await pointsUtil.getCustomerPointsBreakdown(customer.id);
-    const currentPoints = pointsBreakdown.actualPoints;
-
-    console.log('Voucher claimed - no points deducted. Current points:', currentPoints);
+    const remainingPoints = pointsBreakdown.actualPoints;
 
     return NextResponse.json({
       message: 'Voucher created successfully',
       voucher: result.voucher,
-      pointsDeducted: 0, // No points deducted - vouchers are free
-      remainingPoints: currentPoints,
-      points: 0 // Explicitly indicate 0 points deducted
+      pointsDeducted: pointsToDeduct,
+      remainingPoints,
+      points: pointsToDeduct,
     });
   } catch (error) {
     console.error('Error creating voucher:', error);

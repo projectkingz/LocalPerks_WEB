@@ -53,6 +53,14 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
+    // Check if voucher is suspended (fraud/misuse mitigation)
+    if (voucher.status === 'suspended') {
+      return NextResponse.json({ 
+        error: 'This voucher has been suspended and cannot be used.',
+        voucher
+      }, { status: 400 });
+    }
+
     // Check if voucher is already used
     if (voucher.status === 'used') {
       return NextResponse.json({ 
@@ -96,6 +104,38 @@ export async function POST(request: Request) {
       // Log if this is a system discount voucher being scanned
       if (isSystemDiscountVoucher) {
         console.log(`System discount voucher ${voucherCode} being scanned by partner ${userTenantId}`);
+      }
+    }
+
+    // Find the transaction associated with this voucher redemption
+    // For discount vouchers, the transaction contains the discount amount
+    const transaction = await prisma.transaction.findFirst({
+      where: {
+        customerId: voucher.customerId,
+        type: 'SPENT',
+        status: 'APPROVED',
+        // Match by redemption date (transaction created around same time as redemption)
+        createdAt: {
+          gte: new Date(voucher.redemption.createdAt.getTime() - 60000), // 1 minute before
+          lte: new Date(voucher.redemption.createdAt.getTime() + 60000), // 1 minute after
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    // Extract discount amount from transaction or reward name
+    let discountAmount: number | null = null;
+    if (transaction) {
+      // For fixed-amount discount vouchers, the transaction amount is the discount amount
+      discountAmount = transaction.amount;
+    } else {
+      // Fallback: try to extract from reward name (e.g., "£34 Discount Voucher" -> 34)
+      const rewardName = voucher.reward?.name || '';
+      const amountMatch = rewardName.match(/£(\d+(?:\.\d+)?)/);
+      if (amountMatch) {
+        discountAmount = parseFloat(amountMatch[1]);
       }
     }
 
@@ -144,6 +184,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       message: 'Voucher redeemed successfully',
       voucher: updatedVoucher,
+      discountAmount: discountAmount, // The fixed £ amount to deduct from customer's bill at POS
       points: 0, // No points deducted - voucher was already paid for when created
       pointsDeducted: 0
     });
@@ -221,12 +262,50 @@ export async function GET(request: Request) {
               }
             }
           }
+        },
+        redemption: {
+          select: {
+            id: true,
+            points: true,
+            createdAt: true,
+          }
         }
       }
     });
 
+    // Find the transaction associated with this voucher redemption for discount amount
+    let discountAmount: number | null = null;
+    if (fullVoucher?.redemption) {
+      const transaction = await prisma.transaction.findFirst({
+        where: {
+          customerId: fullVoucher.customerId,
+          type: 'SPENT',
+          status: 'APPROVED',
+          createdAt: {
+            gte: new Date(fullVoucher.redemption.createdAt.getTime() - 60000),
+            lte: new Date(fullVoucher.redemption.createdAt.getTime() + 60000),
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
+
+      if (transaction) {
+        discountAmount = transaction.amount;
+      } else {
+        // Fallback: extract from reward name
+        const rewardName = fullVoucher.reward?.name || '';
+        const amountMatch = rewardName.match(/£(\d+(?:\.\d+)?)/);
+        if (amountMatch) {
+          discountAmount = parseFloat(amountMatch[1]);
+        }
+      }
+    }
+
     return NextResponse.json({ 
       voucher: fullVoucher,
+      discountAmount: discountAmount, // The fixed £ amount to deduct from customer's bill at POS
       wasExpired: wasExpired || false
     });
 

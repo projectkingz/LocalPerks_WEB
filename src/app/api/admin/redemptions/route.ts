@@ -16,7 +16,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    // Get all admin user IDs (ADMIN and SUPER_ADMIN roles)
+    const adminUsers = await prisma.user.findMany({
+      where: {
+        role: { in: ['ADMIN', 'SUPER_ADMIN'] }
+      },
+      select: {
+        id: true
+      }
+    });
+    const adminUserIds = adminUsers.map(u => u.id);
+
+    // Only fetch redemptions for rewards that were created/approved by admins
     const redemptions = await prisma.redemption.findMany({
+      where: {
+        reward: {
+          approvedBy: {
+            in: adminUserIds
+          }
+        }
+      },
       include: {
         customer: {
           select: {
@@ -33,6 +52,12 @@ export async function GET(request: NextRequest) {
             name: true,
             description: true,
             discountPercentage: true,
+          }
+        },
+        voucher: {
+          select: {
+            id: true,
+            status: true,
           }
         }
       },

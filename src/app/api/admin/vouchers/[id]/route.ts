@@ -32,7 +32,7 @@ export async function PUT(
     }
 
     // Validate status
-    const validStatuses = ['active', 'used', 'expired'];
+    const validStatuses = ['active', 'used', 'expired', 'suspended'];
     if (!validStatuses.includes(status)) {
       return NextResponse.json(
         { error: `Status must be one of: ${validStatuses.join(', ')}` },

@@ -340,11 +340,13 @@ export async function GET(request: Request) {
     };
 
     return NextResponse.json(stats);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching dashboard stats:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch dashboard statistics' },
-      { status: 500 }
-    );
+    const isDbUnavailable = error?.code === 'P1001' || error?.code === 'P2024';
+    const status = isDbUnavailable ? 503 : 500;
+    const message = isDbUnavailable
+      ? 'Database temporarily unavailable. Please try again in a moment.'
+      : 'Failed to fetch dashboard statistics';
+    return NextResponse.json({ error: message }, { status });
   }
 } 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/auth.config";
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 import { pointsUtil } from "@/lib/pointsUtil";
 
 export async function GET(request: Request) {
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
 
       return NextResponse.json(transactions);
     } catch (error: any) {
-      console.error("Error fetching transactions:", error);
+      logger.error("Error fetching transactions:", error);
       return NextResponse.json(
         { error: "Error fetching transactions" },
         { status: 500 }
@@ -72,7 +73,7 @@ export async function GET(request: Request) {
         pointsBreakdown: breakdown,
       });
     } catch (error) {
-      console.error("Error in debug endpoint:", error);
+      logger.error("Error in debug endpoint:", error);
       return NextResponse.json(
         { error: "Failed to get debug info" },
         { status: 500 }
@@ -140,7 +141,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error("Error fetching points:", error);
+    logger.error("Error fetching points:", error);
     return NextResponse.json(
       { error: "Failed to fetch points" },
       { status: 500 }
@@ -239,7 +240,7 @@ export async function POST(request: Request) {
       transaction: transaction,
     });
   } catch (error) {
-    console.error("Error updating points:", error);
+    logger.error("Error updating points:", error);
     return NextResponse.json(
       { error: "Failed to update points" },
       { status: 500 }

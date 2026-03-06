@@ -1,7 +1,6 @@
 import { defaultPointsConfig, TenantPointsConfig, PointsTier, BonusRule, roundAmount } from './pointsConfig';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 
 export interface PointTransaction {
   customerId: string;
@@ -374,7 +373,7 @@ export const pointsUtil = {
         transactions: [] // Empty array since we removed history
       };
     } catch (error: any) {
-      console.error('Error fetching customer details:', error);
+      logger.error('Error fetching customer details:', error);
       throw error;
     }
   },
@@ -409,7 +408,7 @@ export const pointsUtil = {
       // Ensure points never go below 0
       return Math.max(0, calculatedPoints);
     } catch (error) {
-      console.error('Error calculating customer points:', error);
+      logger.error('Error calculating customer points:', error);
       return 0;
     }
   },
@@ -463,7 +462,7 @@ export const pointsUtil = {
         transactions
       };
     } catch (error) {
-      console.error('Error getting customer points breakdown:', error);
+      logger.error('Error getting customer points breakdown:', error);
       throw error;
     }
   },
@@ -476,7 +475,7 @@ export const pointsUtil = {
       });
 
       if (!user) {
-        console.log('Creating User record for customer:', customerEmail);
+        logger.debug('Creating User record for customer:', customerEmail);
         user = await prisma.user.create({
           data: {
             email: customerEmail,
@@ -485,12 +484,12 @@ export const pointsUtil = {
             tenantId: tenantId || 'default'
           }
         });
-        console.log('Created User record with ID:', user.id);
+        logger.debug('Created User record with ID:', user.id);
       }
 
       return user.id;
     } catch (error) {
-      console.error('Error ensuring customer user record:', error);
+      logger.error('Error ensuring customer user record:', error);
       throw error;
     }
   },
@@ -521,7 +520,7 @@ export const pointsUtil = {
         balanceAfterTransaction
       };
     } catch (error) {
-      console.error('Error validating point transaction:', error);
+      logger.error('Error validating point transaction:', error);
       return {
         isValid: false,
         currentBalance: 0,

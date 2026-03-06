@@ -162,11 +162,11 @@ function SignupSuccessContent() {
             <ol className="text-sm text-blue-800 space-y-3">
               <li className="flex items-start">
                 <span className="font-bold mr-2">1.</span>
-                <span><strong>Email Verification:</strong> A 6-digit code will be sent to your email address.</span>
+                <span><strong>Email Verification:</strong> A 4-digit code will be sent to your email address.</span>
               </li>
               <li className="flex items-start">
                 <span className="font-bold mr-2">2.</span>
-                <span><strong>Mobile Verification:</strong> A 6-digit code will be sent to your mobile number via WhatsApp.</span>
+                <span><strong>Mobile Verification:</strong> A 4-digit code will be sent via WhatsApp (or SMS if WhatsApp isn't available).</span>
               </li>
               <li className="flex items-start">
                 <span className="font-bold mr-2">3.</span>

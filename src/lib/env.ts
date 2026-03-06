@@ -24,10 +24,11 @@ export const env = {
   FACEBOOK_ID: process.env.FACEBOOK_ID,
   FACEBOOK_SECRET: process.env.FACEBOOK_SECRET,
   
-  // SMS (Optional)
-  TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID,
-  TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN,
-  TWILIO_PHONE_NUMBER: process.env.TWILIO_PHONE_NUMBER,
+  // Vonage (Optional - WhatsApp/SMS 2FA)
+  VONAGE_API_KEY: process.env.VONAGE_API_KEY,
+  VONAGE_API_SECRET: process.env.VONAGE_API_SECRET,
+  VONAGE_WHATSAPP_NUMBER: process.env.VONAGE_WHATSAPP_NUMBER,
+  VONAGE_SMS_NUMBER: process.env.VONAGE_SMS_NUMBER,
   
   // Redis (Optional)
   REDIS_URL: process.env.REDIS_URL,

@@ -19,7 +19,8 @@ import {
   UserCheck,
   CreditCard,
   ChevronDown,
-  LayoutGrid
+  LayoutGrid,
+  MessageCircle
 } from 'lucide-react';
 
 export default function Navigation() {
@@ -70,15 +71,26 @@ export default function Navigation() {
   // Check if user is an admin (should access admin routes)
   const isAdmin = session?.user?.role === 'ADMIN' || session?.user?.role === 'SUPER_ADMIN';
 
-  // Debug logging
-  console.log('Navigation Debug:', {
-    userEmail: session?.user?.email,
-    userRole: session?.user?.role,
-    isPartner,
-    isCustomer,
-    isAdmin,
-    pathname
-  });
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+
+  useEffect(() => {
+    if (!session?.user) return;
+
+    const fetchUnread = async () => {
+      try {
+        const res = await fetch('/api/messages/unread-count');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (typeof data.count === 'number') {
+          setUnreadCount(data.count);
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    fetchUnread();
+  }, [session?.user, pathname]);
 
   const handleSignOut = async () => {
     await signOut({ callbackUrl: '/' });
@@ -329,8 +341,22 @@ export default function Navigation() {
           </div>
           <div className="hidden sm:ml-6 sm:flex sm:items-center space-x-4">
             <Link
+              href={isAdmin ? "/admin/messages" : "/messages"}
+              className={`relative inline-flex items-center px-1 pt-1 pb-1 border-b-2 text-sm font-medium h-16 ${
+                (isAdmin ? pathname === '/admin/messages' : pathname === '/messages')
+                  ? 'border-blue-500 text-gray-900'
+                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+              }`}
+            >
+              <MessageCircle className="h-4 w-4 mr-1" />
+              Messages
+              {unreadCount > 0 && (
+                <span className="ml-1 inline-flex h-2 w-2 rounded-full bg-red-500" />
+              )}
+            </Link>
+            <Link
               href={isAdmin ? "/admin/profile" : isPartner ? "/partner/profile" : "/customer/profile"}
-              className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
+              className={`inline-flex items-center px-1 pt-1 pb-1 border-b-2 text-sm font-medium h-16 ${
                 isActive(isAdmin ? '/admin/profile' : isPartner ? '/partner/profile' : '/customer/profile')
                   ? 'border-blue-500 text-gray-900'
                   : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
@@ -513,6 +539,16 @@ export default function Navigation() {
                 </Link>
               </>
             ) : null}
+            <Link
+              href={isAdmin ? "/admin/messages" : "/messages"}
+              className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
+                (isAdmin ? pathname === '/admin/messages' : pathname === '/messages')
+                  ? 'border-blue-500 text-blue-700 bg-blue-50'
+                  : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800'
+              }`}
+            >
+              Messages
+            </Link>
             <Link
               href={isAdmin ? "/admin" : isPartner ? "/partner/profile" : "/customer/profile"}
               className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${

@@ -223,6 +223,21 @@ model Activity {
   @@index([userId])
 }
 
+model Message {
+  id          String   @id @default(cuid())
+  senderId    String
+  recipientId String
+  content     String
+  createdAt   DateTime @default(now())
+  readAt      DateTime?
+  attachmentUrl      String?
+  attachmentName     String?
+  attachmentMimeType String?
+  attachmentSize     Int?
+  @@index([senderId])
+  @@index([recipientId])
+}
+
 model SystemConfig {
   id                   String   @id @default(cuid())
   pointFaceValue       Float    @default(0.01)

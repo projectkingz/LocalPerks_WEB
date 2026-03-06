@@ -1,6 +1,7 @@
 import { Redis } from '@upstash/redis';
-import { Twilio } from 'twilio';
+import { tokenGenerate } from '@vonage/jwt';
 import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 import { sendVerificationCodeEmail } from '@/lib/email/mailtrap';
 
 // Initialize Redis with error handling
@@ -16,23 +17,20 @@ try {
     });
     // Test connection asynchronously (don't block initialization)
     redis.ping().catch((error) => {
-      // Only show warning if Redis was configured but failed to connect
-      console.warn('Redis connection test failed, will use memory fallback:', error.message || error);
+      logger.warn('Redis connection test failed, will use memory fallback:', error.message || error);
       redisConnectionFailed = true;
       redis = null;
     });
   }
 } catch (error) {
-  // Only show warning if Redis was configured but initialization failed
   if (hasRedisConfig) {
-    console.warn('Redis initialization failed:', error);
+    logger.warn('Redis initialization failed:', error);
   }
   redisConnectionFailed = true;
   redis = null;
 }
 
 // In-memory fallback for when Redis is unavailable
-// Use global to persist across module reloads in development
 declare global {
   var __2fa_memory_store__: Map<string, { code: string; expires: number }> | undefined;
   var __2fa_cleanup_interval__: NodeJS.Timeout | undefined;
@@ -41,18 +39,16 @@ declare global {
 const memoryStore = global.__2fa_memory_store__ ?? new Map<string, { code: string; expires: number }>();
 if (!global.__2fa_memory_store__) {
   global.__2fa_memory_store__ = memoryStore;
-  console.log('🆕 Created new global memory store for 2FA codes');
+  logger.debug('🆕 Created new global memory store for 2FA codes');
 } else {
-  console.log('♻️  Reusing existing global memory store for 2FA codes');
+  logger.debug('♻️  Reusing existing global memory store for 2FA codes');
 }
 
 // Cleanup expired entries from memory store every 5 minutes
-// Only set up interval once
 if (!global.__2fa_cleanup_interval__) {
   global.__2fa_cleanup_interval__ = setInterval(() => {
     const now = Date.now();
     let cleaned = 0;
-    // Convert Map entries to array to avoid downlevelIteration requirement
     const entries = Array.from(memoryStore.entries());
     for (const [key, entry] of entries) {
       if (now > entry.expires) {
@@ -61,32 +57,25 @@ if (!global.__2fa_cleanup_interval__) {
       }
     }
     if (cleaned > 0) {
-      console.log(`🧹 Cleaned up ${cleaned} expired 2FA codes`);
+      logger.debug(`🧹 Cleaned up ${cleaned} expired 2FA codes`);
     }
-  }, 5 * 60 * 1000) as any; // 5 minutes
+  }, 5 * 60 * 1000) as any;
 }
 
-// Email service is now handled by Mailtrap via mailtrap.ts
-
-// Only initialize Twilio if credentials are properly set
-let twilio: Twilio | null = null;
-if (process.env.TWILIO_ACCOUNT_SID && 
-    process.env.TWILIO_ACCOUNT_SID !== 'your_account_sid' &&
-    process.env.TWILIO_AUTH_TOKEN && 
-    process.env.TWILIO_AUTH_TOKEN !== 'your_auth_token') {
-  try {
-    twilio = new Twilio(
-      process.env.TWILIO_ACCOUNT_SID,
-      process.env.TWILIO_AUTH_TOKEN
-    );
-  } catch (error) {
-    console.warn('Twilio initialization failed:', error);
-    twilio = null;
-  }
-}
+// Vonage config
+const VONAGE_API_KEY = (process.env.VONAGE_API_KEY || '').trim();
+const VONAGE_API_SECRET = (process.env.VONAGE_API_SECRET || '').trim();
+const VONAGE_APPLICATION_ID = (process.env.VONAGE_APPLICATION_ID || '').trim();
+const VONAGE_PRIVATE_KEY = (process.env.VONAGE_PRIVATE_KEY || '').trim().replace(/\\n/g, '\n');
+const VONAGE_WHATSAPP_NUMBER = (process.env.VONAGE_WHATSAPP_NUMBER || '').trim();
+const VONAGE_SMS_NUMBER = (process.env.VONAGE_SMS_NUMBER || '').trim();
+const vonageConfigured = !!(VONAGE_API_KEY && VONAGE_API_SECRET);
+const messagesApiJwtConfigured = !!(VONAGE_APPLICATION_ID && VONAGE_PRIVATE_KEY);
+const MESSAGES_API_URL = process.env.VONAGE_MESSAGES_SANDBOX === 'true'
+  ? 'https://messages-sandbox.nexmo.com/v1/messages'
+  : 'https://api.nexmo.com/v1/messages';
 
 const CODE_EXPIRY = 10 * 60; // 10 minutes in seconds
-const CODE_LENGTH = 6;
 
 export type TwoFactorMethod = 'email' | 'sms' | 'whatsapp';
 
@@ -95,49 +84,38 @@ interface TwoFactorOptions {
   method: TwoFactorMethod;
   email?: string;
   phone?: string;
-  purpose?: string; // 'registration' or 'login'
+  purpose?: string;
 }
 
-// Generate a random numeric code
+const VONAGE_PREFIX = 'vonage:';
+
+// Generate a random numeric code (for email only) - 4 digits
 function generateCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
-// Store 2FA code in Redis or memory fallback
-async function storeCode(userId: string, code: string, purpose: string = 'registration'): Promise<void> {
+// Store 2FA code or Vonage request_id in Redis or memory
+async function storeCode(userId: string, value: string, purpose: string = 'registration'): Promise<void> {
   const key = `2fa:${userId}:${purpose}`;
   const expires = Date.now() + (CODE_EXPIRY * 1000);
-  
-  console.log(`\n💾 Storing code for key: ${key}`);
-  console.log(`📝 Code: ${code}`);
-  console.log(`⏰ Expires: ${new Date(expires)}`);
-  
+
+  logger.debug(`\n💾 Storing for key: ${key}`);
+  logger.debug(`⏰ Expires: ${new Date(expires)}`);
+
   try {
     if (redis && !redisConnectionFailed) {
-      console.log('🔄 Attempting to store in Redis...');
-      await redis.set(key, code, { ex: CODE_EXPIRY });
-      console.log('✅ Code stored in Redis');
+      await redis.set(key, value, { ex: CODE_EXPIRY });
+      logger.debug('✅ Stored in Redis');
     } else {
-      // Fallback to in-memory storage
-      memoryStore.set(key, { code, expires });
-      console.log('✅ Using in-memory fallback for 2FA code storage');
-      console.log(`📊 Memory store now has ${memoryStore.size} entries`);
+      memoryStore.set(key, { code: value, expires });
+      logger.debug('✅ Using in-memory fallback for 2FA storage');
+      logger.debug(`📊 Memory store now has ${memoryStore.size} entries`);
     }
   } catch (error) {
-    console.warn('⚠️  Failed to store code in Redis, using memory fallback');
+    logger.warn('⚠️  Failed to store in Redis, using memory fallback');
     redisConnectionFailed = true;
     redis = null;
-    memoryStore.set(key, { code, expires });
-    console.log('✅ Code stored in memory fallback');
-    console.log(`📊 Memory store now has ${memoryStore.size} entries`);
-  }
-  
-  // Verify it was stored
-  const stored = memoryStore.get(key);
-  if (stored) {
-    console.log(`✅ Verified: Code is in memory store`);
-  } else if (!redis) {
-    console.error('❌ ERROR: Code was NOT stored in memory!');
+    memoryStore.set(key, { code: value, expires });
   }
 }
 
@@ -146,270 +124,286 @@ async function sendCodeViaEmail(email: string, code: string, name: string): Prom
   try {
     const success = await sendVerificationCodeEmail(email, code, name);
     if (success) {
-      console.log(`✅ Verification email sent to ${email} via Mailtrap`);
+      logger.debug(`✅ Verification email sent to ${email} via Mailtrap`);
     }
     return success;
   } catch (error) {
-    console.error('❌ Error sending 2FA email:', error);
+    logger.error('❌ Error sending 2FA email:', error);
     return false;
   }
 }
 
-// Send code via SMS
-async function sendCodeViaSMS(phone: string, code: string): Promise<boolean> {
-  try {
-    if (!twilio) {
-      console.error('Twilio not configured. Please set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in your .env file.');
-      return false;
+// Get Messages API auth header (JWT preferred for WhatsApp; Basic as fallback)
+function getMessagesApiAuthHeader(): string | null {
+  if (messagesApiJwtConfigured) {
+    try {
+      const jwt = tokenGenerate(VONAGE_APPLICATION_ID, VONAGE_PRIVATE_KEY);
+      return `Bearer ${jwt}`;
+    } catch (err) {
+      logger.warn('⚠️  Vonage JWT generation failed:', (err as Error).message);
     }
-    
-    if (!process.env.TWILIO_PHONE_NUMBER || process.env.TWILIO_PHONE_NUMBER === 'your_twilio_phone_number') {
-      console.error('TWILIO_PHONE_NUMBER not configured in .env file.');
-      return false;
+  }
+  if (vonageConfigured) {
+    const auth = Buffer.from(`${VONAGE_API_KEY}:${VONAGE_API_SECRET}`).toString('base64');
+    return `Basic ${auth}`;
+  }
+  return null;
+}
+
+// Send code via Vonage Messages API (WhatsApp or SMS)
+async function sendCodeViaMessagesAPI(
+  phone: string,
+  code: string,
+  channel: 'whatsapp' | 'sms',
+  fromNumber: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const authHeader = getMessagesApiAuthHeader();
+    if (!authHeader) {
+      return { success: false, error: 'Vonage Messages API not configured (need JWT or API key)' };
     }
 
-    await twilio.messages.create({
-      body: `Your LocalPerks verification code is: ${code}. Valid for 10 minutes.`,
-      to: phone,
-      from: process.env.TWILIO_PHONE_NUMBER,
+    // Vonage expects "to" as digits only (no +)
+    const to = phone.replace(/\D/g, '');
+    const from = fromNumber.replace(/\D/g, '');
+
+    const body: Record<string, unknown> = {
+      from,
+      to,
+      message_type: 'text',
+      channel,
+      text: { body: `Your LocalPerks verification code is: ${code}. Valid for 10 minutes.` },
+    };
+
+    const response = await fetch(MESSAGES_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: authHeader,
+      },
+      body: JSON.stringify(body),
     });
-    return true;
-  } catch (error) {
-    console.error('Error sending 2FA SMS:', error);
-    return false;
+
+    const data = await response.json();
+
+    if (response.ok && data.message_uuid) {
+      logger.debug(`✅ Vonage Messages API (${channel}) sent successfully`);
+      return { success: true };
+    }
+
+    const errorMsg = data.detail || data['invalid_parameters']?.[0]?.message || JSON.stringify(data);
+    return { success: false, error: errorMsg };
+  } catch (error: unknown) {
+    const err = error as Error;
+    logger.error(`❌ Vonage Messages API (${channel}) error:`, err.message || error);
+    return { success: false, error: err.message || 'Failed to send' };
   }
+}
+
+// Send verification via Vonage Verify API (SMS only)
+async function sendCodeViaVonageVerify(phone: string): Promise<{ success: boolean; requestId?: string; error?: string }> {
+  if (!vonageConfigured) {
+    return { success: false, error: 'Vonage not configured' };
+  }
+
+  try {
+    const normalizedPhone = normalizePhoneNumber(phone);
+    logger.debug(`📤 Sending Vonage Verify SMS to: ${normalizedPhone}`);
+
+    const response = await fetch('https://api.nexmo.com/verify/json', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        api_key: VONAGE_API_KEY,
+        api_secret: VONAGE_API_SECRET,
+        number: normalizedPhone,
+        brand: 'LocalPerks',
+      }),
+    });
+
+    const data = await response.json();
+
+    if (data.status === '0' && data.request_id) {
+      logger.debug(`✅ Vonage Verify SMS sent (request_id: ${data.request_id})`);
+      return { success: true, requestId: data.request_id };
+    }
+
+    return { success: false, error: data['error-text'] || data['error_code_label'] || JSON.stringify(data) };
+  } catch (error: unknown) {
+    const err = error as Error;
+    return { success: false, error: err.message || 'Failed to send' };
+  }
+}
+
+// Try WhatsApp first, then SMS fallback (Messages API or Vonage Verify)
+async function sendCodeViaVonageWhatsAppOrSms(phone: string, code: string): Promise<{
+  success: boolean;
+  method: 'whatsapp' | 'sms';
+  requestId?: string;
+  useVerifyFlow?: boolean;
+  error?: string;
+}> {
+  if (!vonageConfigured) {
+    logger.warn('Vonage not configured - verification NOT sent. Configure: VONAGE_API_KEY, VONAGE_API_SECRET');
+    return { success: false, method: 'sms', error: 'Vonage not configured' };
+  }
+
+  const normalizedPhone = normalizePhoneNumber(phone);
+
+  // 1. Try WhatsApp first (if configured)
+  if (VONAGE_WHATSAPP_NUMBER) {
+    const whatsappFrom = VONAGE_WHATSAPP_NUMBER.replace(/\D/g, '');
+    logger.debug(`📤 Trying WhatsApp first to: ${normalizedPhone}`);
+    const waResult = await sendCodeViaMessagesAPI(normalizedPhone, code, 'whatsapp', whatsappFrom);
+    if (waResult.success) {
+      return { success: true, method: 'whatsapp' };
+    }
+    logger.warn(`⚠️  WhatsApp failed: ${waResult.error}. Falling back to SMS...`);
+  } else {
+    logger.debug('📤 VONAGE_WHATSAPP_NUMBER not set, skipping WhatsApp');
+  }
+
+  // 2. Try SMS via Messages API (if VONAGE_SMS_NUMBER configured)
+  if (VONAGE_SMS_NUMBER) {
+    const smsFrom = VONAGE_SMS_NUMBER.replace(/\D/g, '');
+    logger.debug(`📤 Trying SMS via Messages API to: ${normalizedPhone}`);
+    const smsResult = await sendCodeViaMessagesAPI(normalizedPhone, code, 'sms', smsFrom);
+    if (smsResult.success) {
+      return { success: true, method: 'sms' };
+    }
+    logger.warn(`⚠️  SMS Messages API failed: ${smsResult.error}. Trying Vonage Verify...`);
+  }
+
+  // 3. Fallback: Vonage Verify API (SMS, no WhatsApp number needed)
+  logger.debug(`📤 Fallback: Vonage Verify SMS to: ${normalizedPhone}`);
+  const verifyResult = await sendCodeViaVonageVerify(normalizedPhone);
+  if (verifyResult.success && verifyResult.requestId) {
+    return {
+      success: true,
+      method: 'sms',
+      requestId: verifyResult.requestId,
+      useVerifyFlow: true,
+    };
+  }
+
+  return {
+    success: false,
+    method: 'sms',
+    error: verifyResult.error || 'Failed to send verification',
+  };
 }
 
 // Normalize phone number to E.164 format
 export function normalizePhoneNumber(phone: string): string {
-  // Remove all non-digit characters except +
   let normalized = phone.replace(/[^\d+]/g, '');
-  
-  console.log(`📞 Original phone: ${phone}`);
-  
-  // If it starts with 0, assume it's a UK number (remove leading 0 and add +44)
+
+  logger.debug(`📞 Original phone: ${phone}`);
+
   if (normalized.startsWith('0')) {
     normalized = '+44' + normalized.substring(1);
-    console.log(`🇬🇧 Detected UK number, converted to: ${normalized}`);
-  }
-  // If it doesn't start with +, add +44 (UK default)
-  else if (!normalized.startsWith('+')) {
+    logger.debug(`🇬🇧 Detected UK number, converted to: ${normalized}`);
+  } else if (!normalized.startsWith('+')) {
     normalized = '+44' + normalized;
-    console.log(`🇬🇧 Added UK country code: ${normalized}`);
-  }
-  // If it starts with +0, it's invalid - fix it
-  else if (normalized.startsWith('+0')) {
+    logger.debug(`🇬🇧 Added UK country code: ${normalized}`);
+  } else if (normalized.startsWith('+0')) {
     normalized = '+44' + normalized.substring(2);
-    console.log(`🔧 Fixed invalid +0 prefix to: ${normalized}`);
+    logger.debug(`🔧 Fixed invalid +0 prefix to: ${normalized}`);
   }
-  
-  console.log(`✅ Normalized phone: ${normalized}`);
-  return normalized;
-}
 
-// Send code via WhatsApp with SMS fallback
-async function sendCodeViaWhatsApp(phone: string, code: string): Promise<{ success: boolean; method: 'whatsapp' | 'sms' | 'none'; error?: string }> {
-  try {
-    if (!twilio) {
-      console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('❌ Twilio not configured - WhatsApp/SMS code NOT sent');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log(`📱 Code would be sent to: ${phone}`);
-      console.log(`🔑 VERIFICATION CODE: ${code}`);
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('⚠️  Please configure Twilio credentials in .env:');
-      console.log('   TWILIO_ACCOUNT_SID=...');
-      console.log('   TWILIO_AUTH_TOKEN=...');
-      console.log('   TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886');
-      console.log('   TWILIO_PHONE_NUMBER=+14155238886');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-      return { success: false, method: 'none', error: 'Twilio not configured' };
-    }
-    
-    // Normalize phone number
-    const normalizedPhone = normalizePhoneNumber(phone);
-    
-    // Try WhatsApp first
-    const whatsappTo = `whatsapp:${normalizedPhone}`;
-    const whatsappFrom = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+14155238886';
-    
-    console.log(`📤 Attempting WhatsApp to: ${whatsappTo}`);
-    
-    try {
-      await twilio.messages.create({
-        body: `Your LocalPerks verification code is: ${code}. Valid for 10 minutes.`,
-        to: whatsappTo,
-        from: whatsappFrom,
-      });
-      
-      console.log(`✅ WhatsApp sent successfully to ${normalizedPhone}`);
-      return { success: true, method: 'whatsapp' };
-    } catch (whatsappError: any) {
-      // Check if it's a sandbox error (user not in sandbox)
-      const errorMessage = whatsappError?.message || '';
-      const errorCode = whatsappError?.code;
-      
-      // Twilio error codes for WhatsApp sandbox issues
-      // 63007: User not in WhatsApp sandbox
-      // 63016: Unsubscribed recipient
-      if (errorCode === 63007 || errorCode === 63016 || errorMessage.includes('sandbox') || errorMessage.includes('not opted in')) {
-        console.warn(`⚠️  WhatsApp failed (user not in sandbox): ${errorMessage}`);
-        console.log(`🔄 Falling back to SMS for ${normalizedPhone}...`);
-        
-        // Fallback to SMS
-        try {
-          if (!process.env.TWILIO_PHONE_NUMBER || process.env.TWILIO_PHONE_NUMBER === 'your_twilio_phone_number') {
-            console.error('❌ TWILIO_PHONE_NUMBER not configured. Cannot send SMS fallback.');
-            return { 
-              success: false, 
-              method: 'none', 
-              error: 'WhatsApp failed and SMS fallback not configured' 
-            };
-          }
-          
-          await twilio.messages.create({
-            body: `Your LocalPerks verification code is: ${code}. Valid for 10 minutes.`,
-            to: normalizedPhone,
-            from: process.env.TWILIO_PHONE_NUMBER,
-          });
-          
-          console.log(`✅ SMS sent successfully to ${normalizedPhone} (WhatsApp fallback)`);
-          return { success: true, method: 'sms' };
-        } catch (smsError: any) {
-          console.error('❌ SMS fallback also failed:', smsError?.message || smsError);
-          return { 
-            success: false, 
-            method: 'none', 
-            error: `WhatsApp and SMS both failed: ${smsError?.message || 'Unknown error'}` 
-          };
-        }
-      } else {
-        // Other WhatsApp errors - log and return failure
-        console.error('❌ Error sending WhatsApp:', errorMessage);
-        throw whatsappError; // Re-throw to be caught by outer catch
-      }
-    }
-  } catch (error: any) {
-    console.error('❌ Error sending 2FA WhatsApp:', error);
-    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📱 VERIFICATION CODE (FALLBACK)');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log(`Phone: ${phone}`);
-    console.log(`Code: ${code}`);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-    return { 
-      success: false, 
-      method: 'none', 
-      error: error?.message || 'Unknown error sending WhatsApp' 
-    };
-  }
+  logger.debug(`✅ Normalized phone: ${normalized}`);
+  return normalized;
 }
 
 // Generate and send 2FA code
 export async function generateAndSend2FACode(options: TwoFactorOptions): Promise<{
   success: boolean;
   message?: string;
+  method?: 'email' | 'whatsapp' | 'sms';
 }> {
   try {
     const { userId, method, email, phone, purpose = 'registration' } = options;
 
-    // Get user details
     const user = await prisma.user.findUnique({
       where: { id: userId },
     });
 
     if (!user) {
-      return {
-        success: false,
-        message: 'User not found',
-      };
+      return { success: false, message: 'User not found' };
     }
 
-    // Check if a code already exists for this purpose (prevent duplicate sends)
     const key = `2fa:${userId}:${purpose}`;
-    let existingCode = null;
-    
+    let existingValue: string | null = null;
+
     if (redis && !redisConnectionFailed) {
       try {
-        existingCode = await redis.get<string>(key);
-      } catch (error) {
-        // Ignore Redis errors, check memory fallback
+        existingValue = await redis.get<string>(key);
+      } catch {
+        // Ignore Redis errors
       }
     }
-    
-    // Check memory fallback
-    if (!existingCode) {
+
+    if (!existingValue) {
       const memoryEntry = memoryStore.get(key);
       if (memoryEntry && Date.now() < memoryEntry.expires) {
-        existingCode = memoryEntry.code;
-        console.log('⚠️  Code already exists for this user and purpose, not generating duplicate');
-        // Still return success since code exists, but don't send another email
-        return {
-          success: true,
-          message: 'A verification code was already sent. Please check your email.',
-        };
+        existingValue = memoryEntry.code;
       }
-    } else {
-      console.log('⚠️  Code already exists in Redis, not generating duplicate');
+    }
+
+    if (existingValue) {
+      logger.debug('⚠️  Verification already sent for this user and purpose');
       return {
         success: true,
-        message: 'A verification code was already sent. Please check your email.',
+        message: 'A verification code was already sent. Please check your messages.',
       };
     }
 
-    const code = generateCode();
-    await storeCode(userId, code, purpose);
-
-    console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-    console.log(`🔐 GENERATED 2FA CODE`);
-    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-    console.log(`User ID: ${userId}`);
-    console.log(`Purpose: ${purpose}`);
-    console.log(`Code: ${code}`);
-    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
-
     if (method === 'email' && email) {
+      const code = generateCode();
+      await storeCode(userId, code, purpose);
+
+      logger.debug(`\n🔐 GENERATED 2FA CODE (email)`);
+
       const sent = await sendCodeViaEmail(email, code, user.name || 'User');
       if (!sent) {
-        console.log(`\n⚠️  IMPORTANT: Email not configured. Use this code for verification: ${code}\n`);
+        logger.debug(`\n⚠️  IMPORTANT: Email not configured. Use this code: ${code}\n`);
         return {
           success: false,
           message: 'Failed to send code via email',
         };
       }
-    } else if (method === 'sms' && phone) {
-      const sent = await sendCodeViaSMS(phone, code);
-      if (!sent) {
-        return {
-          success: false,
-          message: 'Failed to send code via SMS - Twilio not configured',
-        };
-      }
-    } else if (method === 'whatsapp' && phone) {
-      const result = await sendCodeViaWhatsApp(phone, code);
+      return { success: true, message: 'Verification sent via email', method: 'email' };
+    }
+
+    if ((method === 'sms' || method === 'whatsapp') && phone) {
+      // WhatsApp first, then SMS fallback (Vonage Messages API + Verify fallback)
+      const code = generateCode();
+      const result = await sendCodeViaVonageWhatsAppOrSms(phone, code);
+
       if (!result.success) {
         return {
           success: false,
-          message: result.error || 'Failed to send code via WhatsApp or SMS',
+          message: result.error || 'Failed to send verification',
         };
       }
-      // Log which method was used
-      if (result.method === 'sms') {
-        console.log('📱 Used SMS fallback (WhatsApp sandbox not available)');
+
+      if (result.useVerifyFlow && result.requestId) {
+        await storeCode(userId, VONAGE_PREFIX + result.requestId, purpose);
+        logger.debug(`\n🔐 VONAGE VERIFY SENT (SMS fallback)`);
+      } else {
+        await storeCode(userId, code, purpose);
+        logger.debug(`\n🔐 VONAGE MESSAGES SENT (${result.method})`);
       }
-    } else {
-      return {
-        success: false,
-        message: 'Invalid 2FA method or missing contact information',
-      };
+
+      const deliveryMethod = result.method === 'whatsapp' ? 'WhatsApp' : 'SMS';
+      return { success: true, message: `Verification sent via ${deliveryMethod}`, method: result.method };
     }
 
     return {
-      success: true,
-      message: `Code sent via ${method}`,
+      success: false,
+      message: 'Invalid 2FA method or missing contact information',
     };
   } catch (error) {
-    console.error('Error generating 2FA code:', error);
+    logger.error('Error generating 2FA code:', error);
     return {
       success: false,
       message: 'Failed to generate and send 2FA code',
@@ -417,63 +411,97 @@ export async function generateAndSend2FACode(options: TwoFactorOptions): Promise
   }
 }
 
-// Verify 2FA code
+// Verify 2FA code (handles both email codes and Vonage Verify)
 export async function verify2FACode(options: { userId: string; code: string; purpose?: string }): Promise<boolean> {
   try {
     const { userId, code, purpose = 'registration' } = options;
     const key = `2fa:${userId}:${purpose}`;
-    let storedCode: string | null = null;
-    
-    console.log(`\n🔑 Verifying 2FA code for key: ${key}`);
-    console.log(`📝 Provided code: ${code}`);
-    console.log(`💾 Redis available: ${redis ? 'Yes' : 'No'}`);
-    console.log(`💾 Memory store size: ${memoryStore.size}`);
-    
+    let storedValue: string | null = null;
+
+    logger.debug(`\n🔑 Verifying 2FA code for key: ${key}`);
+
     if (redis && !redisConnectionFailed) {
       try {
-        console.log('🔄 Attempting Redis lookup...');
-        storedCode = await redis.get<string>(key);
-        console.log(`📦 Redis returned: ${storedCode}`);
-        if (storedCode === code) {
-          await redis.del(key);
-          console.log('✅ Code matched in Redis!');
-          return true;
-        }
-      } catch (error) {
-        console.warn('⚠️  Redis verification failed, trying memory fallback');
+        storedValue = await redis.get<string>(key);
+      } catch {
         redisConnectionFailed = true;
         redis = null;
-        // Don't log the full error, just continue to fallback
       }
     }
-    
-    // Check memory fallback
-    console.log('🔄 Checking memory fallback...');
-    const memoryEntry = memoryStore.get(key);
-    console.log(`📦 Memory entry:`, memoryEntry ? `code=${memoryEntry.code}, expires=${new Date(memoryEntry.expires)}` : 'Not found');
-    
-    if (memoryEntry) {
-      // Check if expired
-      if (Date.now() > memoryEntry.expires) {
-        console.log('⏰ Code expired');
-        memoryStore.delete(key);
+
+    if (!storedValue) {
+      const memoryEntry = memoryStore.get(key);
+      if (memoryEntry) {
+        if (Date.now() > memoryEntry.expires) {
+          logger.debug('⏰ Code expired');
+          memoryStore.delete(key);
+          return false;
+        }
+        storedValue = memoryEntry.code;
+      }
+    }
+
+    if (!storedValue) {
+      logger.debug('❌ No verification found');
+      return false;
+    }
+
+    // Vonage Verify flow: stored value is "vonage:REQUEST_ID"
+    if (storedValue.startsWith(VONAGE_PREFIX)) {
+      const requestId = storedValue.slice(VONAGE_PREFIX.length);
+
+      if (!vonageConfigured) {
+        logger.error('❌ Vonage not configured - cannot verify');
         return false;
       }
-      
-      if (memoryEntry.code === code) {
-        memoryStore.delete(key);
-        console.log('✅ Code matched in memory store!');
-        return true;
-      } else {
-        console.log(`❌ Code mismatch. Expected: ${memoryEntry.code}, Got: ${code}`);
+
+      try {
+        const response = await fetch('https://api.nexmo.com/verify/check/json', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            api_key: VONAGE_API_KEY,
+            api_secret: VONAGE_API_SECRET,
+            request_id: requestId,
+            code,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (data.status === '0') {
+          if (redis && !redisConnectionFailed) {
+            await redis.del(key);
+          } else {
+            memoryStore.delete(key);
+          }
+          logger.debug('✅ Vonage Verify code matched!');
+          return true;
+        }
+
+        logger.debug(`❌ Vonage Verify failed: ${data['error-text'] || data.status}`);
+        return false;
+      } catch (error) {
+        logger.error('❌ Vonage Verify check error:', error);
+        return false;
       }
-    } else {
-      console.log('❌ No code found in memory store');
     }
-    
+
+    // Email flow: compare stored code
+    if (storedValue === code) {
+      if (redis && !redisConnectionFailed) {
+        await redis.del(key);
+      } else {
+        memoryStore.delete(key);
+      }
+      logger.debug('✅ Code matched!');
+      return true;
+    }
+
+    logger.debug(`❌ Code mismatch`);
     return false;
   } catch (error) {
-    console.error('❌ Error verifying 2FA code:', error);
+    logger.error('❌ Error verifying 2FA code:', error);
     return false;
   }
 }
@@ -481,52 +509,31 @@ export async function verify2FACode(options: { userId: string; code: string; pur
 // Check if user has pending 2FA verification
 export async function hasPending2FAVerification(userId: string): Promise<boolean> {
   try {
-    // Check both registration and login 2FA codes
     const registrationKey = `2fa:${userId}:registration`;
     const loginKey = `2fa:${userId}:login`;
-    
+
     if (redis && !redisConnectionFailed) {
       try {
         const [registrationExists, loginExists] = await Promise.all([
           redis.exists(registrationKey),
-          redis.exists(loginKey)
+          redis.exists(loginKey),
         ]);
         return registrationExists === 1 || loginExists === 1;
-      } catch (error) {
-        // Only log once to avoid spam
-        if (!redisConnectionFailed) {
-          console.warn('Redis status check failed, checking memory fallback');
-        }
+      } catch {
         redisConnectionFailed = true;
         redis = null;
       }
     }
-    
-    // Check memory fallback
+
     const registrationEntry = memoryStore.get(registrationKey);
     const loginEntry = memoryStore.get(loginKey);
-    
-    // Check registration entry
-    if (registrationEntry) {
-      if (Date.now() > registrationEntry.expires) {
-        memoryStore.delete(registrationKey);
-      } else {
-        return true;
-      }
-    }
-    
-    // Check login entry
-    if (loginEntry) {
-      if (Date.now() > loginEntry.expires) {
-        memoryStore.delete(loginKey);
-      } else {
-        return true;
-      }
-    }
-    
+
+    if (registrationEntry && Date.now() < registrationEntry.expires) return true;
+    if (loginEntry && Date.now() < loginEntry.expires) return true;
+
     return false;
   } catch (error) {
-    console.error('Error checking 2FA status:', error);
+    logger.error('Error checking 2FA status:', error);
     return false;
   }
-} 
+}

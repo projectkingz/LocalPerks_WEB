@@ -59,6 +59,16 @@ export async function GET(request: Request) {
       ? { tenantId }
       : {};
 
+    // For partners, compute tenant customer IDs once and reuse for all related queries
+    let customerIds: string[] | null = null;
+    if (role === 'PARTNER' && tenantId) {
+      const tenantCustomers = await prisma.customer.findMany({
+        where: { tenantId },
+        select: { id: true }
+      });
+      customerIds = tenantCustomers.map((c: any) => c.id);
+    }
+
     // Get total customers (filtered by tenant for partners)
     const totalCustomers = await prisma.customer.count({
       where: tenantFilter
@@ -174,17 +184,10 @@ export async function GET(request: Request) {
     // For partners, we need to filter redemptions by their customers
     let popularRewards;
     if (role === 'PARTNER' && tenantId) {
-      // Get customer IDs for this tenant
-      const tenantCustomerIds = await prisma.customer.findMany({
-        where: { tenantId },
-        select: { id: true }
-      });
-      const customerIds = tenantCustomerIds.map((c: any) => c.id);
-
       popularRewards = await prisma.redemption.groupBy({
         by: ['rewardId'],
         where: {
-          customerId: { in: customerIds },
+          customerId: { in: customerIds || [] },
           createdAt: {
             gte: startDate
           }
@@ -230,17 +233,10 @@ export async function GET(request: Request) {
         // Calculate total points issued for this reward
         let pointsIssuedForReward;
         if (role === 'PARTNER' && tenantId) {
-          // Get customer IDs for this tenant
-          const tenantCustomerIds = await prisma.customer.findMany({
-            where: { tenantId },
-            select: { id: true }
-          });
-          const customerIds = tenantCustomerIds.map((c: any) => c.id);
-
           pointsIssuedForReward = await prisma.redemption.aggregate({
             where: {
               rewardId: redemption.rewardId,
-              customerId: { in: customerIds },
+              customerId: { in: customerIds || [] },
               createdAt: {
                 gte: startDate
               }

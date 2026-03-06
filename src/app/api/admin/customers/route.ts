@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/auth.config';
 import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // First, get all customers with their transaction and redemption information
+    // First, get all customers with their transaction, redemption, and tenant information
     // Note: This queries the Customer model, not the User model, so it should only return actual customers
     const customers = await prisma.customer.findMany({
       include: {
@@ -41,6 +42,12 @@ export async function GET(request: NextRequest) {
           orderBy: {
             createdAt: 'desc'
           }
+        },
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+          }
         }
       },
       orderBy: {
@@ -48,54 +55,23 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    // Get tenant information separately to handle potential null references
-    const customersWithTenants = await Promise.all(
-      customers.map(async (customer: any) => {
-        let tenant = null;
-        try {
-          tenant = await prisma.tenant.findUnique({
-            where: { id: customer.tenantId },
-            select: {
-              id: true,
-              name: true,
-            }
-          });
-        } catch (error) {
-          console.warn(`Could not find tenant for customer ${customer.id}:`, error);
-        }
-
-        return {
-          ...customer,
-          tenant
-        };
-      })
-    );
-
-    // Debug: Log the number of customers found
-    console.log(`Found ${customers.length} customers in database`);
+    logger.debug(`Found ${customers.length} customers in database`);
 
     // Filter out any customers that might be admin or partner accounts
     // by checking if their email exists in the User table with non-CUSTOMER roles
-    const filteredCustomers = await Promise.all(
-      customersWithTenants.map(async (customer) => {
-        // Check if this email exists in the User table with ADMIN or PARTNER role
-        const user = await prisma.user.findUnique({
-          where: { email: customer.email },
-          select: { role: true }
-        });
+    const customerEmails = customers.map((c: any) => c.email).filter(Boolean);
+    const adminOrPartnerUsers = await prisma.user.findMany({
+      where: {
+        email: { in: customerEmails },
+        role: { in: ['ADMIN', 'PARTNER', 'SUPER_ADMIN'] }
+      },
+      select: { email: true }
+    });
+    const excludedEmails = new Set(adminOrPartnerUsers.map(u => u.email));
 
-        // Only include if user doesn't exist or has CUSTOMER role
-        if (!user || user.role === 'CUSTOMER') {
-          return customer;
-        }
-        return null;
-      })
-    );
+    const validCustomers = customers.filter((customer: any) => !excludedEmails.has(customer.email));
 
-    // Remove null values (admin/partner accounts)
-    const validCustomers = filteredCustomers.filter(customer => customer !== null);
-
-    console.log(`Filtered to ${validCustomers.length} actual customers (excluded admin/partner accounts)`);
+    logger.debug(`Filtered to ${validCustomers.length} actual customers (excluded admin/partner accounts)`);
 
     // Calculate additional fields for each customer
     const customersWithCalculations = validCustomers.map((customer: any) => {
@@ -123,7 +99,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(customersWithCalculations);
   } catch (error) {
-    console.error('Error fetching customers:', error);
+    logger.error('Error fetching customers:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

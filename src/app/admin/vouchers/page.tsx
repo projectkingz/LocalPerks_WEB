@@ -1453,7 +1453,7 @@ export default function AdminVouchersPage() {
                   value={editingVoucher.expiresAt ? new Date(editingVoucher.expiresAt).toISOString().slice(0, 16) : ''}
                   onChange={(e) => setEditingVoucher({ 
                     ...editingVoucher, 
-                    expiresAt: e.target.value ? new Date(e.target.value).toISOString() : null 
+                    expiresAt: e.target.value ? new Date(e.target.value).toISOString() : undefined 
                   })}
                   className="block w-full px-8 py-8 text-2xl text-gray-900 bg-gray-50 border-2 border-gray-200 rounded-3xl appearance-none transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-500/30 focus:border-blue-500 focus:bg-white peer group-hover:border-gray-300 shadow-lg hover:shadow-xl min-h-[80px]"
                 />
@@ -1468,7 +1468,7 @@ export default function AdminVouchersPage() {
                   value={editingVoucher.usedAt ? new Date(editingVoucher.usedAt).toISOString().slice(0, 16) : ''}
                   onChange={(e) => setEditingVoucher({ 
                     ...editingVoucher, 
-                    usedAt: e.target.value ? new Date(e.target.value).toISOString() : null 
+                    usedAt: e.target.value ? new Date(e.target.value).toISOString() : undefined 
                   })}
                   className="block w-full px-8 py-8 text-2xl text-gray-900 bg-gray-50 border-2 border-gray-200 rounded-3xl appearance-none transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-500/30 focus:border-blue-500 focus:bg-white peer group-hover:border-gray-300 shadow-lg hover:shadow-xl min-h-[80px]"
                 />

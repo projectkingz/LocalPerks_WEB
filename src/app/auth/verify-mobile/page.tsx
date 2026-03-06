@@ -9,7 +9,7 @@ function VerifyMobileContent() {
   const userId = searchParams.get('userId');
   const email = searchParams.get('email');
   
-  const [code, setCode] = useState(['', '', '', '', '', '']);
+  const [code, setCode] = useState(['', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
@@ -67,7 +67,7 @@ function VerifyMobileContent() {
     newCode[index] = value;
     setCode(newCode);
 
-    if (value && index < 5) {
+    if (value && index < 3) {
       const nextInput = document.getElementById(`code-${index + 1}`);
       nextInput?.focus();
     }
@@ -82,16 +82,16 @@ function VerifyMobileContent() {
 
   const handlePaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
-    const pastedData = e.clipboardData.getData('text').slice(0, 6);
-    const newCode = pastedData.split('').concat(['', '', '', '', '']).slice(0, 6);
+    const pastedData = e.clipboardData.getData('text').slice(0, 4);
+    const newCode = pastedData.split('').concat(['', '', '']).slice(0, 4);
     setCode(newCode);
   };
 
   const handleVerify = async () => {
     const verificationCode = code.join('');
     
-    if (verificationCode.length !== 6) {
-      setError('Please enter the complete 6-digit code');
+    if (verificationCode.length !== 4) {
+      setError('Please enter the complete 4-digit code');
       return;
     }
 
@@ -137,7 +137,7 @@ function VerifyMobileContent() {
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Verify Your Mobile</h1>
           <p className="text-gray-600">
-            We've sent a 6-digit verification code via WhatsApp
+            We've sent a 4-digit verification code via WhatsApp or SMS
           </p>
         </div>
 
@@ -171,7 +171,7 @@ function VerifyMobileContent() {
 
           <button
             onClick={handleVerify}
-            disabled={isLoading || code.join('').length !== 6}
+            disabled={isLoading || code.join('').length !== 4}
             className="w-full bg-green-600 text-white py-4 rounded-xl font-semibold hover:bg-green-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
             {isLoading ? 'Verifying...' : 'Verify Mobile'}

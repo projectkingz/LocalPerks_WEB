@@ -68,7 +68,7 @@ export async function POST(req: Request) {
     const normalizedMobile = normalizePhoneNumber(mobileNumber);
     const result = await generateAndSend2FACode({
       userId: user.id,
-      method: 'whatsapp',
+      method: 'sms',
       phone: normalizedMobile,
       purpose: 'registration'
     });
@@ -82,14 +82,14 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: 'Verification code sent via WhatsApp',
+      message: 'Verification code sent via SMS',
       mobileNumber: mobileNumber,
       expiresIn: 600, // 10 minutes in seconds
     });
   } catch (error) {
-    console.error('Error sending WhatsApp verification code:', error);
+    console.error('Error sending SMS verification code:', error);
     return NextResponse.json(
-      { error: 'Failed to send WhatsApp verification code' },
+      { error: 'Failed to send SMS verification code' },
       { status: 500 }
     );
   }

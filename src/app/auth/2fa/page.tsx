@@ -211,8 +211,9 @@ function TwoFactorAuthContent() {
                 <input
                   type="text"
                   value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  placeholder="Enter verification code"
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  placeholder="Enter 4-digit code"
+                  maxLength={4}
                   className="block w-full px-4 py-3 text-lg text-gray-900 bg-white border-2 border-gray-200 rounded-xl appearance-none focus:outline-none focus:ring-0 focus:border-blue-500"
                   required
                 />
@@ -224,9 +225,9 @@ function TwoFactorAuthContent() {
               >
                 <button
                   onClick={handleVerifyCode}
-                  disabled={loading || code.length !== 6}
+                  disabled={loading || code.length !== 4}
                   className={`group relative w-full flex justify-center py-4 px-4 border border-transparent text-lg font-bold rounded-xl text-white ${
-                    loading || code.length !== 6
+                    loading || code.length !== 4
                       ? 'bg-gray-400 cursor-not-allowed'
                       : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200'
                   }`}

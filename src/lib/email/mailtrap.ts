@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { logger } from '@/lib/logger';
 
 // Mailtrap SMTP configuration - lazy initialization
 let transporter: nodemailer.Transporter | null = null;
@@ -15,14 +16,11 @@ const getMailtrapTransporter = (): nodemailer.Transporter | null => {
   const mailtrapUser = process.env.MAILTRAP_USER;
   const mailtrapPass = process.env.MAILTRAP_PASSWORD;
 
-  console.log('🔍 Checking Mailtrap configuration...');
-  console.log(`   Host: ${mailtrapHost}`);
-  console.log(`   Port: ${mailtrapPort}`);
-  console.log(`   User: ${mailtrapUser ? 'SET' : 'NOT SET'}`);
-  console.log(`   Password: ${mailtrapPass ? 'SET' : 'NOT SET'}`);
+  logger.debug('🔍 Checking Mailtrap configuration...');
+  logger.debug(`   Host: ${mailtrapHost}, Port: ${mailtrapPort}, User: ${mailtrapUser ? 'SET' : 'NOT SET'}, Password: ${mailtrapPass ? 'SET' : 'NOT SET'}`);
 
   if (!mailtrapUser || !mailtrapPass) {
-    console.warn('⚠️  Mailtrap credentials not configured. Email sending will be disabled.');
+    logger.warn('⚠️  Mailtrap credentials not configured. Email sending will be disabled.');
     return null;
   }
 
@@ -35,10 +33,10 @@ const getMailtrapTransporter = (): nodemailer.Transporter | null => {
         pass: mailtrapPass,
       },
     });
-    console.log('✅ Mailtrap transporter created successfully');
+    logger.debug('✅ Mailtrap transporter created successfully');
     return transporter;
   } catch (error) {
-    console.error('❌ Error creating Mailtrap transporter:', error);
+    logger.error('❌ Error creating Mailtrap transporter:', error);
     return null;
   }
 };
@@ -61,17 +59,8 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   const mailtrapTransporter = getMailtrapTransporter();
   
   if (!mailtrapTransporter) {
-    console.warn('⚠️  Mailtrap not configured, email not sent');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📧 EMAIL (DEVELOPMENT MODE - NOT SENT)');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log(`To: ${options.to}`);
-    console.log(`Subject: ${options.subject}`);
-    console.log(`From: ${options.from || 'LocalPerks <noreply@localperks.com>'}`);
-    if (options.text) {
-      console.log(`Text: ${options.text}`);
-    }
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    logger.warn('⚠️  Mailtrap not configured, email not sent');
+    logger.debug(`📧 EMAIL (NOT SENT) To: ${options.to}, Subject: ${options.subject}`);
     return false;
   }
 
@@ -84,22 +73,14 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       text: options.text || options.html.replace(/<[^>]*>/g, ''), // Strip HTML for text version
     };
 
-    console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-    console.log(`📤 Sending email via Mailtrap`);
-    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-    console.log(`To: ${options.to}`);
-    console.log(`Subject: ${options.subject}`);
-    console.log(`From: ${mailOptions.from}`);
-    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+    logger.debug(`📤 Sending email via Mailtrap to: ${options.to}, subject: ${options.subject}`);
 
     const info = await mailtrapTransporter.sendMail(mailOptions);
-    console.log(`✅ Email sent successfully to ${options.to} via Mailtrap`);
-    console.log(`📧 Message ID: ${info.messageId}`);
-    console.log(`📬 Check your Mailtrap inbox at https://mailtrap.io\n`);
+    logger.debug(`✅ Email sent to ${options.to} via Mailtrap, messageId: ${info.messageId}`);
     return true;
   } catch (error: any) {
-    console.error('❌ Error sending email via Mailtrap:', error);
-    console.error('Error details:', error.message || error);
+    logger.error('❌ Error sending email via Mailtrap:', error);
+    logger.error('Error details:', error.message || error);
     return false;
   }
 }

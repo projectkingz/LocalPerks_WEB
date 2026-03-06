@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 import { generateAndSend2FACode, normalizePhoneNumber } from '@/lib/auth/two-factor';
 
 export async function POST(req: Request) {
@@ -14,7 +15,7 @@ export async function POST(req: Request) {
       );
     }
 
-    console.log('🔐 Customer login 2FA request for:', email || userId);
+    logger.debug('🔐 Customer login 2FA request for:', email || userId);
 
     // Verify user exists and is a customer
     const user = await prisma.user.findUnique({
@@ -47,7 +48,7 @@ export async function POST(req: Request) {
     
     // Require mobile number for login 2FA
     if (!customer || !customer.mobile) {
-      console.error('❌ No mobile number found for customer:', user.id);
+      logger.error('❌ No mobile number found for customer:', user.id);
       return NextResponse.json(
         { 
           message: 'Mobile number is required for login verification. Please ensure your account has a mobile number.',
@@ -58,12 +59,10 @@ export async function POST(req: Request) {
     }
     
     const normalizedMobile = normalizePhoneNumber(customer.mobile);
-    console.log(`📱 Customer normalized mobile: ${customer.mobile} → ${normalizedMobile}`);
+    logger.debug(`📱 Customer normalized mobile: ${customer.mobile} → ${normalizedMobile}`);
     
     try {
-      console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-      console.log(`📤 Sending customer login 2FA WhatsApp to: ${normalizedMobile}`);
-      console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+      logger.debug(`📤 Sending customer login 2FA WhatsApp to: ${normalizedMobile}`);
       
       const whatsappResult = await generateAndSend2FACode({
         userId: user.id,
@@ -72,14 +71,14 @@ export async function POST(req: Request) {
         purpose: 'login'
       });
 
-      console.log(`\n📱 WhatsApp/SMS result:`, whatsappResult);
+      logger.debug(`📱 WhatsApp/SMS result:`, whatsappResult);
 
       if (whatsappResult.success) {
         codeSent = true;
-        deliveryMethod = 'whatsapp';
-        console.log('✅ Customer login 2FA code sent successfully via WhatsApp (or SMS fallback)');
+        deliveryMethod = whatsappResult.method || 'whatsapp';
+        logger.debug(`✅ Customer login 2FA code sent successfully via ${whatsappResult.method || 'whatsapp'}`);
       } else {
-        console.error('❌ Failed to send customer login 2FA via WhatsApp/SMS:', whatsappResult.message);
+        logger.error('❌ Failed to send customer login 2FA via WhatsApp/SMS:', whatsappResult.message);
         return NextResponse.json(
           { 
             message: 'Failed to send verification code via WhatsApp. Please try again or contact support.',
@@ -89,7 +88,7 @@ export async function POST(req: Request) {
         );
       }
     } catch (error) {
-      console.error('❌ Error sending customer login 2FA WhatsApp:', error);
+      logger.error('❌ Error sending customer login 2FA WhatsApp:', error);
       return NextResponse.json(
         { 
           message: 'Error sending verification code. Please try again or contact support.',
@@ -103,7 +102,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       message: codeSent 
-        ? `Verification code sent to your WhatsApp`
+        ? `Verification code sent via ${deliveryMethod === 'whatsapp' ? 'WhatsApp' : 'SMS'}`
         : 'Failed to send verification code. Please try again.',
       codeSent,
       method: deliveryMethod,
@@ -111,7 +110,7 @@ export async function POST(req: Request) {
     });
 
   } catch (error) {
-    console.error('Customer login 2FA error:', error);
+    logger.error('Customer login 2FA error:', error);
     return NextResponse.json(
       { message: 'Internal server error' },
       { status: 500 }

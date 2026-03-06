@@ -32,7 +32,13 @@
     "docs",
     ".next",
     "out",
+    "hello-prisma",
+    "mobile",
+    "scripts",
+    "prisma/archive_seed_files",
     "prisma/seed*.ts",
-    "prisma/*data*.ts"
+    "prisma/*data*.ts",
+    "prisma/add-recent-data.ts",
+    "prisma/test-recent-data.ts"
   ]
 }

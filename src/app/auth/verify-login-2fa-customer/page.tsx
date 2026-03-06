@@ -10,7 +10,7 @@ function VerifyLogin2FAContent() {
   const email = searchParams.get('email');
   
   const [userId, setUserId] = useState<string | null>(null);
-  const [code, setCode] = useState(['', '', '', '', '', '']);
+  const [code, setCode] = useState(['', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingUser, setIsFetchingUser] = useState(true);
   const [error, setError] = useState('');
@@ -18,7 +18,7 @@ function VerifyLogin2FAContent() {
   const [codeSent, setCodeSent] = useState(false);
   const [isSendingCode, setIsSendingCode] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
-  const [deliveryMethod, setDeliveryMethod] = useState<'whatsapp' | 'email'>('whatsapp');
+  const [deliveryMethod, setDeliveryMethod] = useState<'whatsapp' | 'sms' | 'email'>('whatsapp');
 
   // Function to send 2FA code
   const send2FACode = useCallback(async () => {
@@ -164,7 +164,7 @@ function VerifyLogin2FAContent() {
     newCode[index] = value;
     setCode(newCode);
 
-    if (value && index < 5) {
+    if (value && index < 3) {
       const nextInput = document.getElementById(`code-${index + 1}`);
       nextInput?.focus();
     }
@@ -179,12 +179,12 @@ function VerifyLogin2FAContent() {
 
   const handlePaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
-    const pastedData = e.clipboardData.getData('text').slice(0, 6);
-    const newCode = pastedData.split('').concat(['', '', '', '', '']).slice(0, 6);
+    const pastedData = e.clipboardData.getData('text').slice(0, 4);
+    const newCode = pastedData.split('').concat(['', '', '']).slice(0, 4);
     setCode(newCode);
     
     // Focus on the last input
-    const lastIndex = Math.min(pastedData.length - 1, 5);
+    const lastIndex = Math.min(pastedData.length - 1, 3);
     const lastInput = document.getElementById(`code-${lastIndex}`);
     lastInput?.focus();
   };
@@ -197,8 +197,8 @@ function VerifyLogin2FAContent() {
 
     const verificationCode = code.join('');
     
-    if (verificationCode.length !== 6) {
-      setError('Please enter the complete 6-digit code');
+    if (verificationCode.length !== 4) {
+      setError('Please enter the complete 4-digit code');
       return;
     }
 
@@ -311,8 +311,8 @@ function VerifyLogin2FAContent() {
             {isSendingCode 
               ? 'Sending verification code...'
               : codeSent
-                ? `We've sent a 6-digit verification code via ${deliveryMethod === 'whatsapp' ? 'WhatsApp' : 'email'}`
-                : 'A 6-digit verification code will be sent to your WhatsApp or email'}
+                ? `We've sent a 4-digit verification code via ${deliveryMethod === 'whatsapp' ? 'WhatsApp' : deliveryMethod === 'sms' ? 'SMS' : 'email'}`
+                : 'A 4-digit verification code will be sent to your WhatsApp, mobile, or email'}
             <br />
             <span className="font-semibold text-gray-900">{email}</span>
           </p>
@@ -352,7 +352,7 @@ function VerifyLogin2FAContent() {
 
           <button
             onClick={handleVerify}
-            disabled={isLoading || code.join('').length !== 6 || !userId}
+            disabled={isLoading || code.join('').length !== 4 || !userId}
             className="w-full bg-blue-600 text-white py-4 rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
             {isLoading ? 'Verifying...' : 'Verify & Sign In'}
@@ -375,7 +375,7 @@ function VerifyLogin2FAContent() {
             </button>
             {codeSent && (
               <p className="text-xs text-gray-500 mt-2">
-                💡 Check your {deliveryMethod === 'whatsapp' ? 'WhatsApp' : 'email'} or server console for the code
+                💡 Check your {deliveryMethod === 'whatsapp' ? 'WhatsApp' : deliveryMethod === 'sms' ? 'SMS' : 'email'} or server console for the code
               </p>
             )}
           </div>

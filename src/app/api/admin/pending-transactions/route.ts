@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/auth.config';
 import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -14,11 +15,7 @@ export async function GET() {
   const allowedRoles = ['PARTNER', 'ADMIN', 'SUPER_ADMIN'];
   const userRole = session.user.role?.toUpperCase();
   if (!userRole || !allowedRoles.includes(userRole)) {
-    console.log('Access denied for pending transactions:', {
-      userEmail: session.user.email,
-      userRole: session.user.role,
-      allowedRoles: allowedRoles
-    });
+    logger.debug('Access denied for pending transactions:', { userEmail: session.user.email, userRole: session.user.role });
     return NextResponse.json({ 
       error: 'Access denied', 
       userRole: session.user.role,
@@ -26,10 +23,7 @@ export async function GET() {
     }, { status: 403 });
   }
 
-  console.log('User authorized to view pending transactions:', {
-    email: session.user.email,
-    role: userRole
-  });
+  logger.debug('User authorized to view pending transactions:', { email: session.user.email, role: userRole });
 
   try {
     // Get pending transactions from the real database
@@ -65,10 +59,7 @@ export async function GET() {
       }
     });
 
-    console.log(`Query found ${pendingTransactions.length} transactions with status 'PENDING'`);
-    if (pendingTransactions.length > 0) {
-      console.log('Sample transaction statuses:', pendingTransactions.slice(0, 3).map(t => ({ id: t.id, status: t.status })));
-    }
+    logger.debug(`Query found ${pendingTransactions.length} transactions with status 'PENDING'`);
 
     // Transform the data to match the expected format
     const formattedTransactions = pendingTransactions.map((transaction: any) => ({
@@ -86,17 +77,11 @@ export async function GET() {
       receiptImage: transaction.receiptImage || null
     }));
 
-    console.log(`Found ${formattedTransactions.length} pending transactions in database`);
-    console.log('Sample transaction:', formattedTransactions[0] ? {
-      id: formattedTransactions[0].id,
-      customerEmail: formattedTransactions[0].customerEmail,
-      status: formattedTransactions[0].status,
-      hasReceiptImage: !!formattedTransactions[0].receiptImage
-    } : 'No transactions');
+    logger.debug(`Found ${formattedTransactions.length} pending transactions in database`);
     
     return NextResponse.json({ pendingTransactions: formattedTransactions });
   } catch (error) {
-    console.error('Error fetching pending transactions:', error);
+    logger.error('Error fetching pending transactions:', error);
     return NextResponse.json({ error: 'Failed to fetch pending transactions' }, { status: 500 });
   }
 }
@@ -190,7 +175,7 @@ export async function POST(request: Request) {
     });
 
   } catch (error) {
-    console.error('Error processing transaction:', error);
+    logger.error('Error processing transaction:', error);
     return NextResponse.json({ error: 'Failed to process transaction' }, { status: 500 });
   }
 } 

@@ -96,7 +96,10 @@ export async function GET() {
         customerVouchers.forEach((v: any) => {
           voucherMap.set(v.rewardId, { status: v.status, usedAt: v.usedAt });
         });
-        
+
+        // Cache tenant points configuration per request to avoid repeated DB lookups
+        const tenantConfigCache = new Map<string, Awaited<ReturnType<typeof getTenantPointsConfig>>>();
+
         // Enrich rewards with voucher info and points cost (£ discount rewards require points)
         const enrichedRewards = await Promise.all(rewards.map(async (reward: any) => {
           const voucher = voucherMap.get(reward.id);
@@ -104,7 +107,11 @@ export async function GET() {
           const amountMatch = reward.name?.match(/£(\d+(?:\.\d+)?)/);
           if (amountMatch) {
             const discountAmount = parseFloat(amountMatch[1]);
-            const config = await getTenantPointsConfig(reward.tenantId);
+            let config = tenantConfigCache.get(reward.tenantId);
+            if (!config) {
+              config = await getTenantPointsConfig(reward.tenantId);
+              tenantConfigCache.set(reward.tenantId, config);
+            }
             points = calculatePointsForDiscount(discountAmount, config);
           }
           return {

@@ -3,6 +3,19 @@ import { hash } from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { generateAndSend2FACode, normalizePhoneNumber } from '@/lib/auth/two-factor';
 import { generateUniqueDisplayId } from '@/lib/customerId';
+import { logger } from '@/lib/logger';
+
+async function rollbackRegistration(userId: string, customerId: string) {
+  try {
+    await prisma.$transaction([
+      prisma.customer.delete({ where: { id: customerId } }),
+      prisma.user.delete({ where: { id: userId } }),
+    ]);
+  } catch {
+    // Best-effort: log but don't throw — the caller already has an error to return
+    logger.error('Failed to rollback registration for user', userId);
+  }
+}
 
 export async function POST(req: Request) {
   try {
@@ -30,7 +43,6 @@ export async function POST(req: Request) {
 
     // Normalize phone number
     const normalizedMobile = normalizePhoneNumber(mobile);
-    console.log('📱 Customer mobile normalized:', mobile, '→', normalizedMobile);
 
     // Hash password
     const hashedPassword = await hash(password, 12);
@@ -75,9 +87,6 @@ export async function POST(req: Request) {
     
     // Send email verification code
     try {
-      console.log('📧 Sending customer email verification code...');
-      console.log(`📧 Sending email to: ${result.user.email}`);
-      
       const emailResult = await generateAndSend2FACode({
         userId: result.user.id,
         method: 'email',
@@ -87,12 +96,9 @@ export async function POST(req: Request) {
 
       if (emailResult.success) {
         emailVerificationSent = true;
-        console.log('✅ Customer email verification code sent successfully');
       } else {
-        console.error('❌ Failed to send customer email verification code:', emailResult.message);
-        // If email fails, rollback the transaction
-        await prisma.user.delete({ where: { id: result.user.id } }).catch(() => {});
-        await prisma.customer.delete({ where: { id: result.customer.id } }).catch(() => {});
+        logger.error('Failed to send customer email verification code:', emailResult.message);
+        await rollbackRegistration(result.user.id, result.customer.id);
         return NextResponse.json(
           { 
             message: 'Registration failed: Could not send email verification code. Please ensure your email address is correct and try again.',
@@ -103,10 +109,8 @@ export async function POST(req: Request) {
         );
       }
     } catch (error) {
-      console.error('❌ Error sending customer email verification code:', error);
-      // Rollback on error
-      await prisma.user.delete({ where: { id: result.user.id } }).catch(() => {});
-      await prisma.customer.delete({ where: { id: result.customer.id } }).catch(() => {});
+      logger.error('Error sending customer email verification code:', error);
+      await rollbackRegistration(result.user.id, result.customer.id);
       return NextResponse.json(
         { 
           message: 'Registration failed: Could not send email verification code. Please try again.',
@@ -122,9 +126,6 @@ export async function POST(req: Request) {
     // code are already committed. We continue so the customer can verify via
     // email and retry mobile verification later.
     try {
-      console.log('📱 Sending customer WhatsApp verification code...');
-      console.log(`📱 Sending WhatsApp to: ${normalizedMobile}`);
-
       const whatsappResult = await generateAndSend2FACode({
         userId: result.user.id,
         method: 'whatsapp',
@@ -134,13 +135,12 @@ export async function POST(req: Request) {
 
       if (whatsappResult.success) {
         whatsappVerificationSent = true;
-        console.log('✅ Customer WhatsApp verification code sent successfully');
       } else {
-        console.warn('⚠️ WhatsApp verification failed (non-fatal):', whatsappResult.message);
+        logger.warn('WhatsApp verification failed (non-fatal):', whatsappResult.message);
         // Do not delete the user — email verification is still valid
       }
     } catch (error) {
-      console.warn('⚠️ WhatsApp verification error (non-fatal):', error);
+      logger.warn('WhatsApp verification error (non-fatal):', error);
       // Do not delete the user — email verification is still valid
     }
 
@@ -161,7 +161,7 @@ export async function POST(req: Request) {
       { status: 201 }
     );
   } catch (error: any) {
-    console.error('Customer registration error:', error);
+    logger.error('Customer registration error:', error);
     return NextResponse.json(
       { message: 'Internal server error' },
       { status: 500 }

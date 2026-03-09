@@ -416,9 +416,31 @@ export async function verify2FACode(options: { userId: string; code: string; pur
   try {
     const { userId, code, purpose = 'registration' } = options;
     const key = `2fa:${userId}:${purpose}`;
-    let storedValue: string | null = null;
+    const attemptsKey = `2fa-attempts:${userId}:${purpose}`;
 
     logger.debug(`\n🔑 Verifying 2FA code for key: ${key}`);
+
+    // Brute-force protection: block after 5 failed attempts within the code TTL
+    const MAX_ATTEMPTS = 5;
+    let failedAttempts = 0;
+    if (redis && !redisConnectionFailed) {
+      try {
+        const attempts = await redis.get<number>(attemptsKey);
+        failedAttempts = attempts || 0;
+      } catch {
+        // Fall through to memory check
+      }
+    }
+    if (failedAttempts === 0) {
+      const entry = memoryStore.get(attemptsKey);
+      if (entry && Date.now() < entry.expires) {
+        failedAttempts = parseInt(entry.code) || 0;
+      }
+    }
+    if (failedAttempts >= MAX_ATTEMPTS) {
+      logger.warn(`2FA brute-force protection triggered for user ${userId} (${purpose})`);
+      return false;
+    }
 
     if (redis && !redisConnectionFailed) {
       try {
@@ -445,6 +467,21 @@ export async function verify2FACode(options: { userId: string; code: string; pur
       logger.debug('❌ No verification found');
       return false;
     }
+
+    // Helper: record a failed attempt
+    const recordFailedAttempt = async () => {
+      const newCount = failedAttempts + 1;
+      if (redis && !redisConnectionFailed) {
+        try {
+          await redis.incr(attemptsKey);
+          await redis.expire(attemptsKey, CODE_EXPIRY);
+        } catch {
+          memoryStore.set(attemptsKey, { code: String(newCount), expires: Date.now() + CODE_EXPIRY * 1000 });
+        }
+      } else {
+        memoryStore.set(attemptsKey, { code: String(newCount), expires: Date.now() + CODE_EXPIRY * 1000 });
+      }
+    };
 
     // Vonage Verify flow: stored value is "vonage:REQUEST_ID"
     if (storedValue.startsWith(VONAGE_PREFIX)) {
@@ -480,6 +517,7 @@ export async function verify2FACode(options: { userId: string; code: string; pur
         }
 
         logger.debug(`❌ Vonage Verify failed: ${data['error-text'] || data.status}`);
+        await recordFailedAttempt();
         return false;
       } catch (error) {
         logger.error('❌ Vonage Verify check error:', error);
@@ -499,6 +537,7 @@ export async function verify2FACode(options: { userId: string; code: string; pur
     }
 
     logger.debug(`❌ Code mismatch`);
+    await recordFailedAttempt();
     return false;
   } catch (error) {
     logger.error('❌ Error verifying 2FA code:', error);

@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   let userTenantId = (session?.user as any)?.tenantId as string | undefined;
 
   const { searchParams } = new URL(request.url);
-  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+  const page = Math.max(1, Math.min(500, parseInt(searchParams.get('page') || '1', 10)));
   const limit = Math.max(1, Math.min(100, parseInt(searchParams.get('limit') || '20', 10)));
   const skip = (page - 1) * limit;
 
@@ -307,13 +307,34 @@ export async function POST(request: Request) {
         finalTenantId = cust?.tenantId || undefined;
       }
       if (!finalTenantId && (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN')) {
-        const defaultTenant = await prisma.tenant.findFirst({ where: { name: 'System Default Tenant' } });
-        finalTenantId = defaultTenant?.id;
+        // Fall back to the shared system tenant (canonical name: 'LocalPerks System').
+        // Create it if it doesn't exist — Transaction.tenantId is non-nullable in the schema.
+        let systemTenant = await prisma.tenant.findFirst({ where: { name: 'LocalPerks System' } });
+        if (!systemTenant) {
+          const systemUser = await prisma.user.upsert({
+            where: { email: 'system@localperks.com' },
+            create: {
+              email: 'system@localperks.com',
+              name: 'LocalPerks System',
+              role: 'ADMIN',
+              suspended: false,
+            },
+            update: {},
+          });
+          systemTenant = await prisma.tenant.create({
+            data: {
+              name: 'LocalPerks System',
+              partnerUserId: systemUser.id,
+              mobile: 'N/A',
+            },
+          });
+        }
+        finalTenantId = systemTenant.id;
       }
-      
+
       if (!amount || !resolvedCustomerId || !finalTenantId) {
-        return NextResponse.json({ 
-          error: 'Missing required fields: amount, customerId (or valid customerQRCode). Could not determine tenant.' 
+        return NextResponse.json({
+          error: 'Missing required fields: amount, customerId (or valid customerQRCode). Could not determine tenant.',
         }, { status: 400 });
       }
 

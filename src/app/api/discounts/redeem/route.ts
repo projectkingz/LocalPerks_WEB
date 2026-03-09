@@ -26,8 +26,15 @@ export async function POST(request: Request) {
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : undefined;
     const payload = verifyMobileJwt(token);
     if (payload) {
-      userEmail = payload.email;
-      userRole = (payload as any).role;
+      // Verify current user status from DB — the JWT may be stale
+      const mobileUser = await prisma.user.findUnique({
+        where: { id: payload.sub },
+        select: { suspended: true, approvalStatus: true, email: true, role: true },
+      });
+      if (mobileUser && !mobileUser.suspended && mobileUser.approvalStatus !== 'SUSPENDED') {
+        userEmail = payload.email;
+        userRole = (payload as any).role;
+      }
     }
   }
 
@@ -61,27 +68,8 @@ export async function POST(request: Request) {
     // Get tenant configuration
     const config = await getTenantPointsConfig(customer.tenantId);
     
-    console.log('Discount redemption debug:', {
-      discountAmount,
-      customerEmail: userEmail,
-      customerPointsDB: customer.points,
-      customerPointsCalculated: currentPoints,
-      config: {
-        pointFaceValue: config.pointFaceValue,
-        basePointsPerPound: config.basePointsPerPound,
-      }
-    });
-    
     // Calculate required points
     const requiredPoints = calculatePointsForDiscount(discountAmount, config);
-
-    console.log('Points calculation:', {
-      discountAmount,
-      requiredPoints,
-      calculation: `${discountAmount} / ${config.pointFaceValue} = ${requiredPoints}`,
-      customerHas: currentPoints,
-      sufficient: currentPoints >= requiredPoints
-    });
 
     // Check if customer has enough points (use calculated points)
     if (currentPoints < requiredPoints) {
@@ -135,7 +123,6 @@ export async function POST(request: Request) {
         }
       });
 
-      console.log('Created system tenant:', systemTenant.id);
     }
 
     // Find or create the discount reward for this amount
@@ -145,6 +132,14 @@ export async function POST(request: Request) {
         tenantId: systemTenant.id
       }
     });
+
+    // Ensure the reward template is approved before allowing redemption
+    if (discountReward && discountReward.approvalStatus !== 'APPROVED') {
+      return NextResponse.json(
+        { error: 'Discount reward is not currently available.' },
+        { status: 400 }
+      );
+    }
 
     if (!discountReward) {
       // Create discount reward if it doesn't exist
@@ -165,7 +160,6 @@ export async function POST(request: Request) {
         }
       });
 
-      console.log(`Created discount reward template: £${discountAmount} Discount Voucher`, discountReward.id);
     }
 
     // Get or create user record for the customer
@@ -239,7 +233,10 @@ export async function POST(request: Request) {
       }
       
       if (!isUnique) {
-        throw new Error('Failed to generate unique voucher code after multiple attempts');
+        // All random attempts collided — fall back to a UUID-derived code which is
+        // guaranteed unique within any reasonable dataset.
+        const { v4: uuidv4 } = await import('uuid');
+        voucherCode = uuidv4().replace(/-/g, '').slice(0, 12).toUpperCase();
       }
       
       // Set expiration date to 1 year from now
@@ -397,10 +394,7 @@ export async function POST(request: Request) {
       meta: error?.meta
     });
     return NextResponse.json(
-      { 
-        error: 'Failed to redeem discount',
-        details: process.env.NODE_ENV === 'development' ? error?.message : undefined
-      },
+      { error: 'Failed to redeem discount' },
       { status: 500 }
     );
   }

@@ -132,11 +132,12 @@ export async function POST(request: NextRequest) {
     // For admin users, tenantId is optional (can be null for LocalPerks rewards)
     let finalTenantId = tenantId;
     
-    // Admins can create rewards for any tenant or for LocalPerks (System Default Tenant)
+    // Admins can create rewards for any tenant or for the LocalPerks system tenant.
+    // 'LocalPerks System' is the canonical name used platform-wide — must match
+    // the name used in /api/discounts/redeem to avoid creating duplicate tenants.
     if (!finalTenantId) {
-      // Find or create the System Default Tenant for LocalPerks rewards
       let defaultTenant = await prisma.tenant.findFirst({
-        where: { name: 'System Default Tenant' }
+        where: { name: 'LocalPerks System' }
       });
 
       if (!defaultTenant) {
@@ -154,7 +155,7 @@ export async function POST(request: NextRequest) {
 
         defaultTenant = await prisma.tenant.create({
           data: {
-            name: 'System Default Tenant',
+            name: 'LocalPerks System',
             partnerUserId: systemUser.id,
             mobile: 'N/A',
           },

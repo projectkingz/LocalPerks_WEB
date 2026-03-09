@@ -1,4 +1,3 @@
-import NextAuth from 'next-auth';
 import type { NextAuthOptions } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import Google from 'next-auth/providers/google';
@@ -7,18 +6,7 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma } from '@/lib/prisma';
 import { compare } from 'bcryptjs';
 import { hasPending2FAVerification } from '@/lib/auth/two-factor';
-import { Prisma } from '@prisma/client';
-
-interface UserWithPassword {
-  id: string;
-  email: string;
-  name: string | null;
-  role: string;
-  tenantId: string | null;
-  password: string | null;
-  suspended: boolean;
-  approvalStatus: string;
-}
+import { logger } from '@/lib/logger';
 
 declare module 'next-auth' {
   interface User {
@@ -50,6 +38,7 @@ declare module 'next-auth/jwt' {
     provider?: string;
     suspended: boolean;
     approvalStatus: string;
+    lastRefreshed?: number;
   }
 }
 
@@ -70,39 +59,43 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials, request) {
-        console.log('Starting authorization...');
+        logger.debug('Starting authorization...');
         if (!credentials?.email || !credentials?.password) {
-          console.log('Missing credentials');
+          logger.debug('Missing credentials');
           return null;
         }
 
         try {
-          console.log('Finding user:', credentials.email);
-          // Use raw query to get user with password
-          const users = await prisma.$queryRaw<UserWithPassword[]>`
-            SELECT id, email, name, role, tenantId, password, suspended, approvalStatus
-            FROM User
-            WHERE email = ${credentials.email}
-            LIMIT 1
-          `;
-
-          const user = users[0];
+          logger.debug('Finding user:', credentials.email);
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.email as string },
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              role: true,
+              tenantId: true,
+              password: true,
+              suspended: true,
+              approvalStatus: true,
+            },
+          });
 
           if (!user) {
-            console.log('User not found');
+            logger.debug('User not found');
             return null;
           }
 
-          console.log('User found:', { id: user.id, email: user.email });
+          logger.debug('User found:', { id: user.id, email: user.email });
 
           // For users without a password (e.g., social login), deny credentials login
           if (!user.password) {
-            console.log('User signed up with social login, cannot use email/password');
+            logger.debug('User signed up with social login, cannot use email/password');
             throw new Error('SOCIAL_LOGIN_ONLY');
           }
 
-          console.log('Verifying password...');
-          
+          logger.debug('Verifying password...');
+
           // Check if this is a 2FA bypass (after successful 2FA verification)
           const is2FABypass = credentials.password === '__2FA_VERIFIED__';
           
@@ -113,26 +106,25 @@ export const authOptions: NextAuthOptions = {
             );
 
             if (!isPasswordValid) {
-              console.log('Invalid password');
+              logger.debug('Invalid password');
               return null;
             }
           }
 
-          console.log('Password verified successfully');
+          logger.debug('Password verified successfully');
 
           // Define isSuspended for use in 2FA checks later
           const isSuspended = Boolean(user.suspended);
-          console.log('Suspended check - raw value:', user.suspended, 'converted:', isSuspended, 'approvalStatus:', user.approvalStatus);
 
           // For PARTNERS, check approvalStatus FIRST before checking suspended
           // Partners with PENDING status should be treated as pending, not suspended
           // Note: Email/mobile verification only happens during registration, not login
           if (user.role === 'PARTNER') {
-            console.log('Partner login - checking approvalStatus:', user.approvalStatus);
-            
+            logger.debug('Partner login - checking approvalStatus:', user.approvalStatus);
+
             // Handle pending approval statuses (verification statuses are only for registration)
             if (user.approvalStatus === 'PENDING' || user.approvalStatus === 'PENDING_ADMIN_APPROVAL' || user.approvalStatus === 'UNDER_REVIEW') {
-              console.log('Partner account is pending approval, redirecting to pending-approval page');
+              logger.debug('Partner account is pending approval');
               throw new Error('PENDING_APPROVAL');
             } else if (user.approvalStatus === 'PENDING_PAYMENT') {
               throw new Error('PENDING_PAYMENT');
@@ -142,14 +134,14 @@ export const authOptions: NextAuthOptions = {
             
             // Only check suspended if partner is ACTIVE
             if (isSuspended) {
-              console.log('Partner account is suspended');
+              logger.debug('Partner account is suspended');
               throw new Error('ACCOUNT_SUSPENDED');
             }
           } else {
             // For non-partners, check suspended status first
             if (isSuspended) {
-              console.log('Account is suspended, throwing specific error');
-              
+              logger.debug('Account is suspended, throwing specific error');
+
               // For customers - verification statuses are only for registration, not login
               if (user.role === 'CUSTOMER') {
                 throw new Error('ACCOUNT_SUSPENDED');
@@ -170,26 +162,26 @@ export const authOptions: NextAuthOptions = {
             // Check if 2FA verification is pending
             const has2FA = await hasPending2FAVerification(user.id);
             if (has2FA) {
-              console.log('2FA verification required');
+              logger.debug('2FA verification required');
               throw new Error('2FA_REQUIRED');
             }
 
             // For active partners, require 2FA login
             if (user.role === 'PARTNER' && !isSuspended && user.approvalStatus === 'ACTIVE') {
-              console.log('Partner login - 2FA required');
+              logger.debug('Partner login - 2FA required');
               throw new Error('PARTNER_2FA_REQUIRED');
             }
 
             // For active customers, require 2FA login
             if (user.role === 'CUSTOMER' && !isSuspended && user.approvalStatus === 'ACTIVE') {
-              console.log('Customer login - 2FA required');
+              logger.debug('Customer login - 2FA required');
               throw new Error('CUSTOMER_2FA_REQUIRED');
             }
           } else {
-            console.log('✅ 2FA bypass - already verified');
+            logger.debug('2FA bypass - already verified');
           }
 
-          console.log('Authorization successful');
+          logger.debug('Authorization successful');
           
           // Return user data
           return {
@@ -216,7 +208,7 @@ export const authOptions: NextAuthOptions = {
             throw error;
           }
           // Only log unexpected errors
-          console.error('Error in authorize:', error);
+          logger.error('Error in authorize:', error);
           return null;
         }
       }
@@ -237,24 +229,17 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async signIn({ user, account, profile }) {
-      console.log('SignIn callback - user suspended status:', user.suspended, typeof user.suspended);
-      console.log('SignIn callback - account provider:', account?.provider);
-      console.log('SignIn callback - user email:', user.email);
+      logger.debug('SignIn callback - account provider:', account?.provider);
 
       // For social logins, enforce authentication method consistency
       if (account?.provider !== 'credentials') {
         try {
-          console.log('Processing social login for:', user.email);
-          
+          logger.debug('Processing social login for:', user.email);
+
           const existingUser = await prisma.user.findUnique({
             where: { email: user.email! },
             include: { accounts: true }
           });
-
-          console.log('Existing user found:', !!existingUser);
-          if (existingUser) {
-            console.log('Existing user accounts:', existingUser.accounts.map((acc: any) => acc.provider));
-          }
 
           if (existingUser) {
             // Check if user has a password (email/password signup)
@@ -268,31 +253,25 @@ export const authOptions: NextAuthOptions = {
               (acc: any) => acc.provider === account?.provider
             );
             
-            console.log('User has password:', hasPassword);
-            console.log('User has OAuth accounts:', hasOAuthAccounts);
-            console.log('User has this provider account:', hasThisProviderAccount);
-            
             // If user signed up with email/password, they can't use social login
             if (hasPassword && !hasOAuthAccounts) {
-              console.log('User signed up with email/password, blocking social login');
+              logger.debug('User signed up with email/password, blocking social login');
               return '/auth/signin?error=email_password_only';
             }
             
             // If user signed up with a different social provider, they can't use this one
             if (hasOAuthAccounts && !hasThisProviderAccount) {
-              console.log('User signed up with different social provider, blocking this provider');
+              logger.debug('User signed up with different social provider, blocking this provider');
               return '/auth/signin?error=wrong_social_provider';
             }
             
             // If user has this provider account, allow login
             if (hasThisProviderAccount) {
-              console.log('User has this provider account, allowing login');
               return true;
             }
             
             // If user has no password and no OAuth accounts (edge case), allow linking
             if (!hasPassword && !hasOAuthAccounts && account) {
-              console.log('Linking new OAuth account to existing user');
               await prisma.account.create({
                 data: {
                   userId: existingUser.id,
@@ -316,8 +295,8 @@ export const authOptions: NextAuthOptions = {
                 });
 
                 if (!existingCustomer) {
-                  console.log('Creating customer record for existing CUSTOMER user');
-                  
+                  logger.debug('Creating customer record for existing CUSTOMER user');
+
                   // Generate unique display ID (uses shared client with Accelerate)
                   const { generateUniqueDisplayId } = await import('@/lib/customerId');
                   const displayId = await generateUniqueDisplayId();
@@ -334,17 +313,11 @@ export const authOptions: NextAuthOptions = {
                     }
                   });
                 }
-              } else {
-                console.log(`Skipping customer record creation for existing ${existingUser.role} user:`, existingUser.email);
               }
             }
-          } else if (user.email) {
-            console.log('New user will be created by NextAuth adapter');
-            // Let NextAuth's PrismaAdapter handle user creation
-            // We'll ensure customer record exists in the session callback
           }
         } catch (error) {
-          console.error('Error during social sign in:', error);
+          logger.error('Error during social sign in:', error);
           return false;
         }
       }
@@ -357,9 +330,31 @@ export const authOptions: NextAuthOptions = {
         token.tenantId = user.tenantId;
         token.suspended = user.suspended;
         token.approvalStatus = user.approvalStatus;
+        token.lastRefreshed = Date.now();
       }
       if (account) {
         token.provider = account.provider;
+      }
+      // Refresh suspension/approval status from DB every 60 seconds so
+      // admin actions (suspend, revoke) take effect without requiring re-login.
+      if (token.id && !user) {
+        const now = Date.now();
+        const lastRefreshed = (token.lastRefreshed as number) || 0;
+        if (now - lastRefreshed > 60 * 1000) {
+          try {
+            const freshUser = await prisma.user.findUnique({
+              where: { id: token.id as string },
+              select: { suspended: true, approvalStatus: true },
+            });
+            if (freshUser) {
+              token.suspended = freshUser.suspended;
+              token.approvalStatus = freshUser.approvalStatus;
+              token.lastRefreshed = now;
+            }
+          } catch {
+            // Keep cached values on DB error - fail open
+          }
+        }
       }
       return token;
     },
@@ -380,8 +375,8 @@ export const authOptions: NextAuthOptions = {
             });
 
             if (!existingCustomer) {
-              console.log('Creating customer record for CUSTOMER user in session callback');
-              
+              logger.debug('Creating customer record for CUSTOMER user in session callback');
+
               // Generate unique display ID (uses shared client with Accelerate)
               const { generateUniqueDisplayId } = await import('@/lib/customerId');
               const displayId = await generateUniqueDisplayId();
@@ -398,11 +393,9 @@ export const authOptions: NextAuthOptions = {
                 }
               });
             }
-          } else {
-            console.log(`Skipping customer record creation for ${session.user.role} user:`, session.user.email);
           }
         } catch (error) {
-          console.error('Error ensuring customer record in session callback:', error);
+          logger.error('Error ensuring customer record in session callback:', error);
         }
       }
       return session;

@@ -101,38 +101,9 @@ export async function GET(request: Request) {
       );
     }
 
-    console.log(
-      "Points API - User:",
-      session.user.email,
-      "Current points:",
-      customer.points
-    );
 
-    // Calculate points from approved and void transactions (excluding pending)
-    const transactions = await prisma.transaction.findMany({
-      where: {
-        customerId: customer.id,
-        status: { in: ["APPROVED", "VOID"] },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
-
-    const calculatedPoints = transactions.reduce((total: number, t: any) => {
-      if (t.type === "EARNED" || t.status === "VOID") {
-        return total + t.points;
-      }
-      if (t.type === "SPENT" || t.type === "REFUND") {
-        const delta = t.points <= 0 ? t.points : -t.points;
-        return total + delta;
-      }
-      return total;
-    }, 0);
-
-    // Always use calculated points from transactions
-    // Ensure points never go below 0
-    const finalPoints = Math.max(0, calculatedPoints);
+    // Delegate to the shared utility so the calculation logic lives in one place.
+    const finalPoints = await pointsUtil.calculateCustomerPoints(customer.id);
 
     const response = {
       points: finalPoints,
@@ -212,10 +183,40 @@ export async function POST(request: Request) {
         );
       }
 
-      transactionPoints = -points;
+      // Store SPENT as a positive value — consistent with /api/discounts/redeem.
+      // The reduce in GET (and pointsUtil.calculateCustomerPoints) normalizes sign via
+      // `t.points <= 0 ? t.points : -t.points`, so positive SPENT is handled correctly.
+      transactionPoints = points;
       transactionType = "SPENT";
     } else {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+    }
+
+    // Resolve tenantId — Transaction.tenantId is non-nullable in the schema.
+    // Fall back to the system tenant if the customer has no tenant assignment.
+    let transactionTenantId = customer.tenantId;
+    if (!transactionTenantId) {
+      let systemTenant = await prisma.tenant.findFirst({ where: { name: 'LocalPerks System' } });
+      if (!systemTenant) {
+        const systemUser = await prisma.user.upsert({
+          where: { email: 'system@localperks.com' },
+          create: {
+            email: 'system@localperks.com',
+            name: 'LocalPerks System',
+            role: 'ADMIN',
+            suspended: false,
+          },
+          update: {},
+        });
+        systemTenant = await prisma.tenant.create({
+          data: {
+            name: 'LocalPerks System',
+            partnerUserId: systemUser.id,
+            mobile: 'N/A',
+          },
+        });
+      }
+      transactionTenantId = systemTenant.id;
     }
 
     // Create a transaction record instead of updating customer points directly
@@ -227,7 +228,7 @@ export async function POST(request: Request) {
         status: "APPROVED",
         userId: userId,
         customerId: customer.id,
-        tenantId: customer.tenantId,
+        tenantId: transactionTenantId,
       },
     });
 

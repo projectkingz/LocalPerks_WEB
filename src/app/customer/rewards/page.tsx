@@ -440,7 +440,7 @@ export default function RewardsPage() {
                     style={{ backgroundColor: colors.light }}
                   >
                     <p className="text-sm font-semibold" style={{ color: colors.primary }}>
-                      Redeem At: {reward.tenant?.name === 'LocalPerks System' || reward.tenant?.name === 'System Default Tenant'
+                      Redeem At: {reward.tenant?.name === 'LocalPerks System'
                         ? 'Any LocalPerks Partner'
                         : (reward.tenant?.name || 'Unknown Business')}
                     </p>

@@ -43,23 +43,25 @@ export async function PATCH(
       }
     }
 
-    // For partners stuck in verification states, handle them appropriately
+    // For partners stuck in verification states, handle them appropriately.
+    // We intentionally do NOT set emailVerified here — the approvalStatus change
+    // to ACTIVE is sufficient for login (credentials flow checks approvalStatus,
+    // not emailVerified). Setting emailVerified without actual email confirmation
+    // would be a security bypass.
     let updateData: any = {
       approvalStatus,
       suspended: approvalStatus === 'ACTIVE' ? false : true
     };
 
-    // If partner is stuck at email verification and we're approving them, mark email as verified
-    if (targetUser.role === 'PARTNER' && 
-        targetUser.approvalStatus === 'PENDING_EMAIL_VERIFICATION' && 
+    if (targetUser.role === 'PARTNER' &&
+        targetUser.approvalStatus === 'PENDING_EMAIL_VERIFICATION' &&
         approvalStatus === 'ACTIVE') {
-      updateData.emailVerified = new Date();
-      console.log(`[Admin Approve] Partner ${targetUser.email} was stuck at email verification, marking email as verified`);
+      console.log(`[Admin Approve] Admin override: Partner ${targetUser.email} approved from PENDING_EMAIL_VERIFICATION without email confirmation`);
     }
 
     // If partner is stuck at mobile verification and we're approving them, skip to ACTIVE
-    if (targetUser.role === 'PARTNER' && 
-        targetUser.approvalStatus === 'PENDING_MOBILE_VERIFICATION' && 
+    if (targetUser.role === 'PARTNER' &&
+        targetUser.approvalStatus === 'PENDING_MOBILE_VERIFICATION' &&
         approvalStatus === 'ACTIVE') {
       console.log(`[Admin Approve] Partner ${targetUser.email} was stuck at mobile verification, approving directly`);
     }

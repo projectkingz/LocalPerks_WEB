@@ -152,15 +152,15 @@ export async function POST(request: Request) {
     }
 
     const [sender, recipient] = await Promise.all([
-      prisma.user.findUnique({ where: { id: senderId } }),
-      prisma.user.findUnique({ where: { id: finalRecipientId } }),
+      prisma.user.findUnique({ where: { id: senderId }, select: { id: true, role: true } }),
+      prisma.user.findUnique({ where: { id: finalRecipientId }, select: { id: true, role: true } }),
     ]);
 
-    if (!sender || !recipient) {
-      return NextResponse.json(
-        { error: 'Sender or recipient not found' },
-        { status: 404 },
-      );
+    if (!sender) {
+      return NextResponse.json({ error: 'Sender account not found' }, { status: 404 });
+    }
+    if (!recipient) {
+      return NextResponse.json({ error: 'Recipient not found' }, { status: 404 });
     }
 
     if (!canSendMessage(sender.role as Role, recipient.role as Role)) {
@@ -170,20 +170,36 @@ export async function POST(request: Request) {
       );
     }
 
-    const message = await prisma.message.create({
-      data: {
-        senderId,
-        recipientId: finalRecipientId,
-        content,
-        attachmentUrl,
-        attachmentName,
-        attachmentMimeType,
-        attachmentSize,
-      },
+    // Use a transaction to atomically re-verify both users still exist at write time.
+    // The Message model has no DB-level FK constraints, so without this check a
+    // deleted user between the lookup above and the create below would create an
+    // orphaned record.
+    const message = await prisma.$transaction(async (tx) => {
+      const [senderCheck, recipientCheck] = await Promise.all([
+        tx.user.findUnique({ where: { id: senderId }, select: { id: true } }),
+        tx.user.findUnique({ where: { id: finalRecipientId }, select: { id: true } }),
+      ]);
+      if (!senderCheck || !recipientCheck) {
+        throw Object.assign(new Error('User deleted during message send'), { code: 'USER_DELETED' });
+      }
+      return tx.message.create({
+        data: {
+          senderId,
+          recipientId: finalRecipientId,
+          content,
+          attachmentUrl,
+          attachmentName,
+          attachmentMimeType,
+          attachmentSize,
+        },
+      });
     });
 
     return NextResponse.json({ message }, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.code === 'USER_DELETED') {
+      return NextResponse.json({ error: 'Recipient no longer exists' }, { status: 404 });
+    }
     return NextResponse.json(
       { error: 'Failed to send message' },
       { status: 500 },

@@ -52,16 +52,18 @@ export async function POST(req: Request) {
       // Generate unique display ID
       const displayId = await generateUniqueDisplayId(tx as any);
       
-      // Create customer with mobile number and display ID
+      // Create customer with mobile number and display ID.
+      // tenantId is intentionally null — customers are not tied to a single
+      // tenant and can transact with any partner business.
       const customer = await tx.customer.create({
         data: {
           name: user.name || '',
           email: user.email,
           points: 0,
-          tenantId: 'default', // You might want to make this configurable
+          tenantId: null,
           mobile: normalizedMobile,
           displayId: displayId,
-        } as any,
+        },
       });
 
       return { user, customer };
@@ -115,11 +117,14 @@ export async function POST(req: Request) {
       );
     }
 
-    // Send WhatsApp verification code
+    // Send WhatsApp verification code.
+    // A WhatsApp failure is non-fatal: the user account and email verification
+    // code are already committed. We continue so the customer can verify via
+    // email and retry mobile verification later.
     try {
       console.log('📱 Sending customer WhatsApp verification code...');
       console.log(`📱 Sending WhatsApp to: ${normalizedMobile}`);
-      
+
       const whatsappResult = await generateAndSend2FACode({
         userId: result.user.id,
         method: 'whatsapp',
@@ -131,32 +136,12 @@ export async function POST(req: Request) {
         whatsappVerificationSent = true;
         console.log('✅ Customer WhatsApp verification code sent successfully');
       } else {
-        console.error('❌ Failed to send customer WhatsApp verification code:', whatsappResult.message);
-        // If WhatsApp fails, rollback the transaction
-        await prisma.user.delete({ where: { id: result.user.id } }).catch(() => {});
-        await prisma.customer.delete({ where: { id: result.customer.id } }).catch(() => {});
-        return NextResponse.json(
-          { 
-            message: 'Registration failed: Could not send WhatsApp verification code. Please ensure your mobile number is correct and try again.',
-            requiresMobileVerification: false,
-            whatsappVerificationSent: false,
-          },
-          { status: 500 }
-        );
+        console.warn('⚠️ WhatsApp verification failed (non-fatal):', whatsappResult.message);
+        // Do not delete the user — email verification is still valid
       }
     } catch (error) {
-      console.error('❌ Error sending customer WhatsApp verification code:', error);
-      // Rollback on error
-      await prisma.user.delete({ where: { id: result.user.id } }).catch(() => {});
-      await prisma.customer.delete({ where: { id: result.customer.id } }).catch(() => {});
-      return NextResponse.json(
-        { 
-          message: 'Registration failed: Could not send WhatsApp verification code. Please try again.',
-          requiresMobileVerification: false,
-          whatsappVerificationSent: false,
-        },
-        { status: 500 }
-      );
+      console.warn('⚠️ WhatsApp verification error (non-fatal):', error);
+      // Do not delete the user — email verification is still valid
     }
 
     return NextResponse.json(

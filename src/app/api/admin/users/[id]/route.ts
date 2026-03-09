@@ -48,6 +48,22 @@ export async function PATCH(
     return NextResponse.json({ message: 'Only Super Admins can change passwords' }, { status: 403 });
   }
 
+  // Validate email format if being changed
+  if (data.email !== undefined) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(data.email)) {
+      return NextResponse.json({ message: 'Invalid email format' }, { status: 400 });
+    }
+    // Check the new email is not already taken by another user
+    const conflict = await prisma.user.findFirst({
+      where: { email: data.email, NOT: { id: params.id } },
+      select: { id: true },
+    });
+    if (conflict) {
+      return NextResponse.json({ message: 'Email already in use by another account' }, { status: 409 });
+    }
+  }
+
   try {
     // Prepare update data
     const updateData: any = {

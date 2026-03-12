@@ -8,9 +8,7 @@ html {
 }
 
 :root {
-  --font-roboto: 'Roboto', sans-serif;
-  --font-roboto-mono: 'Roboto Mono', monospace;
-  --font-fira-sans: var(--font-fira-sans), 'Fira Sans', sans-serif;
+  --font-inter: 'Inter', sans-serif;
   --font-size-display: clamp(2.25rem, 4vw, 3rem);
   --font-size-heading: 1.5rem;
   --font-size-subheading: 1.125rem;
@@ -20,7 +18,7 @@ html {
 }
 
 body {
-  font-family: var(--font-roboto), sans-serif;
+  font-family: var(--font-inter), sans-serif;
 }
 
 @layer utilities {

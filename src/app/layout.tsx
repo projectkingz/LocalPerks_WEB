@@ -1,29 +1,13 @@
-import { Roboto, Roboto_Mono, Fira_Sans } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import './globals.css';
 import Providers from './providers';
 
-const roboto = Roboto({ 
+const inter = Inter({
   subsets: ['latin'],
-  variable: '--font-roboto',
-  weight: ['300', '400', '500', '700', '900'],
+  variable: '--font-inter',
+  weight: ['300', '400', '500', '600', '700', '900'],
   display: 'swap',
-  fallback: ['system-ui', 'arial']
-});
-
-const robotoMono = Roboto_Mono({ 
-  subsets: ['latin'],
-  variable: '--font-roboto-mono',
-  weight: ['300', '400', '500', '600', '700'],
-  display: 'swap',
-  fallback: ['Courier New', 'monospace']
-});
-
-const firaSans = Fira_Sans({ 
-  subsets: ['latin'],
-  variable: '--font-fira-sans',
-  weight: ['300', '400', '500', '600', '700'],
-  display: 'swap',
-  fallback: ['system-ui', 'arial']
+  fallback: ['system-ui', 'arial'],
 });
 
 export const metadata = {
@@ -37,8 +21,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${roboto.variable} ${robotoMono.variable} ${firaSans.variable}`}>
-      <body className={roboto.className}>
+    <html lang="en" className={inter.variable}>
+      <body className={inter.className}>
         <Providers>
           {children}
         </Providers>

@@ -32,8 +32,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
     }
 
-    // Check and update any expired vouchers first
-    await checkAndUpdateExpiredVouchers();
+    // Check and update any expired vouchers (non-fatal if it fails)
+    try {
+      await checkAndUpdateExpiredVouchers();
+    } catch (e) {
+      console.warn('checkAndUpdateExpiredVouchers failed (non-fatal):', e);
+    }
 
     // Get actual vouchers for this customer
     const vouchers = await prisma.voucher.findMany({
@@ -51,16 +55,9 @@ export async function GET(request: NextRequest) {
             id: true,
             name: true,
             description: true,
-            points: true,
+            discountPercentage: true,
           }
         },
-        redemption: {
-          select: {
-            id: true,
-            points: true,
-            createdAt: true,
-          }
-        }
       },
       orderBy: {
         createdAt: 'desc'
@@ -79,18 +76,13 @@ export async function GET(request: NextRequest) {
         id: voucher.reward.id,
         title: voucher.reward.name,
         description: voucher.reward.description,
-        points: voucher.reward.points,
+        discountPercentage: voucher.reward.discountPercentage,
       },
       customer: {
         id: voucher.customer.id,
         name: voucher.customer.name,
         email: voucher.customer.email,
       },
-      redemption: voucher.redemption ? {
-        id: voucher.redemption.id,
-        points: voucher.redemption.points,
-        createdAt: voucher.redemption.createdAt.toISOString(),
-      } : null,
     }));
 
     return NextResponse.json({

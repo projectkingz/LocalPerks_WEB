@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     // Get all available rewards from all tenants (no tenant filtering for customers)
     const rewards = await prisma.reward.findMany({
       orderBy: {
-        points: "asc", // points field, not pointsRequired
+        createdAt: "desc",
       },
       include: {
         tenant: {
@@ -91,11 +91,13 @@ export async function GET(request: NextRequest) {
     // Format rewards for mobile
     const formattedRewards = rewards.map((reward: any) => ({
       id: reward.id,
-      title: reward.name, // name field in schema
+      title: reward.name,
       description: reward.description,
-      pointsRequired: reward.points, // points field in schema
+      discountPercentage: reward.discountPercentage,
       merchant: reward.tenant?.name || 'LocalPerks',
-      canRedeem: currentPoints >= reward.points,
+      canRedeem: true,
+      validFrom: reward.validFrom?.toISOString() ?? null,
+      validTo: reward.validTo?.toISOString() ?? null,
       createdAt: reward.createdAt.toISOString(),
       tenant: {
         id: reward.tenant?.id,
